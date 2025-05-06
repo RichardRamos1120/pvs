@@ -94,7 +94,7 @@ const Reports = () => {
     };
     
     fetchData();
-  }, [auth, firestoreOperations, selectedStation]);
+  }, [auth, firestoreOperations]);
   
   // Handle station filter change
   const handleStationFilterChange = async (stationName) => {

@@ -67,8 +67,10 @@ const Dashboard = () => {
                 const profile = await firestoreOperations.getUserProfile(user.uid);
                 setUserProfile(profile);
 
-                // Set selected station based on user profile
-                if (profile && profile.station) {
+                // FIXED: Only set station from profile if user hasn't manually selected one
+                // This is the key fix - we only set the station from the profile if there's
+                // no existing selectedStation in localStorage
+                if (profile && profile.station && !localStorage.getItem('selectedStation')) {
                     handleStationChange(profile.station);
                 }
 
@@ -85,7 +87,7 @@ const Dashboard = () => {
         };
 
         fetchData();
-    }, [auth, firestoreOperations, selectedStation]);
+    }, [auth, firestoreOperations]); // Removed selectedStation from dependencies to prevent update loops
 
     // Create new log
     const createNewLog = () => {
@@ -446,16 +448,6 @@ const Dashboard = () => {
                             <FileText className="h-8 w-8 text-green-600 dark:text-green-400 mb-2" />
                             <span className="text-sm font-medium">All Reports</span>
                         </button>
-{/* 
-                        <button className="flex flex-col items-center justify-center p-4 bg-purple-50 dark:bg-purple-900/20 rounded-lg hover:bg-purple-100 dark:hover:bg-purple-900/30 transition-colors">
-                            <Truck className="h-8 w-8 text-purple-600 dark:text-purple-400 mb-2" />
-                            <span className="text-sm font-medium">Equipment</span>
-                        </button> */}
-
-                        {/* <button className="flex flex-col items-center justify-center p-4 bg-indigo-50 dark:bg-indigo-900/20 rounded-lg hover:bg-indigo-100 dark:hover:bg-indigo-900/30 transition-colors">
-                            <Clipboard className="h-8 w-8 text-indigo-600 dark:text-indigo-400 mb-2" />
-                            <span className="text-sm font-medium">Training</span>
-                        </button> */}
                     </div>
                 </div>
             </div>
