@@ -32,7 +32,18 @@ const TodayLog = () => {
   // Initialize darkMode from localStorage with default to true (dark mode)
   const [darkMode, setDarkMode] = useState(() => {
     const savedMode = localStorage.getItem('darkMode');
-    return savedMode !== null ? savedMode === 'true' : true; // Default to true (dark mode)
+    const isDarkMode = savedMode !== null ? savedMode === 'true' : true; // Default to true (dark mode)
+
+    // Apply dark mode class to HTML element for Tailwind
+    if (isDarkMode) {
+      document.documentElement.classList.add('dark');
+      document.body.classList.add('dark-mode');
+    } else {
+      document.documentElement.classList.remove('dark');
+      document.body.classList.remove('dark-mode');
+    }
+
+    return isDarkMode;
   });
 
   // Initialize selectedStation from localStorage
@@ -54,6 +65,13 @@ const TodayLog = () => {
   const [unsavedChanges, setUnsavedChanges] = useState(false);
   // Add state for success notification
   const [saveSuccess, setSaveSuccess] = useState(false);
+  // States for crew management
+  const [showCrewModal, setShowCrewModal] = useState(false);
+  const [availableFirefighters, setAvailableFirefighters] = useState([]);
+  const [filteredFirefighters, setFilteredFirefighters] = useState([]);
+  const [selectedCrew, setSelectedCrew] = useState([]);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [stationFilter, setStationFilter] = useState('all');
 
   const navigate = useNavigate();
   const location = useLocation();
@@ -65,6 +83,15 @@ const TodayLog = () => {
   const handleDarkModeChange = (mode) => {
     setDarkMode(mode);
     localStorage.setItem('darkMode', mode.toString());
+
+    // Apply dark mode class to HTML element for Tailwind
+    if (mode) {
+      document.documentElement.classList.add('dark');
+      document.body.classList.add('dark-mode');
+    } else {
+      document.documentElement.classList.remove('dark');
+      document.body.classList.remove('dark-mode');
+    }
   };
 
   const handleStationChange = (station) => {
@@ -149,8 +176,51 @@ const TodayLog = () => {
     if (todayLog) {
       setLocalNotes(todayLog.notes || '');
       setUnsavedChanges(false);
+      // Initialize selected crew from todayLog
+      setSelectedCrew(todayLog.crew || []);
     }
   }, [todayLog]);
+
+  // Load firefighters when crew modal is opened
+  useEffect(() => {
+    if (showCrewModal) {
+      const fetchFirefighters = async () => {
+        try {
+          // Get all firefighters by role without station filter
+          const firefighters = await firestoreOperations.getUsersByRole('firefighter');
+          setAvailableFirefighters(firefighters);
+          setFilteredFirefighters(firefighters);
+        } catch (error) {
+          console.error("Error fetching firefighters:", error);
+        }
+      };
+
+      fetchFirefighters();
+    }
+  }, [showCrewModal, firestoreOperations]);
+
+  // Filter firefighters based on search term and station filter
+  useEffect(() => {
+    if (!availableFirefighters.length) return;
+
+    let filtered = [...availableFirefighters];
+
+    // Apply station filter if not 'all'
+    if (stationFilter !== 'all') {
+      filtered = filtered.filter(f => f.station === stationFilter);
+    }
+
+    // Apply search term filter
+    if (searchTerm.trim()) {
+      const search = searchTerm.toLowerCase();
+      filtered = filtered.filter(f =>
+        f.displayName?.toLowerCase().includes(search) ||
+        f.email?.toLowerCase().includes(search)
+      );
+    }
+
+    setFilteredFirefighters(filtered);
+  }, [availableFirefighters, searchTerm, stationFilter]);
 
   // Effect to auto-hide success message after 2 seconds
   useEffect(() => {
@@ -439,6 +509,41 @@ const TodayLog = () => {
     } catch (error) {
       console.error("Error updating notes:", error);
       setError("Failed to update notes: " + error.message);
+    }
+  };
+
+  // Update crew members
+  const updateCrew = async (crew) => {
+    // Check permission before allowing edit
+    if (readOnlyMode) {
+      setError("You don't have permission to update crew");
+      return;
+    }
+
+    if (!todayLog) return;
+
+    try {
+      console.log("Updating crew members");
+      const updatedLog = {
+        ...todayLog,
+        crew
+      };
+
+      // Update in Firestore
+      await firestoreOperations.updateLog(todayLog.id, updatedLog);
+
+      // Update local state
+      setTodayLog(updatedLog);
+      console.log("Crew updated successfully");
+
+      // Close the modal
+      setShowCrewModal(false);
+
+      // Show success notification
+      setSaveSuccess(true);
+    } catch (error) {
+      console.error("Error updating crew:", error);
+      setError("Failed to update crew: " + error.message);
     }
   };
 
@@ -826,7 +931,18 @@ const TodayLog = () => {
                 </div>
 
                 <div className="md:w-1/2 md:pl-4">
-                  <h4 className="font-medium mb-2 text-gray-900 dark:text-white">Crew on Duty</h4>
+                  <div className="flex justify-between items-center mb-2">
+                    <h4 className="font-medium text-gray-900 dark:text-white">Crew on Duty</h4>
+                    {todayLog.status !== 'complete' && !readOnlyMode && (
+                      <button
+                        onClick={() => setShowCrewModal(true)}
+                        className="text-sm text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300 flex items-center"
+                      >
+                        <Users className="h-3 w-3 mr-1" />
+                        Edit Crew
+                      </button>
+                    )}
+                  </div>
                   <div className="flex flex-wrap gap-2">
                     {todayLog.crew && todayLog.crew.length > 0 ? (
                       todayLog.crew.map((member, idx) => (
@@ -877,6 +993,171 @@ const TodayLog = () => {
           onAddActivity={addNewActivity}
           darkMode={darkMode}
         />
+
+        {/* Crew Selection Modal */}
+        {showCrewModal && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4 overflow-y-auto">
+            <div className={`${darkMode ? 'bg-gray-800' : 'bg-white'} rounded-lg shadow-lg w-full max-w-lg my-8 max-h-[90vh] overflow-y-auto`}>
+              <div className={`px-6 py-4 border-b ${darkMode ? 'border-gray-700' : 'border-gray-200'} flex justify-between items-center`}>
+                <h2 className={`text-xl font-bold ${darkMode ? 'text-white' : 'text-gray-900'}`}>Select Crew on Duty</h2>
+                <button
+                  onClick={() => setShowCrewModal(false)}
+                  className={`${darkMode ? 'text-gray-300 hover:text-gray-100' : 'text-gray-500 hover:text-gray-700'}`}
+                >
+                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
+
+              <div className="px-6 py-4">
+                <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
+                  Select the firefighters that are on duty today.
+                </p>
+
+                {/* Search and filter area */}
+                <div className="mb-4 flex flex-col sm:flex-row gap-3">
+                  {/* Search input */}
+                  <div className="relative flex-grow">
+                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                      <svg className="h-5 w-5 text-gray-400" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                        <path fillRule="evenodd" d="M8 4a4 4 0 100 8 4 4 0 000-8zM2 8a6 6 0 1110.89 3.476l4.817 4.817a1 1 0 01-1.414 1.414l-4.816-4.816A6 6 0 012 8z" clipRule="evenodd" />
+                      </svg>
+                    </div>
+                    <input
+                      type="text"
+                      className="block w-full pl-10 pr-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md leading-5 bg-white dark:bg-gray-700 text-gray-800 dark:text-white placeholder-gray-500 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+                      placeholder="Search by name or email..."
+                      value={searchTerm}
+                      onChange={(e) => setSearchTerm(e.target.value)}
+                    />
+                  </div>
+
+                  {/* Station filter dropdown */}
+                  <div className="w-full sm:w-auto">
+                    <select
+                      className="block w-full border border-gray-300 dark:border-gray-600 rounded-md px-3 py-2 bg-white dark:bg-gray-700 text-gray-800 dark:text-gray-100 sm:text-sm"
+                      value={stationFilter}
+                      onChange={(e) => setStationFilter(e.target.value)}
+                    >
+                      <option value="all">All Stations</option>
+                      <option value={selectedStation}>Current Station ({selectedStation})</option>
+                      <option value="Station 1">Station 1</option>
+                      <option value="Station 4">Station 4</option>
+                      <option value="Station 7">Station 7</option>
+                      <option value="Station 10">Station 10</option>
+                      <option value="Station 11">Station 11</option>
+                      <option value="Station 14">Station 14</option>
+                      <option value="Station 23">Station 23</option>
+                    </select>
+                  </div>
+                </div>
+
+                {availableFirefighters.length === 0 ? (
+                  <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-700 rounded-md p-4 mb-4">
+                    <div className="flex">
+                      <div className="flex-shrink-0">
+                        <svg className="h-5 w-5 text-yellow-400" viewBox="0 0 20 20" fill="currentColor">
+                          <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+                        </svg>
+                      </div>
+                      <div className="ml-3">
+                        <h3 className="text-sm font-medium text-yellow-800 dark:text-yellow-300">No firefighters found</h3>
+                        <div className="mt-2 text-sm text-yellow-700 dark:text-yellow-400">
+                          <p>
+                            No users with the firefighter role found in the system.
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                ) : filteredFirefighters.length === 0 ? (
+                  <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-700 rounded-md p-4 mb-4">
+                    <div className="flex">
+                      <div className="flex-shrink-0">
+                        <svg className="h-5 w-5 text-yellow-400" viewBox="0 0 20 20" fill="currentColor">
+                          <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+                        </svg>
+                      </div>
+                      <div className="ml-3">
+                        <h3 className="text-sm font-medium text-yellow-800 dark:text-yellow-300">No matches found</h3>
+                        <div className="mt-2 text-sm text-yellow-700 dark:text-yellow-400">
+                          <p>
+                            No firefighters match your search criteria. Try adjusting your filters.
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="mb-4">
+                    <div className="max-h-60 overflow-y-auto border border-gray-200 dark:border-gray-700 rounded-md">
+                      {filteredFirefighters.map((firefighter) => (
+                        <div
+                          key={firefighter.id}
+                          className={`flex items-center p-3 border-b border-gray-200 dark:border-gray-700 last:border-0 hover:bg-gray-50 dark:hover:bg-gray-750 ${
+                            selectedCrew.includes(firefighter.displayName) ? 'bg-blue-50 dark:bg-blue-900/20' : ''
+                          }`}
+                        >
+                          <input
+                            type="checkbox"
+                            id={`firefighter-${firefighter.id}`}
+                            checked={selectedCrew.includes(firefighter.displayName)}
+                            onChange={(e) => {
+                              if (e.target.checked) {
+                                setSelectedCrew([...selectedCrew, firefighter.displayName]);
+                              } else {
+                                setSelectedCrew(selectedCrew.filter(name => name !== firefighter.displayName));
+                              }
+                            }}
+                            className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                          />
+                          <label
+                            htmlFor={`firefighter-${firefighter.id}`}
+                            className="ml-3 block text-gray-900 dark:text-white cursor-pointer w-full"
+                          >
+                            <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center">
+                              <div>
+                                {firefighter.displayName}
+                                <p className="text-sm text-gray-500 dark:text-gray-400">
+                                  {firefighter.email}
+                                </p>
+                              </div>
+                              {firefighter.station && (
+                                <span className="text-xs text-gray-500 dark:text-gray-400 bg-gray-100 dark:bg-gray-700 px-2 py-1 rounded mt-1 sm:mt-0">
+                                  {firefighter.station}
+                                </span>
+                              )}
+                            </div>
+                          </label>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                <div className="flex justify-end space-x-3 mt-6">
+                  <button
+                    onClick={() => setShowCrewModal(false)}
+                    className={`px-4 py-2 border rounded-md text-sm font-medium ${
+                      darkMode
+                        ? 'border-gray-600 text-gray-200 hover:bg-gray-700'
+                        : 'border-gray-300 text-gray-700 hover:bg-gray-50'
+                    }`}
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={() => updateCrew(selectedCrew)}
+                    className="px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+                  >
+                    Save Crew
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </Layout>
   );

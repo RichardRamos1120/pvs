@@ -28,9 +28,13 @@ const Layout = ({ children, darkMode, setDarkMode, selectedStation, setSelectedS
     setDarkMode(!darkMode);
     if (!darkMode) {
       document.body.classList.add('dark-mode');
+      document.documentElement.classList.add('dark'); // For Tailwind dark mode
     } else {
       document.body.classList.remove('dark-mode');
+      document.documentElement.classList.remove('dark'); // For Tailwind dark mode
     }
+    // Save to localStorage
+    localStorage.setItem('darkMode', (!darkMode).toString());
   };
   
   // Handle logout
@@ -63,15 +67,22 @@ const Layout = ({ children, darkMode, setDarkMode, selectedStation, setSelectedS
             </div>
             
             <div className="hidden md:flex items-center space-x-6">
-              <select 
-                className={`${darkMode ? 'bg-gray-700' : 'bg-blue-700'} text-white rounded-md px-3 py-1 text-sm border-none focus:ring-2 focus:ring-blue-400 min-w-[120px]`}
-                value={selectedStation}
-                onChange={(e) => setSelectedStation(e.target.value)}
-              >
-                {stations.map(station => (
-                  <option key={station} value={station}>{station}</option>
-                ))}
-              </select>
+              {/* Station selector - disabled on Reports pages */}
+              {location.pathname === '/reports' || location.pathname.startsWith('/report/') ? (
+                <div className={`${darkMode ? 'bg-gray-700' : 'bg-blue-700'} text-white rounded-md px-3 py-1 text-sm min-w-[120px] opacity-50`}>
+                  {selectedStation}
+                </div>
+              ) : (
+                <select
+                  className={`${darkMode ? 'bg-gray-700' : 'bg-blue-700'} text-white rounded-md px-3 py-1 text-sm border-none focus:ring-2 focus:ring-blue-400 min-w-[120px]`}
+                  value={selectedStation}
+                  onChange={(e) => setSelectedStation(e.target.value)}
+                >
+                  {stations.map(station => (
+                    <option key={station} value={station}>{station}</option>
+                  ))}
+                </select>
+              )}
               
               <div className="text-sm flex items-center whitespace-nowrap">
                 <Calendar className="w-4 h-4 mr-1 flex-shrink-0" />
@@ -140,18 +151,26 @@ const Layout = ({ children, darkMode, setDarkMode, selectedStation, setSelectedS
                 <span>{auth.currentUser?.displayName || 'Captain'}</span>
               </div>
               
-              <select 
-                className={`w-full ${darkMode ? 'bg-gray-700' : 'bg-blue-700'} text-white rounded-md px-3 py-2 text-sm border-none focus:ring-2 focus:ring-blue-400 mb-2`}
-                value={selectedStation}
-                onChange={(e) => {
-                  setSelectedStation(e.target.value);
-                  setMenuOpen(false);
-                }}
-              >
-                {stations.map(station => (
-                  <option key={station} value={station}>{station}</option>
-                ))}
-              </select>
+              {/* Mobile station selector - disabled on Reports pages */}
+              {location.pathname === '/reports' || location.pathname.startsWith('/report/') ? (
+                <div className={`w-full ${darkMode ? 'bg-gray-700' : 'bg-blue-700'} text-white rounded-md px-3 py-2 text-sm mb-2 opacity-50 flex items-center`}>
+                  <span>Station: </span>
+                  <span className="ml-2 font-medium">{selectedStation}</span>
+                </div>
+              ) : (
+                <select
+                  className={`w-full ${darkMode ? 'bg-gray-700' : 'bg-blue-700'} text-white rounded-md px-3 py-2 text-sm border-none focus:ring-2 focus:ring-blue-400 mb-2`}
+                  value={selectedStation}
+                  onChange={(e) => {
+                    setSelectedStation(e.target.value);
+                    setMenuOpen(false);
+                  }}
+                >
+                  {stations.map(station => (
+                    <option key={station} value={station}>{station}</option>
+                  ))}
+                </select>
+              )}
               
               <div className="flex flex-col space-y-2">
                 <button

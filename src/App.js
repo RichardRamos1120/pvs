@@ -12,6 +12,20 @@ import Login from './components/Login';
 import Signup from './components/Signup';
 import './App.css';
 
+// Initialize dark mode on app load
+(() => {
+  const savedMode = localStorage.getItem('darkMode');
+  const isDarkMode = savedMode !== null ? savedMode === 'true' : true; // Default to true (dark mode)
+
+  if (isDarkMode) {
+    document.documentElement.classList.add('dark');
+    document.body.classList.add('dark-mode');
+  } else {
+    document.documentElement.classList.remove('dark');
+    document.body.classList.remove('dark-mode');
+  }
+})();
+
 // Firebase configuration
 const firebaseConfig = {
   apiKey: "AIzaSyDk6-WRfKSXei7T7YYJQpJ40mFEPno8rQ0",
@@ -299,6 +313,35 @@ const App = () => {
       } catch (error) {
         console.error("Error deleting log:", error);
         return false;
+      }
+    },
+
+    // Get users by role
+    getUsersByRole: async (role, stationFilter = null) => {
+      try {
+        const usersRef = collection(db, "users");
+        let q;
+
+        if (stationFilter) {
+          // Filter by role and station
+          q = query(usersRef,
+            where("role", "==", role),
+            where("station", "==", stationFilter)
+          );
+        } else {
+          // Filter by role only
+          q = query(usersRef, where("role", "==", role));
+        }
+
+        const snapshot = await getDocs(q);
+        const usersList = snapshot.docs.map(doc => ({
+          id: doc.id,
+          ...doc.data()
+        }));
+        return usersList;
+      } catch (error) {
+        console.error("Error getting users by role:", error);
+        return [];
       }
     }
   };

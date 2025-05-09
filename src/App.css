@@ -14,10 +14,10 @@ body {
   color: #1f2937;
 }
 
-/* Dark mode */
+/* Dark mode - Improved text color for better readability */
 body.dark-mode {
   background-color: #111827;
-  color: #959595;
+  color: #e5e7eb; /* Brighter text for better readability */
 }
 
 /* Loading indicator */
@@ -43,14 +43,25 @@ input, textarea, select {
   border-radius: 0.375rem;
   background-color: #ffffff;
   font-size: 0.875rem;
+  color: #1f2937; /* Ensure consistent text color in light mode */
 }
 
 body.dark-mode input,
 body.dark-mode textarea,
-body.dark-mode select {
+body.dark-mode select,
+.dark input,
+.dark textarea,
+.dark select {
   background-color: #374151;
   border-color: #4b5563;
   color: #f9fafb;
+}
+
+/* Ensure form focus states are visible in both modes */
+input:focus, textarea:focus, select:focus {
+  outline: none;
+  box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.5);
+  border-color: #3b82f6;
 }
 
 /* Placeholder text */
@@ -60,8 +71,10 @@ textarea::placeholder {
 }
 
 body.dark-mode input::placeholder,
-body.dark-mode textarea::placeholder {
-  color: #6b7280;
+body.dark-mode textarea::placeholder,
+.dark input::placeholder,
+.dark textarea::placeholder {
+  color: #6b7280; /* Increased contrast in dark mode */
 }
 
 /* Buttons */
@@ -185,16 +198,16 @@ body.dark-mode .timeline-dot {
 }
 
 body.dark-mode .status-complete {
-  background-color: rgba(6, 95, 70, 0.2);
+  background-color: rgba(6, 95, 70, 0.3); /* Increased opacity */
   color: #34d399;
 }
 
 body.dark-mode .status-draft {
-  background-color: rgba(146, 64, 14, 0.2);
+  background-color: rgba(146, 64, 14, 0.3); /* Increased opacity */
   color: #fbbf24;
 }
 
-/* Activity categories */
+/* Activity categories - Adjusted for better readability in both modes */
 .bg-category-admin {
   background-color: #93c5fd;
 }
@@ -231,40 +244,41 @@ body.dark-mode .status-draft {
   background-color: #d1d5db;
 }
 
+/* Activity categories in dark mode - Lightened for better visibility */
 body.dark-mode .bg-category-admin {
-  background-color: #1d4ed8;
+  background-color: #3b82f6; /* Lightened */
 }
 
 body.dark-mode .bg-category-maintenance {
-  background-color: #065f46;
+  background-color: #10b981; /* Lightened */
 }
 
 body.dark-mode .bg-category-medical {
-  background-color: #b91c1c;
+  background-color: #ef4444; /* Lightened */
 }
 
 body.dark-mode .bg-category-operations {
-  background-color: #5b21b6;
+  background-color: #8b5cf6; /* Lightened */
 }
 
 body.dark-mode .bg-category-pr {
-  background-color: #a16207;
+  background-color: #f59e0b; /* Lightened */
 }
 
 body.dark-mode .bg-category-prev {
-  background-color: #9a3412;
+  background-color: #f97316; /* Lightened */
 }
 
 body.dark-mode .bg-category-training {
-  background-color: #3730a3;
+  background-color: #6366f1; /* Lightened */
 }
 
 body.dark-mode .bg-category-union {
-  background-color: #9d174d;
+  background-color: #ec4899; /* Lightened */
 }
 
 body.dark-mode .bg-category-iso {
-  background-color: #4b5563;
+  background-color: #6b7280; /* Lightened */
 }
 
 /* Media queries for responsive design */
@@ -339,5 +353,143 @@ body.dark-mode .bg-category-iso {
 
 /* Custom colors for dark mode specifically for bg-gray-750 */
 .dark .bg-gray-750 {
-  background-color: #283141;
+  background-color: #1e293b;
+}
+
+/* Dark mode overrides for better readability */
+.dark .text-gray-500 {
+  color: #cbd5e1 !important;
+}
+
+.dark .text-gray-600 {
+  color: #e2e8f0 !important;
+}
+
+.dark .text-gray-700 {
+  color: #f1f5f9 !important;
+}
+
+.dark .text-gray-400 {
+  color: #a1a1aa !important;
+}
+
+/* Ensure dark mode headings are clearly visible */
+.dark h1, 
+.dark h2, 
+.dark h3, 
+.dark h4, 
+.dark h5, 
+.dark h6,
+.dark .font-medium,
+.dark .font-semibold,
+.dark .font-bold {
+  color: #f1f5f9 !important;
+}
+
+/* Improved colors for dark mode UI elements */
+.dark .bg-gray-800 {
+  background-color: #1f2937;
+}
+
+.dark .bg-gray-700 {
+  background-color: #374151;
+}
+
+.dark .bg-gray-900 {
+  background-color: #111827;
+}
+
+/* Dashboard stats in dark mode */
+.dark .bg-blue-900 {
+  background-color: rgba(59, 130, 246, 0.2);
+}
+
+.dark .bg-green-900 {
+  background-color: rgba(16, 185, 129, 0.2);
+}
+
+.dark .bg-indigo-900 {
+  background-color: rgba(99, 102, 241, 0.2);
+}
+
+.dark .bg-yellow-900 {
+  background-color: rgba(245, 158, 11, 0.2);
+}
+
+/* Status colors in dark mode */
+.dark .text-green-400 {
+  color: #34d399;
+}
+
+.dark .text-blue-400 {
+  color: #60a5fa;
+}
+
+.dark .text-yellow-400 {
+  color: #fbbf24;
+}
+
+/* Light mode specific fixes */
+.bg-white {
+  background-color: #ffffff;
+}
+
+.bg-gray-50 {
+  background-color: #f9fafb;
+}
+
+.bg-gray-100 {
+  background-color: #f3f4f6;
+}
+
+.text-gray-800 {
+  color: #1f2937;
+}
+
+.text-gray-900 {
+  color: #111827;
+}
+
+/* Fix for select elements and options */
+select {
+  color: #1f2937 !important;
+  background-color: #ffffff !important;
+  appearance: auto; /* Ensure native dropdown arrow is visible */
+}
+
+select option {
+  color: #1f2937 !important;
+  background-color: #ffffff !important;
+  padding: 8px 12px !important; /* Better padding for dropdown options */
+}
+
+/* Dark mode select elements and options */
+body.dark-mode select,
+.dark select {
+  color: #f9fafb !important;
+  background-color: #374151 !important;
+  border-color: #4b5563 !important;
+}
+
+body.dark-mode select option,
+.dark select option {
+  color: #f9fafb !important;
+  background-color: #374151 !important;
+  padding: 8px 12px !important;
+}
+
+/* Disabled state for form elements */
+input:disabled, textarea:disabled, select:disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
+  background-color: #f3f4f6 !important;
+}
+
+body.dark-mode input:disabled,
+body.dark-mode textarea:disabled,
+body.dark-mode select:disabled,
+.dark input:disabled,
+.dark textarea:disabled,
+.dark select:disabled {
+  background-color: #1f2937 !important;
 }

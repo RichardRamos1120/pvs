@@ -16,7 +16,10 @@ import {
     PlusCircle,
     Edit3,
     Clock,
-    AlertTriangle
+    AlertTriangle,
+    Trash2,
+    Eye,
+    AlertCircle
 } from 'lucide-react';
 import Layout from './Layout';
 
@@ -24,18 +27,31 @@ const Dashboard = () => {
     // Initialize darkMode from localStorage with default to true (dark mode)
     const [darkMode, setDarkMode] = useState(() => {
         const savedMode = localStorage.getItem('darkMode');
-        return savedMode !== null ? savedMode === 'true' : true; // Default to true (dark mode)
+        const isDarkMode = savedMode !== null ? savedMode === 'true' : true; // Default to true (dark mode)
+
+        // Apply dark mode class to HTML element for Tailwind
+        if (isDarkMode) {
+            document.documentElement.classList.add('dark');
+            document.body.classList.add('dark-mode');
+        } else {
+            document.documentElement.classList.remove('dark');
+            document.body.classList.remove('dark-mode');
+        }
+
+        return isDarkMode;
     });
-    
+
     // Initialize selectedStation from localStorage
     const [selectedStation, setSelectedStation] = useState(() => {
         return localStorage.getItem('selectedStation') || 'Station 1';
     });
-    
+
     const [pastLogs, setPastLogs] = useState([]);
     const [userProfile, setUserProfile] = useState(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
+    const [logToDelete, setLogToDelete] = useState(null);
+    const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
 
     const navigate = useNavigate();
     const auth = getAuth();
@@ -45,6 +61,15 @@ const Dashboard = () => {
     const handleDarkModeChange = (mode) => {
         setDarkMode(mode);
         localStorage.setItem('darkMode', mode.toString());
+
+        // Apply dark mode class to HTML element for Tailwind
+        if (mode) {
+            document.documentElement.classList.add('dark');
+            document.body.classList.add('dark-mode');
+        } else {
+            document.documentElement.classList.remove('dark');
+            document.body.classList.remove('dark-mode');
+        }
     };
     
     const handleStationChange = (station) => {
@@ -127,6 +152,35 @@ const Dashboard = () => {
         navigate('/today');
     };
     
+    // Delete log functions
+    const confirmDeleteLog = (log) => {
+        setLogToDelete(log);
+        setDeleteConfirmOpen(true);
+    };
+
+    const cancelDeleteLog = () => {
+        setLogToDelete(null);
+        setDeleteConfirmOpen(false);
+    };
+
+    const deleteLog = async () => {
+        if (!logToDelete) return;
+
+        try {
+            await firestoreOperations.deleteLog(logToDelete.id);
+
+            // Update the logs list by filtering out the deleted log
+            setPastLogs(pastLogs.filter(log => log.id !== logToDelete.id));
+
+            // Close the confirmation modal
+            setDeleteConfirmOpen(false);
+            setLogToDelete(null);
+        } catch (error) {
+            console.error('Error deleting log:', error);
+            setError('Failed to delete log. Please try again.');
+        }
+    };
+
     // Get statistics for dashboard
     const getStatistics = () => {
         // Total reports submitted this week
@@ -197,6 +251,37 @@ const Dashboard = () => {
     return (
         <Layout darkMode={darkMode} setDarkMode={handleDarkModeChange} selectedStation={selectedStation} setSelectedStation={handleStationChange}>
             <div>
+                {/* Delete Confirmation Modal */}
+                {deleteConfirmOpen && logToDelete && (
+                    <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
+                        <div className="bg-white dark:bg-gray-800 rounded-lg shadow-lg p-6 max-w-md w-full">
+                            <div className="flex items-center mb-4 text-red-600 dark:text-red-400">
+                                <AlertCircle className="h-6 w-6 mr-2" />
+                                <h3 className="text-lg font-medium">Delete Draft Log</h3>
+                            </div>
+
+                            <p className="mb-6 text-gray-600 dark:text-gray-300">
+                                Are you sure you want to delete the draft log from <span className="font-semibold">{logToDelete.date}</span>?
+                                This action cannot be undone and all activities in this log will be permanently lost.
+                            </p>
+
+                            <div className="flex justify-end space-x-3">
+                                <button
+                                    onClick={cancelDeleteLog}
+                                    className="px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-700 dark:text-white text-sm font-medium hover:bg-gray-50 dark:hover:bg-gray-600"
+                                >
+                                    Cancel
+                                </button>
+                                <button
+                                    onClick={deleteLog}
+                                    className="px-4 py-2 bg-red-600 text-white rounded-md text-sm font-medium hover:bg-red-700"
+                                >
+                                    Delete Draft Log
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                )}
                 {/* Welcome Section */}
                 <div className="bg-white dark:bg-gray-800 shadow rounded-lg p-6 mb-6">
                     <div className="flex flex-col md:flex-row justify-between items-start md:items-center">
@@ -330,12 +415,32 @@ const Dashboard = () => {
                                                 }`}>
                                                 {log.status === 'complete' ? 'Complete' : 'Draft'}
                                             </span>
-                                            <button
-                                                onClick={() => navigate(`/report/${log.id}`)}
-                                                className="text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 text-sm"
-                                            >
-                                                View
-                                            </button>
+                                            {log.status === 'draft' ? (
+                                                <div className="flex space-x-2">
+                                                    <button
+                                                        onClick={() => confirmDeleteLog(log)}
+                                                        className="text-red-600 dark:text-red-400 hover:text-red-800 dark:hover:text-red-300 text-sm flex items-center"
+                                                    >
+                                                        <Trash2 className="h-4 w-4 mr-1" />
+                                                        Delete
+                                                    </button>
+                                                    <button
+                                                        onClick={() => navigate(`/report/${log.id}`)}
+                                                        className="text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 text-sm flex items-center"
+                                                    >
+                                                        <Eye className="h-4 w-4 mr-1" />
+                                                        View
+                                                    </button>
+                                                </div>
+                                            ) : (
+                                                <button
+                                                    onClick={() => navigate(`/report/${log.id}`)}
+                                                    className="text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 text-sm flex items-center"
+                                                >
+                                                    <Eye className="h-4 w-4 mr-1" />
+                                                    View
+                                                </button>
+                                            )}
                                         </div>
                                     </div>
                                 ))}

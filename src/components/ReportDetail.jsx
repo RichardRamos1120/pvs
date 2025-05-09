@@ -142,30 +142,300 @@ const ReportDetail = () => {
     return `${start} - ${end}`;
   };
   
-  // Export to PDF
+  // Export to PDF - Using jsPDF directly for better styled output
   const exportToPDF = () => {
-    // Create a clone of the report to style for PDF
-    const reportElement = document.getElementById('report-container');
-    
-    if (!reportElement) return;
-    
-    const clone = reportElement.cloneNode(true);
-    clone.style.width = '100%';
-    clone.style.padding = '20px';
-    clone.style.backgroundColor = 'white';
-    clone.style.color = 'black';
-    
-    // Set PDF options
-    const options = {
-      margin: 10,
-      filename: `${log.station.replace(/\s+/g, '-')}_${log.date.replace(/,\s+/g, '_')}.pdf`,
-      image: { type: 'jpeg', quality: 0.98 },
-      html2canvas: { scale: 2 },
-      jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
-    };
-    
-    // Generate PDF
-    html2pdf().from(clone).set(options).save();
+    if (!log) return;
+
+    // Import required libraries dynamically
+    import('jspdf').then(({ default: jsPDF }) => {
+      // Create a new jsPDF instance
+      const pdf = new jsPDF({
+        orientation: 'portrait',
+        unit: 'mm',
+        format: 'a4'
+      });
+
+      // Set font styles
+      pdf.setFont('helvetica', 'normal');
+
+      // Helper functions for styling
+      const addTitle = (text, y) => {
+        pdf.setFont('helvetica', 'bold');
+        pdf.setFontSize(18);
+        pdf.text(text, 105, y, { align: 'center' });
+        return y + 8;
+      };
+
+      const addSubtitle = (text, y) => {
+        pdf.setFont('helvetica', 'normal');
+        pdf.setFontSize(12);
+        pdf.text(text, 105, y, { align: 'center' });
+        return y + 12;
+      };
+
+      const addSectionTitle = (text, y) => {
+        pdf.setFont('helvetica', 'bold');
+        pdf.setFontSize(14);
+        pdf.text(text, 15, y);
+        pdf.setDrawColor(0, 0, 0);
+        pdf.line(15, y + 2, 195, y + 2);
+        return y + 10;
+      };
+
+      const addField = (label, value, y) => {
+        pdf.setFont('helvetica', 'bold');
+        pdf.setFontSize(10);
+        pdf.text(label, 15, y);
+        pdf.setFont('helvetica', 'normal');
+        pdf.text(value, 50, y);
+        return y + 6;
+      };
+
+      const addListItem = (text, y, indent = 15) => {
+        pdf.setFont('helvetica', 'normal');
+        pdf.setFontSize(10);
+        pdf.text('•', indent, y);
+        pdf.text(text, indent + 5, y);
+        return y + 6;
+      };
+
+      const addParagraph = (text, y, maxWidth = 180) => {
+        pdf.setFont('helvetica', 'normal');
+        pdf.setFontSize(10);
+
+        // Handle text wrapping
+        const lines = pdf.splitTextToSize(text, maxWidth);
+        pdf.text(lines, 15, y);
+        return y + (lines.length * 6);
+      };
+
+      // Add logo/header with background
+      pdf.setFillColor(42, 72, 120); // Navy blue header
+      pdf.rect(0, 0, 210, 25, 'F');
+      pdf.setTextColor(255, 255, 255); // White text
+      pdf.setFontSize(20);
+      pdf.setFont('helvetica', 'bold');
+      pdf.text(`${log.station} - Daily Activity Log`, 105, 15, { align: 'center' });
+
+      // Reset text color
+      pdf.setTextColor(0, 0, 0);
+
+      // Start positioning
+      let y = 35;
+
+      // Date and Shift subtitle
+      y = addSubtitle(`${log.date} • ${log.shift} Shift • ${log.status === 'complete' ? 'COMPLETED' : 'DRAFT'}`, y);
+
+      // Staff Information Section
+      y = addSectionTitle('STAFF INFORMATION', y + 5);
+      y = addField('Captain:', log.captain, y);
+
+      // Crew members
+      if (log.crew && log.crew.length > 0) {
+        y = addField('Crew on Duty:', '', y);
+        log.crew.forEach(member => {
+          y = addListItem(member, y, 50);
+        });
+      } else {
+        y = addField('Crew on Duty:', 'No crew members assigned', y);
+      }
+
+      // Activity Summary Section
+      y = addSectionTitle('ACTIVITY SUMMARY', y + 5);
+
+      // Calculate hours by category
+      const hoursByCategory = {};
+      (log.activities || []).forEach(activity => {
+        if (!activity) return;
+        const category = activity.type;
+        if (!hoursByCategory[category]) {
+          hoursByCategory[category] = 0;
+        }
+        hoursByCategory[category] += parseFloat(activity.hours || 0);
+      });
+
+      // Display summary as a table
+      if (Object.keys(hoursByCategory).length > 0) {
+        // Add table headers
+        pdf.setFillColor(240, 240, 240);
+        pdf.rect(15, y, 90, 7, 'F');
+        pdf.rect(105, y, 30, 7, 'F');
+
+        pdf.setFont('helvetica', 'bold');
+        pdf.setFontSize(10);
+        pdf.text('CATEGORY', 20, y + 5);
+        pdf.text('HOURS', 110, y + 5);
+
+        y += 10;
+
+        // Add table rows
+        Object.entries(hoursByCategory).forEach(([category, hours], index) => {
+          if (index % 2 === 0) {
+            pdf.setFillColor(250, 250, 250);
+            pdf.rect(15, y - 5, 90, 7, 'F');
+            pdf.rect(105, y - 5, 30, 7, 'F');
+          }
+
+          pdf.setFont('helvetica', 'normal');
+          pdf.text(category, 20, y);
+          pdf.text(hours.toFixed(1), 110, y);
+
+          y += 7;
+        });
+
+        // Add total row
+        pdf.setFillColor(220, 230, 240);
+        pdf.rect(15, y - 5, 90, 7, 'F');
+        pdf.rect(105, y - 5, 30, 7, 'F');
+
+        pdf.setFont('helvetica', 'bold');
+        pdf.text('TOTAL', 20, y);
+        pdf.text(log.totalHours || "0.0", 110, y);
+
+        y += 10;
+      } else {
+        y = addParagraph('No activities recorded for this log.', y);
+      }
+
+      // Activity Details Section
+      y = addSectionTitle('ACTIVITY DETAILS', y + 5);
+
+      if (log.activities && log.activities.length > 0) {
+        log.activities.forEach((activity, index) => {
+          // Add activity header with background
+          pdf.setFillColor(245, 245, 245);
+          pdf.rect(15, y - 5, 180, 7, 'F');
+
+          pdf.setFont('helvetica', 'bold');
+          pdf.setFontSize(11);
+          pdf.text(`${index + 1}. ${activity.type}: ${activity.description}`, 20, y);
+          y += 7;
+
+          pdf.setFontSize(10);
+          pdf.setFont('helvetica', 'normal');
+          pdf.text(`Time: ${formatTimeRange(activity.details?.startTime, activity.details?.endTime)} • ${activity.hours} hrs`, 25, y);
+          y += 7;
+
+          // Type-specific details
+          if (activity.type === 'MAINTENANCE') {
+            if (activity.details?.apparatus) {
+              pdf.text(`Apparatus: ${activity.details.apparatus}`, 25, y);
+              y += 5;
+            }
+            if (activity.details?.maintenanceType) {
+              pdf.text(`Type: ${activity.details.maintenanceType}`, 25, y);
+              y += 5;
+            }
+            if (activity.details?.passFailStatus) {
+              pdf.text(`Status: ${activity.details.passFailStatus}`, 25, y);
+              y += 5;
+            }
+          }
+
+          if (activity.type === 'TRAINING' && activity.details?.trainingMethod) {
+            pdf.text(`Method: ${activity.details.trainingMethod}`, 25, y);
+            y += 5;
+          }
+
+          if (activity.type === 'OPERATIONS') {
+            if (activity.details?.stationCoverage) {
+              pdf.text(`Station: ${activity.details.stationCoverage}`, 25, y);
+              y += 5;
+            }
+            if (activity.details?.apparatus) {
+              pdf.text(`Apparatus: ${activity.details.apparatus}`, 25, y);
+              y += 5;
+            }
+          }
+
+          if (activity.type === 'ADMIN' && activity.details?.documentType) {
+            pdf.text(`Document Type: ${activity.details.documentType}`, 25, y);
+            y += 5;
+          }
+
+          // Notes with background
+          if (activity.notes) {
+            pdf.setFillColor(250, 250, 245);
+            pdf.rect(25, y, 165, 12, 'F');
+            pdf.setDrawColor(220, 220, 200);
+            pdf.setLineWidth(0.2);
+            pdf.rect(25, y, 165, 12);
+
+            pdf.setFont('helvetica', 'italic');
+            pdf.text(`Notes: ${activity.notes}`, 30, y + 5);
+            y += 16;
+          }
+
+          y += 5;
+
+          // Check if we need to add a new page
+          if (y > 270) {
+            pdf.addPage();
+            y = 20;
+          }
+        });
+      } else {
+        y = addParagraph('No activities recorded for this log.', y);
+      }
+
+      // Captain's Notes Section (if present)
+      if (log.notes) {
+        // Check if we need to add a new page
+        if (y > 230) {
+          pdf.addPage();
+          y = 20;
+        }
+
+        y = addSectionTitle("CAPTAIN'S NOTES", y + 5);
+
+        // Add notes with a background box
+        pdf.setFillColor(255, 252, 230); // Light yellow background
+        pdf.rect(15, y, 180, 30, 'F');
+        pdf.setDrawColor(220, 210, 180); // Light brown border
+        pdf.setLineWidth(0.3);
+        pdf.rect(15, y, 180, 30);
+
+        y = addParagraph(log.notes, y + 5, 170);
+      }
+
+      // Verification Section (if complete)
+      if (log.status === 'complete') {
+        // Check if we need to add a new page
+        if (y > 250) {
+          pdf.addPage();
+          y = 20;
+        }
+
+        y = addSectionTitle("VERIFICATION", y + 5);
+        y = addField('Completed by:', log.captain || log.completedBy || 'Unknown', y);
+        y = addField('Date:', log.completedAt ? new Date(log.completedAt).toLocaleString() : 'Not recorded', y);
+
+        // Simple verification stamp
+        pdf.setFontSize(10);
+        pdf.setFont('helvetica', 'italic');
+        pdf.setTextColor(0, 100, 0); // Dark green
+        pdf.text('Verified', 150, y - 5);
+      }
+
+      // Footer with page numbers
+      const totalPages = pdf.getNumberOfPages();
+
+      for (let i = 1; i <= totalPages; i++) {
+        pdf.setPage(i);
+        pdf.setFontSize(8);
+        pdf.setFont('helvetica', 'normal');
+        pdf.setTextColor(100, 100, 100);
+        pdf.text(`Page ${i} of ${totalPages}`, 105, 290, { align: 'center' });
+        pdf.text(`Generated on ${new Date().toLocaleString()}`, 190, 290, { align: 'right' });
+      }
+
+      // Save the PDF
+      pdf.save(`${log.station.replace(/\s+/g, '-')}_${log.date.replace(/,\s+/g, '_')}.pdf`);
+    })
+    .catch(error => {
+      console.error("PDF generation error:", error);
+      alert("Error generating PDF. Please try again.");
+    });
   };
   
   // Loading state
@@ -259,20 +529,25 @@ const ReportDetail = () => {
           </div>
         </div>
         
-        {/* Log Metadata Card */}
+        {/* Log Metadata and Crew Card */}
         <div className="bg-white dark:bg-gray-800 shadow rounded-lg p-6">
-          <div className="flex justify-between items-center mb-6">
-            <div className="flex items-center">
+          <div className="flex flex-col md:flex-row md:justify-between md:items-start gap-4 mb-6">
+            {/* Captain info */}
+            <div className="flex items-start">
               <div className="bg-blue-100 dark:bg-blue-900 p-3 rounded-lg mr-4">
                 <Building className="w-6 h-6 text-blue-600 dark:text-blue-400" />
               </div>
               <div>
-                <h3 className="text-lg font-semibold">{log.captain}</h3>
+                <h3 className="text-lg font-semibold">Captain: {log.captain}</h3>
                 <p className="text-sm text-gray-600 dark:text-gray-400">
-                  {log.crew && log.crew.length > 0 ? log.crew.join(', ') : 'No crew members assigned'}
+                  {log.completedAt ? 
+                    `Completed on ${new Date(log.completedAt).toLocaleDateString()} at ${new Date(log.completedAt).toLocaleTimeString()}` : 
+                    (log.status === 'draft' ? 'Draft - Not completed' : 'Completed')}
                 </p>
               </div>
             </div>
+            
+            {/* Action buttons */}
             <div className="flex space-x-3">
               {log.status === 'draft' && (userProfile?.role === 'captain' || userProfile?.role === 'admin') && (
                 <button 
@@ -291,6 +566,29 @@ const ReportDetail = () => {
                 Export PDF
               </button>
             </div>
+          </div>
+          
+          {/* Crew members section */}
+          <div className="mt-4">
+            <h3 className="text-md font-semibold border-b pb-2 mb-3">Crew on Duty</h3>
+            
+            {log.crew && log.crew.length > 0 ? (
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2">
+                {log.crew.map((member, index) => (
+                  <div 
+                    key={index} 
+                    className="flex items-center p-2 bg-gray-50 dark:bg-gray-750 rounded-lg border border-gray-200 dark:border-gray-700"
+                  >
+                    <div className="w-8 h-8 rounded-full bg-blue-100 dark:bg-blue-900 flex items-center justify-center mr-2">
+                      <User className="w-4 h-4 text-blue-600 dark:text-blue-400" />
+                    </div>
+                    <span className="text-sm font-medium">{member}</span>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="text-sm text-gray-500 dark:text-gray-400 italic">No crew members assigned to this log</p>
+            )}
           </div>
         </div>
             
@@ -413,6 +711,24 @@ const ReportDetail = () => {
         
         {/* Summary Cards */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          {/* Captain's Notes - Now on the left */}
+          {log.notes ? (
+            <div className="bg-white dark:bg-gray-800 shadow rounded-lg p-6">
+              <h3 className="text-lg font-semibold border-b pb-2 mb-4">Captain's Notes</h3>
+              <div className="p-4 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-100 dark:border-yellow-900/30 rounded-lg">
+                <p>{log.notes}</p>
+              </div>
+            </div>
+          ) : (
+            <div className="bg-white dark:bg-gray-800 shadow rounded-lg p-6">
+              <h3 className="text-lg font-semibold border-b pb-2 mb-4">Captain's Notes</h3>
+              <div className="p-4 bg-gray-50 dark:bg-gray-750 border border-gray-200 dark:border-gray-700 rounded-lg text-gray-500 dark:text-gray-400 italic">
+                <p>No additional notes for this log.</p>
+              </div>
+            </div>
+          )}
+          
+          {/* Activity Summary - Now on the right */}
           <div className="bg-white dark:bg-gray-800 shadow rounded-lg p-6">
             <h3 className="text-lg font-semibold border-b pb-2 mb-4">Activity Summary</h3>
             
@@ -435,16 +751,6 @@ const ReportDetail = () => {
               </div>
             </div>
           </div>
-          
-          {/* Captain's Notes */}
-          {log.notes && (
-            <div className="bg-white dark:bg-gray-800 shadow rounded-lg p-6">
-              <h3 className="text-lg font-semibold border-b pb-2 mb-4">Captain's Notes</h3>
-              <div className="p-4 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-100 dark:border-yellow-900/30 rounded-lg">
-                <p>{log.notes}</p>
-              </div>
-            </div>
-          )}
         </div>
         
         {/* Signature Section (if complete) */}

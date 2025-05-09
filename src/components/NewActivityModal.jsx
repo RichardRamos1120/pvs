@@ -238,15 +238,11 @@ const NewActivityModal = ({ show, onClose, onAddActivity, darkMode }) => {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
             {/* Category selection */}
             <div>
-              <label className={`block text-sm font-medium mb-1 ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>
+              <label className="block text-sm font-medium mb-1">
                 Activity Category*
               </label>
               <select 
-                className={`w-full p-2 border rounded-lg ${
-                  darkMode 
-                    ? 'border-gray-600 bg-gray-700 text-white' 
-                    : 'border-gray-300 bg-white text-gray-900'
-                }`}
+                className="w-full p-2 border rounded-lg"
                 value={newActivityCategory}
                 onChange={(e) => {
                   setNewActivityCategory(e.target.value);
@@ -264,15 +260,11 @@ const NewActivityModal = ({ show, onClose, onAddActivity, darkMode }) => {
             {/* Type selection */}
             {newActivityCategory && (
               <div>
-                <label className={`block text-sm font-medium mb-1 ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>
+                <label className="block text-sm font-medium mb-1">
                   Activity Type*
                 </label>
                 <select 
-                  className={`w-full p-2 border rounded-lg ${
-                    darkMode 
-                      ? 'border-gray-600 bg-gray-700 text-white' 
-                      : 'border-gray-300 bg-white text-gray-900'
-                  }`}
+                  className="w-full p-2 border rounded-lg"
                   value={newActivityType}
                   onChange={(e) => setNewActivityType(e.target.value)}
                   required
@@ -289,31 +281,23 @@ const NewActivityModal = ({ show, onClose, onAddActivity, darkMode }) => {
           {/* Time inputs */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
             <div>
-              <label className={`block text-sm font-medium mb-1 ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>
+              <label className="block text-sm font-medium mb-1">
                 Start Time
               </label>
               <input 
                 type="time" 
-                className={`w-full p-2 border rounded-lg ${
-                  darkMode 
-                    ? 'border-gray-600 bg-gray-700 text-white' 
-                    : 'border-gray-300 bg-white text-gray-900'
-                }`}
+                className="w-full p-2 border rounded-lg"
                 value={newActivityStart}
                 onChange={(e) => setNewActivityStart(e.target.value)}
               />
             </div>
             <div>
-              <label className={`block text-sm font-medium mb-1 ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>
+              <label className="block text-sm font-medium mb-1">
                 End Time
               </label>
               <input 
                 type="time" 
-                className={`w-full p-2 border rounded-lg ${
-                  darkMode 
-                    ? 'border-gray-600 bg-gray-700 text-white' 
-                    : 'border-gray-300 bg-white text-gray-900'
-                }`}
+                className="w-full p-2 border rounded-lg"
                 value={newActivityEnd}
                 onChange={(e) => setNewActivityEnd(e.target.value)}
               />
@@ -323,22 +307,16 @@ const NewActivityModal = ({ show, onClose, onAddActivity, darkMode }) => {
           {/* Category-specific details */}
           {newActivityCategory === 'MAINTENANCE' && (
             <div className="mb-4">
-              <h3 className={`text-sm font-medium mb-2 pb-1 border-b ${
-                darkMode ? 'border-gray-700 text-gray-300' : 'border-gray-200 text-gray-700'
-              }`}>
+              <h3 className="text-sm font-medium mb-2 pb-1 border-b">
                 Maintenance Details
               </h3>
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div>
-                  <label className={`block text-sm font-medium mb-1 ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>
+                  <label className="block text-sm font-medium mb-1">
                     Apparatus
                   </label>
                   <select 
-                    className={`w-full p-2 border rounded-lg ${
-                      darkMode 
-                        ? 'border-gray-600 bg-gray-700 text-white' 
-                        : 'border-gray-300 bg-white text-gray-900'
-                    }`}
+                    className="w-full p-2 border rounded-lg"
                     value={newActivityApparatus}
                     onChange={(e) => setNewActivityApparatus(e.target.value)}
                   >
@@ -349,15 +327,11 @@ const NewActivityModal = ({ show, onClose, onAddActivity, darkMode }) => {
                   </select>
                 </div>
                 <div>
-                  <label className={`block text-sm font-medium mb-1 ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>
+                  <label className="block text-sm font-medium mb-1">
                     Maintenance Type
                   </label>
                   <select 
-                    className={`w-full p-2 border rounded-lg ${
-                      darkMode 
-                        ? 'border-gray-600 bg-gray-700 text-white' 
-                        : 'border-gray-300 bg-white text-gray-900'
-                    }`}
+                    className="w-full p-2 border rounded-lg"
                     value={newActivityMaintenanceType}
                     onChange={(e) => setNewActivityMaintenanceType(e.target.value)}
                   >
@@ -368,15 +342,11 @@ const NewActivityModal = ({ show, onClose, onAddActivity, darkMode }) => {
                   </select>
                 </div>
                 <div>
-                  <label className={`block text-sm font-medium mb-1 ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>
+                  <label className="block text-sm font-medium mb-1">
                     Status
                   </label>
                   <select 
-                    className={`w-full p-2 border rounded-lg ${
-                      darkMode 
-                        ? 'border-gray-600 bg-gray-700 text-white' 
-                        : 'border-gray-300 bg-white text-gray-900'
-                    }`}
+                    className="w-full p-2 border rounded-lg"
                     value={newActivityPassFail}
                     onChange={(e) => setNewActivityPassFail(e.target.value)}
                   >
@@ -391,21 +361,15 @@ const NewActivityModal = ({ show, onClose, onAddActivity, darkMode }) => {
           
           {newActivityCategory === 'TRAINING' && (
             <div className="mb-4">
-              <h3 className={`text-sm font-medium mb-2 pb-1 border-b ${
-                darkMode ? 'border-gray-700 text-gray-300' : 'border-gray-200 text-gray-700'
-              }`}>
+              <h3 className="text-sm font-medium mb-2 pb-1 border-b">
                 Training Details
               </h3>
               <div>
-                <label className={`block text-sm font-medium mb-1 ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>
+                <label className="block text-sm font-medium mb-1">
                   Training Method
                 </label>
                 <select 
-                  className={`w-full p-2 border rounded-lg ${
-                    darkMode 
-                      ? 'border-gray-600 bg-gray-700 text-white' 
-                      : 'border-gray-300 bg-white text-gray-900'
-                  }`}
+                  className="w-full p-2 border rounded-lg"
                   value={newActivityTrainingMethod}
                   onChange={(e) => setNewActivityTrainingMethod(e.target.value)}
                 >
@@ -420,22 +384,16 @@ const NewActivityModal = ({ show, onClose, onAddActivity, darkMode }) => {
           
           {newActivityCategory === 'OPERATIONS' && newActivityType.includes('COVER') && (
             <div className="mb-4">
-              <h3 className={`text-sm font-medium mb-2 pb-1 border-b ${
-                darkMode ? 'border-gray-700 text-gray-300' : 'border-gray-200 text-gray-700'
-              }`}>
+              <h3 className="text-sm font-medium mb-2 pb-1 border-b">
                 Operation Details
               </h3>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
-                  <label className={`block text-sm font-medium mb-1 ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>
+                  <label className="block text-sm font-medium mb-1">
                     Station Coverage
                   </label>
                   <select 
-                    className={`w-full p-2 border rounded-lg ${
-                      darkMode 
-                        ? 'border-gray-600 bg-gray-700 text-white' 
-                        : 'border-gray-300 bg-white text-gray-900'
-                    }`}
+                    className="w-full p-2 border rounded-lg"
                     value={newActivityStationCoverage}
                     onChange={(e) => setNewActivityStationCoverage(e.target.value)}
                   >
@@ -446,15 +404,11 @@ const NewActivityModal = ({ show, onClose, onAddActivity, darkMode }) => {
                   </select>
                 </div>
                 <div>
-                  <label className={`block text-sm font-medium mb-1 ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>
+                  <label className="block text-sm font-medium mb-1">
                     Apparatus
                   </label>
                   <select 
-                    className={`w-full p-2 border rounded-lg ${
-                      darkMode 
-                        ? 'border-gray-600 bg-gray-700 text-white' 
-                        : 'border-gray-300 bg-white text-gray-900'
-                    }`}
+                    className="w-full p-2 border rounded-lg"
                     value={newActivityApparatus}
                     onChange={(e) => setNewActivityApparatus(e.target.value)}
                   >
@@ -470,21 +424,15 @@ const NewActivityModal = ({ show, onClose, onAddActivity, darkMode }) => {
           
           {newActivityCategory === 'ADMIN' && (
             <div className="mb-4">
-              <h3 className={`text-sm font-medium mb-2 pb-1 border-b ${
-                darkMode ? 'border-gray-700 text-gray-300' : 'border-gray-200 text-gray-700'
-              }`}>
+              <h3 className="text-sm font-medium mb-2 pb-1 border-b">
                 Administrative Details
               </h3>
               <div>
-                <label className={`block text-sm font-medium mb-1 ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>
+                <label className="block text-sm font-medium mb-1">
                   Document Type
                 </label>
                 <select 
-                  className={`w-full p-2 border rounded-lg ${
-                    darkMode 
-                      ? 'border-gray-600 bg-gray-700 text-white' 
-                      : 'border-gray-300 bg-white text-gray-900'
-                  }`}
+                  className="w-full p-2 border rounded-lg"
                   value={newActivityDocumentType}
                   onChange={(e) => setNewActivityDocumentType(e.target.value)}
                 >
@@ -499,16 +447,12 @@ const NewActivityModal = ({ show, onClose, onAddActivity, darkMode }) => {
           
           {/* Notes */}
           <div className="mb-4">
-            <label className={`block text-sm font-medium mb-1 ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>
+            <label className="block text-sm font-medium mb-1">
               Notes
             </label>
             <div className="relative">
               <textarea 
-                className={`w-full p-2 border rounded-lg ${
-                  darkMode 
-                    ? 'border-gray-600 bg-gray-700 text-white' 
-                    : 'border-gray-300 bg-white text-gray-900'
-                }`}
+                className="w-full p-2 border rounded-lg"
                 rows="3"
                 placeholder="Add any additional notes here..."
                 value={newActivityNotes}
