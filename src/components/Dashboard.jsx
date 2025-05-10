@@ -391,66 +391,134 @@ const Dashboard = () => {
                                 View All
                             </button>
                         </div>
-                        <div className="divide-y divide-gray-200 dark:divide-gray-700">
-                            {pastLogs
-                                .filter(log => log.station === selectedStation)
-                                .sort((a, b) => new Date(b.rawDate) - new Date(a.rawDate))
-                                .slice(0, 5)
-                                .map((log) => (
-                                    <div key={log.id} className="p-4 flex flex-col sm:flex-row justify-between">
-                                        <div className="flex items-center mb-2 sm:mb-0">
-                                            <div className="bg-blue-100 dark:bg-blue-900 p-2 rounded-lg mr-3">
-                                                <Calendar className="h-5 w-5 text-blue-600 dark:text-blue-400" />
+
+                        {/* Desktop view */}
+                        <div className="hidden sm:block">
+                            <div className="divide-y divide-gray-200 dark:divide-gray-700">
+                                {pastLogs
+                                    .filter(log => log.station === selectedStation)
+                                    .sort((a, b) => new Date(b.rawDate) - new Date(a.rawDate))
+                                    .slice(0, 5)
+                                    .map((log) => (
+                                        <div key={log.id} className="p-4 flex justify-between items-center hover:bg-gray-50 dark:hover:bg-gray-750">
+                                            <div className="flex items-center">
+                                                <div className="bg-blue-100 dark:bg-blue-900 p-2 rounded-lg mr-3 flex-shrink-0">
+                                                    <Calendar className="h-5 w-5 text-blue-600 dark:text-blue-400" />
+                                                </div>
+                                                <div>
+                                                    <p className="font-medium">{log.date}</p>
+                                                    <p className="text-sm text-gray-500 dark:text-gray-400">
+                                                        {log.totalHours} hours • {log.activities ? log.activities.length : 0} activities
+                                                    </p>
+                                                </div>
                                             </div>
-                                            <div>
-                                                <p className="font-medium">{log.date}</p>
-                                                <p className="text-sm text-gray-500 dark:text-gray-400">
-                                                    {log.totalHours} hours • {log.activities ? log.activities.length : 0} activities
-                                                </p>
-                                            </div>
-                                        </div>
-                                        <div className="flex items-center">
-                                            <span className={`px-2 py-1 rounded-full text-xs font-medium mr-3 ${log.status === 'complete' ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-200' :
-                                                    'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-200'
-                                                }`}>
-                                                {log.status === 'complete' ? 'Complete' : 'Draft'}
-                                            </span>
-                                            {log.status === 'draft' ? (
-                                                <div className="flex space-x-2">
-                                                    <button
-                                                        onClick={() => confirmDeleteLog(log)}
-                                                        className="text-red-600 dark:text-red-400 hover:text-red-800 dark:hover:text-red-300 text-sm flex items-center"
-                                                    >
-                                                        <Trash2 className="h-4 w-4 mr-1" />
-                                                        Delete
-                                                    </button>
+                                            <div className="flex items-center">
+                                                <span className={`px-2 py-1 rounded-full text-xs font-medium mr-3 ${log.status === 'complete' ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-200' :
+                                                        'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-200'
+                                                    }`}>
+                                                    {log.status === 'complete' ? 'Complete' : 'Draft'}
+                                                </span>
+                                                {log.status === 'draft' ? (
+                                                    <div className="flex space-x-3">
+                                                        <button
+                                                            onClick={() => confirmDeleteLog(log)}
+                                                            className="text-red-600 dark:text-red-400 hover:text-red-800 dark:hover:text-red-300 text-sm flex items-center px-2 py-1"
+                                                        >
+                                                            <Trash2 className="h-4 w-4 mr-1" />
+                                                            Delete
+                                                        </button>
+                                                        <button
+                                                            onClick={() => navigate(`/report/${log.id}`)}
+                                                            className="text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 text-sm flex items-center px-2 py-1"
+                                                        >
+                                                            <Eye className="h-4 w-4 mr-1" />
+                                                            View
+                                                        </button>
+                                                    </div>
+                                                ) : (
                                                     <button
                                                         onClick={() => navigate(`/report/${log.id}`)}
-                                                        className="text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 text-sm flex items-center"
+                                                        className="text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 text-sm flex items-center px-2 py-1"
                                                     >
                                                         <Eye className="h-4 w-4 mr-1" />
                                                         View
                                                     </button>
-                                                </div>
-                                            ) : (
-                                                <button
-                                                    onClick={() => navigate(`/report/${log.id}`)}
-                                                    className="text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 text-sm flex items-center"
-                                                >
-                                                    <Eye className="h-4 w-4 mr-1" />
-                                                    View
-                                                </button>
-                                            )}
+                                                )}
+                                            </div>
                                         </div>
-                                    </div>
-                                ))}
-
-                            {pastLogs.filter(log => log.station === selectedStation).length === 0 && (
-                                <div className="p-6 text-center text-gray-500 dark:text-gray-400">
-                                    No logs found for this station.
-                                </div>
-                            )}
+                                    ))}
+                            </div>
                         </div>
+
+                        {/* Mobile view */}
+                        <div className="sm:hidden">
+                            <div className="divide-y divide-gray-200 dark:divide-gray-700">
+                                {pastLogs
+                                    .filter(log => log.station === selectedStation)
+                                    .sort((a, b) => new Date(b.rawDate) - new Date(a.rawDate))
+                                    .slice(0, 5)
+                                    .map((log) => (
+                                        <div key={log.id} className="p-4 hover:bg-gray-50 dark:hover:bg-gray-750">
+                                            <div className="flex items-center mb-2">
+                                                <div className="w-10 h-10 bg-blue-100 dark:bg-blue-900 rounded-lg flex items-center justify-center mr-3">
+                                                    <Calendar className="w-5 h-5 text-blue-600 dark:text-blue-400" />
+                                                </div>
+                                                <div>
+                                                    <h4 className="font-medium text-gray-900 dark:text-white">{log.date}</h4>
+                                                    <div className="text-sm text-gray-500 dark:text-gray-400">
+                                                        {log.totalHours} hours • {log.activities ? log.activities.length : 0} activities
+                                                    </div>
+                                                </div>
+                                            </div>
+
+                                            <div className="flex justify-between items-center py-1">
+                                                <div>
+                                                    <span className={`px-2 py-1 rounded-full text-xs font-medium ${log.status === 'complete' ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-200' :
+                                                            'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-200'
+                                                        }`}>
+                                                        {log.status === 'complete' ? 'Complete' : 'Draft'}
+                                                    </span>
+                                                </div>
+                                            </div>
+
+                                            <div className="mt-2 flex justify-end space-x-3">
+                                                {log.status === 'draft' ? (
+                                                    <>
+                                                        <button
+                                                            onClick={() => confirmDeleteLog(log)}
+                                                            className="text-red-600 hover:text-red-900 dark:text-red-400 dark:hover:text-red-200 text-sm flex items-center"
+                                                        >
+                                                            <Trash2 className="w-4 h-4 mr-1" />
+                                                            Delete
+                                                        </button>
+                                                        <button
+                                                            className="text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300 text-sm flex items-center"
+                                                            onClick={() => navigate(`/report/${log.id}`)}
+                                                        >
+                                                            <Eye className="w-4 h-4 mr-1" />
+                                                            View
+                                                        </button>
+                                                    </>
+                                                ) : (
+                                                    <button
+                                                        className="text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300 text-sm flex items-center"
+                                                        onClick={() => navigate(`/report/${log.id}`)}
+                                                    >
+                                                        <Eye className="w-4 h-4 mr-1" />
+                                                        View
+                                                    </button>
+                                                )}
+                                            </div>
+                                        </div>
+                                    ))}
+                            </div>
+                        </div>
+
+                        {pastLogs.filter(log => log.station === selectedStation).length === 0 && (
+                            <div className="p-6 text-center text-gray-500 dark:text-gray-400">
+                                No logs found for this station.
+                            </div>
+                        )}
                     </div>
 
                     {/* Activity by Category */}
