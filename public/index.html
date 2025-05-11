@@ -40,17 +40,22 @@
       To create a production bundle, use `npm run build` or `yarn build`.
     -->
     <script>
-      // Check if we need to redirect to another route (from 404.html)
-      (function() {
-        var redirect = sessionStorage.getItem('redirect');
-        if (redirect && redirect !== window.location.pathname) {
-          sessionStorage.removeItem('redirect');
-          // Avoid infinite loops
-          if (redirect !== '/' && redirect !== '/index.html') {
-            window.history.replaceState(null, null, redirect);
-          }
+      // Single Page Apps for GitHub Pages
+      // MIT License
+      // https://github.com/rafgraph/spa-github-pages
+      // This script checks to see if a redirect is present in the query string,
+      // converts it back into the correct url and adds it to the browser's
+      // history using window.history.replaceState(...)
+      (function(l) {
+        if (l.search[1] === '/' ) {
+          var decoded = l.search.slice(1).split('&').map(function(s) {
+            return s.replace(/~and~/g, '&')
+          }).join('?');
+          window.history.replaceState(null, null,
+              l.pathname.slice(0, -1) + decoded + l.hash
+          );
         }
-      })();
+      }(window.location))
     </script>
   </body>
 

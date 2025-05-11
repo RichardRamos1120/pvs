@@ -29,6 +29,12 @@ import {
 import NewActivityModal from './NewActivityModal.jsx';
 
 const TodayLog = () => {
+  // First get the React Router hooks to have access to location
+  const navigate = useNavigate();
+  const location = useLocation();
+  const auth = getAuth();
+  const db = getFirestore();
+
   // Initialize darkMode from localStorage with default to true (dark mode)
   const [darkMode, setDarkMode] = useState(() => {
     const savedMode = localStorage.getItem('darkMode');
@@ -46,8 +52,18 @@ const TodayLog = () => {
     return isDarkMode;
   });
 
-  // Initialize selectedStation from localStorage
+  // Initialize selectedStation from localStorage or from navigation state
   const [selectedStation, setSelectedStation] = useState(() => {
+    // If we're navigating from another component with a specific station, use that
+    const fromStation = location.state?.fromStation;
+
+    if (fromStation) {
+      // Update localStorage to match the station we're navigating from
+      localStorage.setItem('selectedStation', fromStation);
+      return fromStation;
+    }
+
+    // Otherwise use the localStorage value or default
     return localStorage.getItem('selectedStation') || 'Station 1';
   });
 
@@ -59,7 +75,7 @@ const TodayLog = () => {
   const [userRole, setUserRole] = useState(null);
   const [readOnlyMode, setReadOnlyMode] = useState(false);
   const [userChecked, setUserChecked] = useState(false);
-  
+
   // New states for notes handling
   const [localNotes, setLocalNotes] = useState('');
   const [unsavedChanges, setUnsavedChanges] = useState(false);
@@ -72,11 +88,6 @@ const TodayLog = () => {
   const [selectedCrew, setSelectedCrew] = useState([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [stationFilter, setStationFilter] = useState('all');
-
-  const navigate = useNavigate();
-  const location = useLocation();
-  const auth = getAuth();
-  const db = getFirestore();
   const firestoreOperations = useContext(FirestoreContext);
 
   // Wrapper functions to update localStorage when state changes
@@ -346,17 +357,16 @@ const TodayLog = () => {
           if (specificLog) {
             console.log("Found specific log:", specificLog);
 
-            // If this log belongs to a different station, update the station
-            if (specificLog.station !== selectedStation) {
-              console.log(`Log belongs to ${specificLog.station}, updating station from ${selectedStation}`);
-              setSelectedStation(specificLog.station);
-              localStorage.setItem('selectedStation', specificLog.station);
-            }
-
+            // Set the log without changing the station again to avoid infinite loop
+            // We already set the station in the handleStationChange function before navigating
             setTodayLog(specificLog);
+
             // Mark this station-date as checked
             const stationDateKey = `${specificLog.station}-${dateKey}`;
             setLogChecked(prev => ({...prev, [stationDateKey]: true}));
+
+            // Ensure loading is set to false
+            setLoading(false);
             return; // Exit early since we found the specific log
           } else {
             console.log("Specific log not found, will try to find today's log");

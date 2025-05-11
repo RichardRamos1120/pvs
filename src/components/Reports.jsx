@@ -616,12 +616,17 @@ const Reports = () => {
                                       {(userProfile?.role === 'admin' || userProfile?.role === 'captain') && (
                                         <button
                                           onClick={() => {
-                                            // Ensure we first select the correct station for the log being edited
-                                            if (log.station && log.station !== selectedStation) {
-                                              handleStationChange(log.station);
+                                            // First update localStorage directly to ensure station is set before navigation
+                                            if (log.station) {
+                                              localStorage.setItem('selectedStation', log.station);
                                             }
-                                            // Then navigate to today's log with the log ID
-                                            navigate('/today', { state: { logId: log.id } });
+                                            // Navigate to today's log with the log ID and station info
+                                            navigate('/today', {
+                                              state: {
+                                                logId: log.id,
+                                                fromStation: log.station
+                                              }
+                                            });
                                           }}
                                           className="text-green-600 hover:text-green-900 dark:text-green-400 dark:hover:text-green-200 inline-flex items-center"
                                         >
@@ -708,12 +713,17 @@ const Reports = () => {
                               {(userProfile?.role === 'admin' || userProfile?.role === 'captain') && (
                                 <button
                                   onClick={() => {
-                                    // Ensure we first select the correct station for the log being edited
-                                    if (log.station && log.station !== selectedStation) {
-                                      handleStationChange(log.station);
+                                    // First update localStorage directly to ensure station is set before navigation
+                                    if (log.station) {
+                                      localStorage.setItem('selectedStation', log.station);
                                     }
-                                    // Then navigate to today's log with the log ID
-                                    navigate('/today', { state: { logId: log.id } });
+                                    // Navigate to today's log with the log ID and station info
+                                    navigate('/today', {
+                                      state: {
+                                        logId: log.id,
+                                        fromStation: log.station
+                                      }
+                                    });
                                   }}
                                   className="text-green-600 hover:text-green-900 dark:text-green-400 dark:hover:text-green-200 text-sm flex items-center"
                                 >

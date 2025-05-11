@@ -556,12 +556,17 @@ const ReportDetail = () => {
               {log.status === 'draft' && (userProfile?.role === 'captain' || userProfile?.role === 'admin') && (
                 <button
                   onClick={() => {
-                    // Ensure we first select the correct station for the log being edited
-                    if (log.station && log.station !== selectedStation) {
-                      handleStationChange(log.station);
+                    // First update localStorage directly to ensure station is set before navigation
+                    if (log.station) {
+                      localStorage.setItem('selectedStation', log.station);
                     }
-                    // Then navigate to today's log with the log ID
-                    navigate('/today', { state: { logId: log.id } });
+                    // Navigate to today's log with the log ID and station info
+                    navigate('/today', {
+                      state: {
+                        logId: log.id,
+                        fromStation: log.station
+                      }
+                    });
                   }}
                   className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-green-600 hover:bg-green-700"
                 >
