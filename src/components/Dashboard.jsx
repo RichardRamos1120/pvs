@@ -93,14 +93,18 @@ const Dashboard = () => {
                 setUserProfile(profile);
 
                 // FIXED: Only set station from profile if user hasn't manually selected one
-                // This is the key fix - we only set the station from the profile if there's
-                // no existing selectedStation in localStorage
-                if (profile && profile.station && !localStorage.getItem('selectedStation')) {
+                // Check for localStorage first, and only use profile station as a fallback
+                const savedStation = localStorage.getItem('selectedStation');
+                if (!savedStation && profile && profile.station) {
                     handleStationChange(profile.station);
+                } else if (savedStation) {
+                    // Make sure state matches localStorage
+                    setSelectedStation(savedStation);
                 }
 
-                // Fetch logs for the selected station
-                const logs = await firestoreOperations.getLogs(selectedStation);
+                // Fetch logs for the selected station using the most up-to-date station
+                const stationToUse = savedStation || (profile && profile.station) || selectedStation;
+                const logs = await firestoreOperations.getLogs(stationToUse);
                 setPastLogs(logs);
 
             } catch (error) {
@@ -116,9 +120,50 @@ const Dashboard = () => {
 
     // Create new log
     const createNewLog = () => {
-        // We don't need to create the log here anymore
-        // Just navigate to the today page and let it handle creating a log if none exists
-        navigate('/today');
+        console.log("Dashboard: Creating new log...");
+        // Create today log immediately and then navigate to it
+        const tryCreateLog = async () => {
+            try {
+                // Create new log for today
+                const today = new Date();
+                const formattedToday = today.toLocaleDateString('en-US', {
+                    weekday: 'short',
+                    month: 'short',
+                    day: 'numeric',
+                    year: 'numeric'
+                });
+
+                const newLog = {
+                    date: formattedToday,
+                    rawDate: today.toISOString(),
+                    captain: auth.currentUser?.displayName || "Captain",
+                    station: selectedStation,
+                    shift: "B",
+                    crew: [],
+                    activities: [],
+                    totalHours: "0.0",
+                    status: 'draft',
+                    notes: ""
+                };
+
+                console.log("Dashboard: Creating log with data:", newLog);
+                const createdLog = await firestoreOperations.createLog(newLog);
+
+                if (createdLog) {
+                    console.log("Dashboard: Log created successfully:", createdLog);
+                    // Navigate to today's log after creation
+                    navigate('/today');
+                } else {
+                    console.error("Dashboard: Failed to create log");
+                    navigate('/today');
+                }
+            } catch (error) {
+                console.error("Dashboard: Error creating log:", error);
+                navigate('/today');
+            }
+        };
+
+        tryCreateLog();
     };
 
     // Check if there's an active (draft) log for today
@@ -147,8 +192,7 @@ const Dashboard = () => {
 
     // Continue editing today's log
     const continueToday = () => {
-        // No need to fetch the log here anymore
-        // Just navigate to the today route and let that component handle finding the log
+        // Navigate to today route without create parameter since log already exists
         navigate('/today');
     };
     
@@ -165,6 +209,14 @@ const Dashboard = () => {
 
     const deleteLog = async () => {
         if (!logToDelete) return;
+
+        // Security check - only allow admins and captains to delete logs
+        if (userProfile?.role !== 'admin' && userProfile?.role !== 'captain') {
+            setError('Permission denied. Only captains and administrators can delete logs.');
+            setDeleteConfirmOpen(false);
+            setLogToDelete(null);
+            return;
+        }
 
         try {
             await firestoreOperations.deleteLog(logToDelete.id);
@@ -299,15 +351,8 @@ const Dashboard = () => {
                             </p>
                         </div>
                         <div className="mt-4 md:mt-0 flex flex-wrap gap-2">
-                            {hasActiveLog ? (
-                                <button
-                                    onClick={continueToday}
-                                    className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700"
-                                >
-                                    <Edit3 className="h-4 w-4 mr-1" />
-                                    Continue Today's Log
-                                </button>
-                            ) : (
+                            {/* Only show "Start New Log" button for admins and captains if no active log exists */}
+                            {!hasActiveLog && (userProfile?.role === 'admin' || userProfile?.role === 'captain') && (
                                 <button
                                     onClick={createNewLog}
                                     className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-green-600 hover:bg-green-700"
@@ -323,6 +368,16 @@ const Dashboard = () => {
                                 <FileText className="h-4 w-4 mr-1" />
                                 View Past Logs
                             </button>
+                            {/* Show a button to navigate to today's log when one exists */}
+                            {hasActiveLog && (
+                                <button
+                                    onClick={() => navigate('/today')}
+                                    className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700"
+                                >
+                                    <FileText className="h-4 w-4 mr-1" />
+                                    View Today's Log
+                                </button>
+                            )}
                         </div>
                     </div>
                 </div>
@@ -420,13 +475,15 @@ const Dashboard = () => {
                                                 </span>
                                                 {log.status === 'draft' ? (
                                                     <div className="flex space-x-3">
-                                                        <button
-                                                            onClick={() => confirmDeleteLog(log)}
-                                                            className="text-red-600 dark:text-red-400 hover:text-red-800 dark:hover:text-red-300 text-sm flex items-center px-2 py-1"
-                                                        >
-                                                            <Trash2 className="h-4 w-4 mr-1" />
-                                                            Delete
-                                                        </button>
+                                                        {(userProfile?.role === 'admin' || userProfile?.role === 'captain') && (
+                                                            <button
+                                                                onClick={() => confirmDeleteLog(log)}
+                                                                className="text-red-600 dark:text-red-400 hover:text-red-800 dark:hover:text-red-300 text-sm flex items-center px-2 py-1"
+                                                            >
+                                                                <Trash2 className="h-4 w-4 mr-1" />
+                                                                Delete
+                                                            </button>
+                                                        )}
                                                         <button
                                                             onClick={() => navigate(`/report/${log.id}`)}
                                                             className="text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 text-sm flex items-center px-2 py-1"
@@ -484,13 +541,15 @@ const Dashboard = () => {
                                             <div className="mt-2 flex justify-end space-x-3">
                                                 {log.status === 'draft' ? (
                                                     <>
-                                                        <button
-                                                            onClick={() => confirmDeleteLog(log)}
-                                                            className="text-red-600 hover:text-red-900 dark:text-red-400 dark:hover:text-red-200 text-sm flex items-center"
-                                                        >
-                                                            <Trash2 className="w-4 h-4 mr-1" />
-                                                            Delete
-                                                        </button>
+                                                        {(userProfile?.role === 'admin' || userProfile?.role === 'captain') && (
+                                                            <button
+                                                                onClick={() => confirmDeleteLog(log)}
+                                                                className="text-red-600 hover:text-red-900 dark:text-red-400 dark:hover:text-red-200 text-sm flex items-center"
+                                                            >
+                                                                <Trash2 className="w-4 h-4 mr-1" />
+                                                                Delete
+                                                            </button>
+                                                        )}
                                                         <button
                                                             className="text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300 text-sm flex items-center"
                                                             onClick={() => navigate(`/report/${log.id}`)}
@@ -606,13 +665,27 @@ const Dashboard = () => {
                 <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
                     <h3 className="text-lg font-semibold mb-4">Quick Links</h3>
                     <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-                        <button
-                            onClick={createNewLog}
-                            className="flex flex-col items-center justify-center p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg hover:bg-blue-100 dark:hover:bg-blue-900/30 transition-colors"
-                        >
-                            <PlusCircle className="h-8 w-8 text-blue-600 dark:text-blue-400 mb-2" />
-                            <span className="text-sm font-medium">New Log</span>
-                        </button>
+                        {/* Only show "New Log" button for admins and captains when no active log exists */}
+                        {!hasActiveLog && (userProfile?.role === 'admin' || userProfile?.role === 'captain') && (
+                            <button
+                                onClick={createNewLog}
+                                className="flex flex-col items-center justify-center p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg hover:bg-blue-100 dark:hover:bg-blue-900/30 transition-colors"
+                            >
+                                <PlusCircle className="h-8 w-8 text-blue-600 dark:text-blue-400 mb-2" />
+                                <span className="text-sm font-medium">New Log</span>
+                            </button>
+                        )}
+
+                        {/* Show a button to navigate to today's log when one exists */}
+                        {hasActiveLog && (
+                            <button
+                                onClick={() => navigate('/today')}
+                                className="flex flex-col items-center justify-center p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg hover:bg-blue-100 dark:hover:bg-blue-900/30 transition-colors"
+                            >
+                                <FileText className="h-8 w-8 text-blue-600 dark:text-blue-400 mb-2" />
+                                <span className="text-sm font-medium">Today's Log</span>
+                            </button>
+                        )}
 
                         <button
                             onClick={() => navigate('/reports')}

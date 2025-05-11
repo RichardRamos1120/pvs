@@ -170,16 +170,22 @@ const NewActivityModal = ({ show, onClose, onAddActivity, darkMode }) => {
       alert("Category and activity type are required");
       return;
     }
-    
+
+    // Validate time fields
+    if (!newActivityStart || !newActivityEnd) {
+      alert("Start time and end time are required");
+      return;
+    }
+
     // Calculate hours
     const hours = calculateHours(newActivityStart, newActivityEnd);
-    
+
     // Create activity details based on category
     let details = {
       startTime: newActivityStart,
       endTime: newActivityEnd
     };
-    
+
     // Add category-specific details
     if (newActivityCategory === 'MAINTENANCE') {
       details.apparatus = newActivityApparatus;
@@ -193,7 +199,7 @@ const NewActivityModal = ({ show, onClose, onAddActivity, darkMode }) => {
     } else if (newActivityCategory === 'ADMIN') {
       details.documentType = newActivityDocumentType;
     }
-    
+
     const newActivity = {
       id: `activity-${Date.now()}`,
       type: newActivityCategory,
@@ -282,24 +288,28 @@ const NewActivityModal = ({ show, onClose, onAddActivity, darkMode }) => {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
             <div>
               <label className="block text-sm font-medium mb-1">
-                Start Time
+                Start Time*
               </label>
-              <input 
-                type="time" 
-                className="w-full p-2 border rounded-lg"
+              <input
+                type="time"
+                className={`w-full p-2 border rounded-lg ${darkMode ? 'bg-gray-700 text-white' : 'bg-white text-gray-900'}`}
+                style={{ colorScheme: darkMode ? 'dark' : 'light' }}
                 value={newActivityStart}
                 onChange={(e) => setNewActivityStart(e.target.value)}
+                required
               />
             </div>
             <div>
               <label className="block text-sm font-medium mb-1">
-                End Time
+                End Time*
               </label>
-              <input 
-                type="time" 
-                className="w-full p-2 border rounded-lg"
+              <input
+                type="time"
+                className={`w-full p-2 border rounded-lg ${darkMode ? 'bg-gray-700 text-white' : 'bg-white text-gray-900'}`}
+                style={{ colorScheme: darkMode ? 'dark' : 'light' }}
                 value={newActivityEnd}
                 onChange={(e) => setNewActivityEnd(e.target.value)}
+                required
               />
             </div>
           </div>

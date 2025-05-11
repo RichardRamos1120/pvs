@@ -45,8 +45,12 @@ const ReportDetail = () => {
   };
   
   const handleStationChange = (station) => {
-    setSelectedStation(station);
-    localStorage.setItem('selectedStation', station);
+    // Only update if we're actually changing stations
+    if (station !== selectedStation) {
+      // Set the new station
+      setSelectedStation(station);
+      localStorage.setItem('selectedStation', station);
+    }
   };
   
   // Fetch log and user profile on component mount
@@ -550,8 +554,15 @@ const ReportDetail = () => {
             {/* Action buttons */}
             <div className="flex space-x-3">
               {log.status === 'draft' && (userProfile?.role === 'captain' || userProfile?.role === 'admin') && (
-                <button 
-                  onClick={() => navigate('/today', { state: { logId: log.id } })}
+                <button
+                  onClick={() => {
+                    // Ensure we first select the correct station for the log being edited
+                    if (log.station && log.station !== selectedStation) {
+                      handleStationChange(log.station);
+                    }
+                    // Then navigate to today's log with the log ID
+                    navigate('/today', { state: { logId: log.id } });
+                  }}
                   className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-green-600 hover:bg-green-700"
                 >
                   <Edit3 className="h-4 w-4 mr-1" />

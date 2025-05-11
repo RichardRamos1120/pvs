@@ -59,7 +59,9 @@ const TodayLog = () => {
   const [userRole, setUserRole] = useState(null);
   const [readOnlyMode, setReadOnlyMode] = useState(false);
   const [userChecked, setUserChecked] = useState(false);
-  
+  // Track the last station we checked for a log
+  const [lastCheckedStation, setLastCheckedStation] = useState(null);
+
   // New states for notes handling
   const [localNotes, setLocalNotes] = useState('');
   const [unsavedChanges, setUnsavedChanges] = useState(false);
@@ -79,56 +81,43 @@ const TodayLog = () => {
   const db = getFirestore();
   const firestoreOperations = useContext(FirestoreContext);
 
-  // Wrapper functions to update localStorage when state changes
-  const handleDarkModeChange = (mode) => {
-    setDarkMode(mode);
-    localStorage.setItem('darkMode', mode.toString());
-
-    // Apply dark mode class to HTML element for Tailwind
-    if (mode) {
-      document.documentElement.classList.add('dark');
-      document.body.classList.add('dark-mode');
-    } else {
-      document.documentElement.classList.remove('dark');
-      document.body.classList.remove('dark-mode');
-    }
-  };
-
-  const handleStationChange = (station) => {
-    // Only reset if we're actually changing stations
-    if (station !== selectedStation) {
-      // Clear the current log when changing stations
-      setTodayLog(null);
-      // Reset noLogExists flag
-      setNoLogExists(false);
-      // Reset the logChecked state for the new station
-      const today = new Date();
-      const dateKey = today.toISOString().split('T')[0];
-      const stationDateKey = `${station}-${dateKey}`;
-      setLogChecked(prev => {
-        const newState = {...prev};
-        // Remove the new station from checked logs so it will be fetched again
-        delete newState[stationDateKey];
-        return newState;
-      });
-      // Set loading to true to show loading indicator
-      setLoading(true);
-      // Set the new station
-      setSelectedStation(station);
-      localStorage.setItem('selectedStation', station);
-    }
-  };
-
   // Check if user has permission to edit logs
   const hasEditPermission = userRole === 'admin' || userRole === 'captain';
 
-  // Function to create a new log for today
-  const createNewLog = async () => {
+  // Function to explicitly create a new log - defined early to avoid reference errors
+  const createNewLogDirectly = async () => {
+    if (!hasEditPermission) return;
+
     try {
       setLoading(true);
 
-      // Get today's date
+      // First, check if a log already exists for this station today
       const today = new Date();
+      const startOfDay = new Date(today);
+      startOfDay.setHours(0, 0, 0, 0);
+
+      const endOfDay = new Date(today);
+      endOfDay.setHours(23, 59, 59, 999);
+
+      console.log("Checking for existing logs before creating a new one");
+
+      // Double-check if a log already exists
+      const existingLogs = await firestoreOperations.getLogsByDateAndStation(
+        selectedStation,
+        startOfDay.toISOString(),
+        endOfDay.toISOString()
+      );
+
+      // If a log already exists, just load it instead of creating a new one
+      if (existingLogs && existingLogs.length > 0) {
+        console.log("Found existing log when trying to create a new one:", existingLogs[0]);
+        setTodayLog(existingLogs[0]);
+        setError('');
+        setLoading(false);
+        return;
+      }
+
+      // No existing log found, create a new one
       const formattedToday = today.toLocaleDateString('en-US', {
         weekday: 'short',
         month: 'short',
@@ -155,7 +144,11 @@ const TodayLog = () => {
       if (createdLog) {
         console.log("Log created successfully:", createdLog);
         setTodayLog(createdLog);
-        setNoLogExists(false);
+        setError('');
+        setShouldCreateLog(false); // Reset this flag
+
+        // Update the last checked station
+        setLastCheckedStation(selectedStation);
       } else {
         throw new Error("Failed to create log");
       }
@@ -164,6 +157,40 @@ const TodayLog = () => {
       setError(error.message || "Failed to create log");
     } finally {
       setLoading(false);
+    }
+  };
+
+  // Wrapper functions to update localStorage when state changes
+  const handleDarkModeChange = (mode) => {
+    setDarkMode(mode);
+    localStorage.setItem('darkMode', mode.toString());
+
+    // Apply dark mode class to HTML element for Tailwind
+    if (mode) {
+      document.documentElement.classList.add('dark');
+      document.body.classList.add('dark-mode');
+    } else {
+      document.documentElement.classList.remove('dark');
+      document.body.classList.remove('dark-mode');
+    }
+  };
+
+  const handleStationChange = (station) => {
+    // Only proceed if the station actually changed
+    if (station !== selectedStation) {
+      console.log(`Station changed from ${selectedStation} to ${station}`);
+      setSelectedStation(station);
+      localStorage.setItem('selectedStation', station);
+
+      // Clear the existing log and error state when changing stations
+      setTodayLog(null);
+      setError('');
+
+      // Reset shouldCreateLog when changing stations
+      setShouldCreateLog(false);
+
+      // Set loading to true to show the loading indicator while we fetch data
+      setLoading(true);
     }
   };
 
@@ -298,74 +325,128 @@ const TodayLog = () => {
     return () => clearTimeout(timer);
   }, [saveSuccess]);
 
-  // Add state to track if we've already checked for logs for this station-day combination
-  const [logChecked, setLogChecked] = useState({});
-  // Add state to track if no log exists for today
-  const [noLogExists, setNoLogExists] = useState(false);
+  // Cleanup effect when component unmounts
+  useEffect(() => {
+    return () => {
+      // Reset states when component unmounts
+      setShouldCreateLog(false);
+      setLastCheckedStation(null);
+    };
+  }, []);
+
+  // Determine if we should create a new log when none exists
+  const [shouldCreateLog, setShouldCreateLog] = useState(false);
+  
+  // Check navigation parameters to see if we should create a log, set a specific station, or load a specific log
+  useEffect(() => {
+    // Check URL parameters
+    const queryParams = new URLSearchParams(window.location.search);
+    const createParam = queryParams.get('create');
+
+    // Check location state (from navigate function)
+    const locationState = location.state;
+
+    console.log("Create parameter in URL:", createParam);
+    console.log("Location state:", locationState);
+
+    // Set station from location state if provided
+    if (locationState && locationState.station) {
+      console.log("Setting station from location state:", locationState.station);
+      handleStationChange(locationState.station);
+    }
+
+    // Check if we were passed a specific log ID to load (for editing)
+    if (locationState && locationState.logId) {
+      console.log("Log ID provided in location state:", locationState.logId);
+      const loadSpecificLog = async () => {
+        try {
+          setLoading(true);
+          console.log("Loading specific log with ID:", locationState.logId);
+
+          // Mark as loaded specific log before we do anything else
+          setLoadedSpecificLog(true);
+
+          const logData = await firestoreOperations.getLog(locationState.logId);
+
+          if (logData) {
+            console.log("Successfully loaded log from ID:", logData);
+            setTodayLog(logData);
+            setError('');
+
+            // Update the station if the log's station differs from the currently selected one
+            if (logData.station && logData.station !== selectedStation) {
+              console.log(`Setting station to match log: ${logData.station}`);
+              handleStationChange(logData.station);
+            }
+          } else {
+            console.error("No log data returned for ID:", locationState.logId);
+            setError("Log not found. It may have been deleted.");
+          }
+        } catch (error) {
+          console.error("Error loading specific log:", error);
+          setError("Failed to load the selected log. Please try again.");
+        } finally {
+          setLoading(false);
+
+          // Clear the location state after using it, but do it with a delay to ensure
+          // the station change has taken effect
+          setTimeout(() => {
+            window.history.replaceState({}, document.title);
+          }, 500);
+        }
+      };
+
+      loadSpecificLog();
+    }
+    // Set shouldCreateLog if either method indicates we should create
+    else if (createParam === 'true' || (locationState && locationState.shouldCreate === true)) {
+      setShouldCreateLog(true);
+      console.log("Should create log set to true");
+
+      // Clear the location state after using it to prevent recreation on page refresh
+      if (locationState && locationState.shouldCreate) {
+        window.history.replaceState({}, document.title);
+      }
+
+      // Remove the URL parameter if present
+      if (createParam === 'true') {
+        const newUrl = window.location.pathname;
+        window.history.replaceState({}, document.title, newUrl);
+      }
+    } else {
+      // Reset the flag if no creation parameters are found
+      setShouldCreateLog(false);
+    }
+  }, [location, firestoreOperations, selectedStation, handleStationChange]);
+
+  // Flag to track if we loaded a specific log via logId
+  const [loadedSpecificLog, setLoadedSpecificLog] = useState(false);
+
+  // Set the loadedSpecificLog flag when loading a log by ID
+  useEffect(() => {
+    const locationState = location.state;
+
+    // If we have a logId in the state, we should mark as loaded specific log
+    // whether or not we have a todayLog, to prevent the other useEffect from running
+    if (locationState?.logId) {
+      console.log("Setting loadedSpecificLog flag to true");
+      setLoadedSpecificLog(true);
+    }
+  }, [location.state]);
 
   // Load logs after user check is complete
   useEffect(() => {
-    if (!userChecked || userRole === null) {
-      return;
-    }
-
-    // Create a unique key for this station and day
-    const today = new Date();
-    const dateKey = today.toISOString().split('T')[0]; // Get YYYY-MM-DD format
-    const stationDateKey = `${selectedStation}-${dateKey}`;
-
-    // Check if a specific log ID was passed in the location state
-    const logId = location.state?.logId;
-
-    // If we have a logId from navigation state, we should always try to load that log
-    if (logId) {
-      console.log("Log ID found in navigation state:", logId);
-      // Special case - don't return early, proceed to fetch the log
-    }
-    // Otherwise, if we've already checked for this station-date combination, don't check again
-    else if (logChecked[stationDateKey] && (todayLog || noLogExists)) {
-      console.log("Already checked for logs for this station and date:", stationDateKey);
+    // Skip if user is not checked, or we already loaded a specific log
+    if (!userChecked || userRole === null || loadedSpecificLog) {
       return;
     }
 
     const fetchTodayLogs = async () => {
       try {
         setLoading(true);
-        setNoLogExists(false); // Reset the no log exists state
-        setError(''); // Clear any previous errors
 
-        // Check if a specific log ID was passed in the location state
-        const logId = location.state?.logId;
-
-        if (logId) {
-          // If we have a specific log ID, load that log directly
-          console.log("Fetching specific log with ID:", logId);
-
-          const specificLog = await firestoreOperations.getLog(logId);
-
-          if (specificLog) {
-            console.log("Found specific log:", specificLog);
-
-            // If this log belongs to a different station, update the station
-            if (specificLog.station !== selectedStation) {
-              console.log(`Log belongs to ${specificLog.station}, updating station from ${selectedStation}`);
-              setSelectedStation(specificLog.station);
-              localStorage.setItem('selectedStation', specificLog.station);
-            }
-
-            setTodayLog(specificLog);
-            // Mark this station-date as checked
-            const stationDateKey = `${specificLog.station}-${dateKey}`;
-            setLogChecked(prev => ({...prev, [stationDateKey]: true}));
-            return; // Exit early since we found the specific log
-          } else {
-            console.log("Specific log not found, will try to find today's log");
-            // If the specific log is not found, continue with normal flow
-          }
-        }
-
-        // If no specific log ID or it wasn't found, look for today's log
         // Get today's date range (start and end of day)
+        const today = new Date();
         const startOfDay = new Date(today);
         startOfDay.setHours(0, 0, 0, 0);
 
@@ -374,6 +455,10 @@ const TodayLog = () => {
 
         console.log("Searching for logs between:", startOfDay, "and", endOfDay);
         console.log("For station:", selectedStation);
+        console.log("Last checked station:", lastCheckedStation);
+
+        // Update the last checked station
+        setLastCheckedStation(selectedStation);
 
         // Query for today's log for the selected station
         const logs = await firestoreOperations.getLogsByDateAndStation(
@@ -384,34 +469,72 @@ const TodayLog = () => {
 
         console.log("Logs found:", logs);
 
-        // Mark that we've checked for logs for this station-date combination
-        setLogChecked(prev => ({...prev, [stationDateKey]: true}));
-
         if (logs && logs.length > 0) {
           // Use the first log found (should usually be only one per day per station)
           setTodayLog(logs[0]);
           console.log("Found existing log:", logs[0]);
+          // Clear any errors since we found a log
+          setError('');
         } else {
-          // Instead of automatically creating a log, we'll set the state to show a create button
-          console.log("No log found for today");
-          setTodayLog(null);
-          setNoLogExists(true);
+          // Only create new log if explicitly requested and user has permission
+          if (hasEditPermission && shouldCreateLog) {
+            console.log("No log found for today, creating a new one");
+            // Create new log for today
+            const formattedToday = today.toLocaleDateString('en-US', {
+              weekday: 'short',
+              month: 'short',
+              day: 'numeric',
+              year: 'numeric'
+            });
 
-          if (!hasEditPermission) {
-            console.log("User doesn't have permission to create a log");
-            setError("No activity log exists for today. Please contact a captain or administrator to create a new log.");
+            const newLog = {
+              date: formattedToday,
+              rawDate: today.toISOString(),
+              captain: auth.currentUser?.displayName || "Captain",
+              station: selectedStation,
+              shift: "B",
+              crew: [],
+              activities: [],
+              totalHours: "0.0",
+              status: 'draft',
+              notes: ""
+            };
+
+            console.log("Creating new log with data:", newLog);
+            const createdLog = await firestoreOperations.createLog(newLog);
+
+            if (createdLog) {
+              console.log("Log created successfully:", createdLog);
+              setTodayLog(createdLog);
+              // Reset shouldCreateLog after successful creation
+              setShouldCreateLog(false);
+            } else {
+              throw new Error("Failed to create log");
+            }
+          } else {
+            console.log("No log found for today and not explicitly requested to create one");
+            if (!hasEditPermission) {
+              setError("No activity log exists for today. Please contact a captain or administrator to create a new log.");
+            } else {
+              // User has permission but didn't request to create one
+              setError("No log exists for today. Click 'Create New Log' to start one.");
+            }
+            // Make sure todayLog is null when there's no log
+            setTodayLog(null);
           }
         }
       } catch (error) {
         console.error("Error fetching logs:", error);
         setError(error.message || "Failed to load log data");
+        // Clear todayLog on error
+        setTodayLog(null);
       } finally {
         setLoading(false);
       }
     };
 
     fetchTodayLogs();
-  }, [userChecked, userRole, selectedStation, firestoreOperations, auth.currentUser, hasEditPermission, logChecked, todayLog, noLogExists, location.state]);
+  }, [userChecked, userRole, selectedStation, firestoreOperations, auth.currentUser, hasEditPermission, shouldCreateLog, lastCheckedStation, loadedSpecificLog]);
 
   // Function to handle local notes changes
   const handleNotesChange = (e) => {
@@ -733,14 +856,40 @@ const TodayLog = () => {
   if (error && userRole !== null) {
     return (
       <Layout darkMode={darkMode} setDarkMode={handleDarkModeChange} selectedStation={selectedStation} setSelectedStation={handleStationChange}>
-        <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative mb-6" role="alert">
-          <span className="block sm:inline">{error}</span>
-          <button
-            className="mt-2 bg-red-500 hover:bg-red-700 text-white font-bold py-2 px-4 rounded"
-            onClick={() => navigate('/dashboard')}
-          >
-            Return to Dashboard
-          </button>
+        <div className="bg-white dark:bg-gray-800 shadow rounded-lg p-8 text-center">
+          <div className="text-gray-500 dark:text-gray-400 mb-4">
+            <Clipboard className="h-12 w-12 mx-auto mb-2" />
+            <p className="text-lg">No log found for today</p>
+            <p className="text-sm mt-1">
+              {!readOnlyMode
+                ? "You can create a new log or return to the dashboard"
+                : "No log has been created for today yet. Please check back later."}
+            </p>
+          </div>
+
+          <div className="bg-red-100 dark:bg-red-900/20 border border-red-200 dark:border-red-700 text-red-800 dark:text-red-200 rounded p-4 mb-4">
+            <span className="block">{error}</span>
+          </div>
+
+          <div className="flex flex-wrap justify-center gap-3">
+            <button
+              onClick={() => navigate('/dashboard')}
+              className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700"
+            >
+              <ArrowLeft className="h-4 w-4 mr-1" />
+              Back to Dashboard
+            </button>
+
+            {hasEditPermission && (
+              <button
+                onClick={createNewLogDirectly}
+                className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-green-600 hover:bg-green-700"
+              >
+                <Plus className="h-4 w-4 mr-1" />
+                Create New Log
+              </button>
+            )}
+          </div>
         </div>
       </Layout>
     );
@@ -755,21 +904,19 @@ const TodayLog = () => {
             <Clipboard className="h-12 w-12 mx-auto mb-2" />
             <p className="text-lg">No log found for today</p>
             {!readOnlyMode ? (
-              <p className="text-sm mt-1">Would you like to create a new log for today?</p>
+              <p className="text-sm mt-1">You can create a new log or return to the dashboard</p>
             ) : (
               <p className="text-sm mt-1">No log has been created for today yet. Please check back later.</p>
             )}
           </div>
-          <div className="flex justify-center space-x-4">
-            {!readOnlyMode && hasEditPermission && noLogExists && (
-              <button
-                onClick={createNewLog}
-                className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-green-600 hover:bg-green-700"
-              >
-                <Plus className="h-4 w-4 mr-1" />
-                Create Today's Log
-              </button>
-            )}
+          {/* Error message if any */}
+          {error && (
+            <div className="mb-4 p-3 bg-red-100 dark:bg-red-900/20 border border-red-200 dark:border-red-700 text-red-800 dark:text-red-200 rounded text-sm">
+              {error}
+            </div>
+          )}
+
+          <div className="flex flex-wrap justify-center gap-3">
             <button
               onClick={() => navigate('/dashboard')}
               className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700"
@@ -777,6 +924,16 @@ const TodayLog = () => {
               <ArrowLeft className="h-4 w-4 mr-1" />
               Back to Dashboard
             </button>
+
+            {hasEditPermission && (
+              <button
+                onClick={createNewLogDirectly}
+                className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-green-600 hover:bg-green-700"
+              >
+                <Plus className="h-4 w-4 mr-1" />
+                Create New Log
+              </button>
+            )}
           </div>
         </div>
       </Layout>
@@ -1025,14 +1182,6 @@ const TodayLog = () => {
                           Save Notes
                         </button>
                       )}
-                      {/* {todayLog.status !== 'complete' && !readOnlyMode && (
-                        <button
-                          className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 p-1"
-                          title="Voice input"
-                        >
-                          <Mic className="h-5 w-5" />
-                        </button>
-                      )} */}
                     </div>
                   </div>
                 </div>

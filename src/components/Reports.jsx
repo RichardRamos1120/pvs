@@ -44,7 +44,8 @@ const Reports = () => {
   
   const [pastLogs, setPastLogs] = useState([]);
   const [activeTab, setActiveTab] = useState('all'); // 'all', 'draft', 'complete'
-  const [stationFilter, setStationFilter] = useState('all');
+  // Initialize stationFilter - default to 'all' for admin users or to selectedStation for others
+  const [stationFilter, setStationFilter] = useState('all'); // Start with 'all', we'll update after checking user role
   const [searchTerm, setSearchTerm] = useState('');
   const [dateRange, setDateRange] = useState('all');
   const [loading, setLoading] = useState(true);
@@ -73,8 +74,14 @@ const Reports = () => {
   };
   
   const handleStationChange = (station) => {
-    setSelectedStation(station);
-    localStorage.setItem('selectedStation', station);
+    // Only update if we're actually changing stations
+    if (station !== selectedStation) {
+      // Set loading to true when changing stations
+      setLoading(true);
+      // Set the new station
+      setSelectedStation(station);
+      localStorage.setItem('selectedStation', station);
+    }
   };
   
   // Fetch user profile and logs on component mount
@@ -83,31 +90,53 @@ const Reports = () => {
       try {
         setLoading(true);
         const user = auth.currentUser;
-        
+
         if (!user) {
           throw new Error('Not authenticated');
         }
-        
+
         // Get user profile
         const profile = await firestoreOperations.getUserProfile(user.uid);
         setUserProfile(profile);
-        
-        // Set selected station based on user profile
-        if (profile && profile.station) {
-          handleStationChange(profile.station);
-          setStationFilter(profile.station);
+
+        // Check if we already have a station selection from localStorage
+        const savedStation = localStorage.getItem('selectedStation');
+
+        // Set proper station filter based on user role
+        if (profile && profile.role === 'admin') {
+          // Admin users start with 'all' filter by default
+          // But respect the station filter that was set in this session
+          if (stationFilter !== 'all') {
+            // Keep the current stationFilter if it's not 'all'
+          } else {
+            // Default to 'all' for admins on first load
+            setStationFilter('all');
+          }
+        } else {
+          // Non-admin users are limited to their saved station
+          const stationToUse = savedStation || profile.station || selectedStation;
+          setStationFilter(stationToUse);
         }
-        
+
         // Fetch logs
         let logs;
         if (profile && profile.role === 'admin') {
-          // Admin can see all logs
-          logs = await firestoreOperations.getAllLogs();
+          // If station filter is 'all' and user is admin, get all logs
+          if (stationFilter === 'all') {
+            console.log("Fetching ALL logs for admin user");
+            logs = await firestoreOperations.getAllLogs();
+          } else {
+            // Otherwise filter by the current station
+            console.log(`Fetching logs for admin user filtered by station: ${stationFilter}`);
+            logs = await firestoreOperations.getLogs(stationFilter);
+          }
         } else {
           // Regular users see only their station logs
-          logs = await firestoreOperations.getLogs(profile.station || selectedStation);
+          const stationToUse = savedStation || profile.station || selectedStation;
+          console.log(`Fetching logs for regular user with station: ${stationToUse}`);
+          logs = await firestoreOperations.getLogs(stationToUse);
         }
-        
+
         setPastLogs(logs || []);
       } catch (error) {
         console.error('Error fetching data:', error);
@@ -116,31 +145,48 @@ const Reports = () => {
         setLoading(false);
       }
     };
-    
+
     fetchData();
-  }, [auth, firestoreOperations]);
+  }, [auth, firestoreOperations, stationFilter, selectedStation]);
   
   // Handle station filter change
   const handleStationFilterChange = async (stationName) => {
+    console.log(`Changing station filter to: ${stationName}`);
     setStationFilter(stationName);
-    
+
+    // Also update the global selectedStation if not "all"
     if (stationName !== 'all') {
-      try {
-        const logs = await firestoreOperations.getLogs(stationName);
-        setPastLogs(logs || []);
-      } catch (error) {
-        console.error('Error fetching logs for station:', error);
-        setError('Failed to load logs for selected station.');
+      handleStationChange(stationName);
+    }
+
+    try {
+      setLoading(true);
+      let logs;
+
+      if (stationName === 'all') {
+        if (userProfile && userProfile.role === 'admin') {
+          // Admin viewing all logs
+          console.log("Fetching ALL logs for admin user");
+          logs = await firestoreOperations.getAllLogs();
+        } else {
+          // Non-admin users shouldn't see "all" option, but if they try, default to their station
+          console.log("Non-admin trying to access all logs, defaulting to their station");
+          const stationToUse = localStorage.getItem('selectedStation') || userProfile?.station || selectedStation;
+          setStationFilter(stationToUse); // Update UI to show correct station
+          logs = await firestoreOperations.getLogs(stationToUse);
+        }
+      } else {
+        // Specific station filter
+        console.log(`Fetching logs for station: ${stationName}`);
+        logs = await firestoreOperations.getLogs(stationName);
       }
-    } else if (userProfile && userProfile.role === 'admin') {
-      // Admin viewing all logs
-      try {
-        const logs = await firestoreOperations.getAllLogs();
-        setPastLogs(logs || []);
-      } catch (error) {
-        console.error('Error fetching all logs:', error);
-        setError('Failed to load all logs.');
-      }
+
+      setPastLogs(logs || []);
+    } catch (error) {
+      console.error('Error fetching logs:', error);
+      setError('Failed to load logs. Please try again.');
+    } finally {
+      setLoading(false);
     }
   };
   
@@ -194,6 +240,14 @@ const Reports = () => {
 
   const deleteLog = async () => {
     if (!logToDelete) return;
+
+    // Security check - only allow admins and captains to delete logs
+    if (userProfile?.role !== 'admin' && userProfile?.role !== 'captain') {
+      setError('Permission denied. Only captains and administrators can delete logs.');
+      setDeleteConfirmOpen(false);
+      setLogToDelete(null);
+      return;
+    }
 
     try {
       await firestoreOperations.deleteLog(logToDelete.id);
@@ -418,12 +472,17 @@ const Reports = () => {
                 value={stationFilter}
                 onChange={(e) => handleStationFilterChange(e.target.value)}
               >
-                {userProfile?.role === 'admin' && <option value="all">All Stations</option>}
+                {/* Show "All Stations" option only for admin users */}
+                {userProfile?.role === 'admin' && (
+                  <option value="all">All Stations</option>
+                )}
+
+                {/* Show individual stations */}
                 {stationsList
-                  .filter(station => station !== 'all' || userProfile?.role === 'admin')
+                  .filter(station => station !== 'all') // Filter out 'all' since we handle it separately above
                   .map((station) => (
                     <option key={station} value={station}>
-                      {station === 'all' ? 'All Stations' : station}
+                      {station}
                     </option>
                   ))
                 }
@@ -554,20 +613,31 @@ const Reports = () => {
                                 <div className="flex items-center space-x-3 ml-4">
                                   {log.status === 'draft' ? (
                                     <>
-                                      <button
-                                        onClick={() => navigate('/today', { state: { logId: log.id } })}
-                                        className="text-green-600 hover:text-green-900 dark:text-green-400 dark:hover:text-green-200 inline-flex items-center"
-                                      >
-                                        <Edit3 className="w-4 h-4 mr-1" />
-                                        Edit
-                                      </button>
-                                      <button
-                                        onClick={() => confirmDeleteLog(log)}
-                                        className="text-red-600 hover:text-red-900 dark:text-red-400 dark:hover:text-red-200 inline-flex items-center"
-                                      >
-                                        <Trash2 className="w-4 h-4 mr-1" />
-                                        Delete
-                                      </button>
+                                      {(userProfile?.role === 'admin' || userProfile?.role === 'captain') && (
+                                        <button
+                                          onClick={() => {
+                                            // Ensure we first select the correct station for the log being edited
+                                            if (log.station && log.station !== selectedStation) {
+                                              handleStationChange(log.station);
+                                            }
+                                            // Then navigate to today's log with the log ID
+                                            navigate('/today', { state: { logId: log.id } });
+                                          }}
+                                          className="text-green-600 hover:text-green-900 dark:text-green-400 dark:hover:text-green-200 inline-flex items-center"
+                                        >
+                                          <Edit3 className="w-4 h-4 mr-1" />
+                                          Edit
+                                        </button>
+                                      )}
+                                      {(userProfile?.role === 'admin' || userProfile?.role === 'captain') && (
+                                        <button
+                                          onClick={() => confirmDeleteLog(log)}
+                                          className="text-red-600 hover:text-red-900 dark:text-red-400 dark:hover:text-red-200 inline-flex items-center"
+                                        >
+                                          <Trash2 className="w-4 h-4 mr-1" />
+                                          Delete
+                                        </button>
+                                      )}
                                       <button
                                         className="text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300 inline-flex items-center"
                                         onClick={() => navigate(`/report/${log.id}`)}
@@ -635,20 +705,31 @@ const Reports = () => {
                         <div className="mt-2 flex justify-end space-x-3">
                           {log.status === 'draft' ? (
                             <>
-                              <button
-                                onClick={() => navigate('/today', { state: { logId: log.id } })}
-                                className="text-green-600 hover:text-green-900 dark:text-green-400 dark:hover:text-green-200 text-sm flex items-center"
-                              >
-                                <Edit3 className="w-4 h-4 mr-1" />
-                                Edit
-                              </button>
-                              <button
-                                onClick={() => confirmDeleteLog(log)}
-                                className="text-red-600 hover:text-red-900 dark:text-red-400 dark:hover:text-red-200 text-sm flex items-center"
-                              >
-                                <Trash2 className="w-4 h-4 mr-1" />
-                                Delete
-                              </button>
+                              {(userProfile?.role === 'admin' || userProfile?.role === 'captain') && (
+                                <button
+                                  onClick={() => {
+                                    // Ensure we first select the correct station for the log being edited
+                                    if (log.station && log.station !== selectedStation) {
+                                      handleStationChange(log.station);
+                                    }
+                                    // Then navigate to today's log with the log ID
+                                    navigate('/today', { state: { logId: log.id } });
+                                  }}
+                                  className="text-green-600 hover:text-green-900 dark:text-green-400 dark:hover:text-green-200 text-sm flex items-center"
+                                >
+                                  <Edit3 className="w-4 h-4 mr-1" />
+                                  Edit
+                                </button>
+                              )}
+                              {(userProfile?.role === 'admin' || userProfile?.role === 'captain') && (
+                                <button
+                                  onClick={() => confirmDeleteLog(log)}
+                                  className="text-red-600 hover:text-red-900 dark:text-red-400 dark:hover:text-red-200 text-sm flex items-center"
+                                >
+                                  <Trash2 className="w-4 h-4 mr-1" />
+                                  Delete
+                                </button>
+                              )}
                               <button
                                 className="text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300 text-sm flex items-center"
                                 onClick={() => navigate(`/report/${log.id}`)}
