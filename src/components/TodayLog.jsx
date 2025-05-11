@@ -52,15 +52,17 @@ const TodayLog = () => {
     return isDarkMode;
   });
 
+  // Get navigation data once to avoid re-renders
+  const initialFromStation = location.state?.fromStation;
+  const initialLogId = location.state?.logId;
+
   // Initialize selectedStation from localStorage or from navigation state
   const [selectedStation, setSelectedStation] = useState(() => {
     // If we're navigating from another component with a specific station, use that
-    const fromStation = location.state?.fromStation;
-
-    if (fromStation) {
+    if (initialFromStation) {
       // Update localStorage to match the station we're navigating from
-      localStorage.setItem('selectedStation', fromStation);
-      return fromStation;
+      localStorage.setItem('selectedStation', initialFromStation);
+      return initialFromStation;
     }
 
     // Otherwise use the localStorage value or default
@@ -314,6 +316,9 @@ const TodayLog = () => {
   // Add state to track if no log exists for today
   const [noLogExists, setNoLogExists] = useState(false);
 
+  // Track if we've already handled a specific log ID
+  const [handledLogId, setHandledLogId] = useState(null);
+
   // Load logs after user check is complete
   useEffect(() => {
     if (!userChecked || userRole === null) {
@@ -325,29 +330,33 @@ const TodayLog = () => {
     const dateKey = today.toISOString().split('T')[0]; // Get YYYY-MM-DD format
     const stationDateKey = `${selectedStation}-${dateKey}`;
 
-    // Check if a specific log ID was passed in the location state
-    const logId = location.state?.logId;
+    // Use the initialLogId that was captured once during component initialization
+    const logId = initialLogId;
 
-    // If we have a logId from navigation state, we should always try to load that log
-    if (logId) {
-      console.log("Log ID found in navigation state:", logId);
-      // Special case - don't return early, proceed to fetch the log
+    // If we have already handled this specific log ID, don't fetch it again
+    if (logId && handledLogId === logId && todayLog) {
+      console.log("Already handled this specific log ID:", logId);
+      return;
     }
-    // Otherwise, if we've already checked for this station-date combination, don't check again
-    else if (logChecked[stationDateKey] && (todayLog || noLogExists)) {
+
+    // If we're just checking for today's logs (no specific logId)
+    // and we've already checked this station/date combination, don't check again
+    if (!logId && logChecked[stationDateKey] && (todayLog || noLogExists)) {
       console.log("Already checked for logs for this station and date:", stationDateKey);
       return;
     }
 
     const fetchTodayLogs = async () => {
       try {
-        setLoading(true);
+        // Only set loading to true if we're not already loading
+        if (!loading) {
+          setLoading(true);
+        }
+
         setNoLogExists(false); // Reset the no log exists state
         setError(''); // Clear any previous errors
 
-        // Check if a specific log ID was passed in the location state
-        const logId = location.state?.logId;
-
+        // Use the logId we defined earlier
         if (logId) {
           // If we have a specific log ID, load that log directly
           console.log("Fetching specific log with ID:", logId);
@@ -357,13 +366,24 @@ const TodayLog = () => {
           if (specificLog) {
             console.log("Found specific log:", specificLog);
 
-            // Set the log without changing the station again to avoid infinite loop
-            // We already set the station in the handleStationChange function before navigating
+            // Set the log
             setTodayLog(specificLog);
+
+            // Record that we've handled this log ID
+            setHandledLogId(logId);
 
             // Mark this station-date as checked
             const stationDateKey = `${specificLog.station}-${dateKey}`;
             setLogChecked(prev => ({...prev, [stationDateKey]: true}));
+
+            // Clear navigation state to prevent further processing
+            if (window.history.replaceState) {
+              window.history.replaceState(
+                {},
+                document.title,
+                window.location.pathname
+              );
+            }
 
             // Ensure loading is set to false
             setLoading(false);
@@ -421,7 +441,7 @@ const TodayLog = () => {
     };
 
     fetchTodayLogs();
-  }, [userChecked, userRole, selectedStation, firestoreOperations, auth.currentUser, hasEditPermission, logChecked, todayLog, noLogExists, location.state]);
+  }, [userChecked, userRole, selectedStation, firestoreOperations, auth.currentUser, hasEditPermission, logChecked, todayLog, noLogExists, handledLogId, loading, initialLogId]);
 
   // Function to handle local notes changes
   const handleNotesChange = (e) => {
