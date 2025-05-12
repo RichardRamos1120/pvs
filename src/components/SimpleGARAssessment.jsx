@@ -97,18 +97,18 @@ const GARAssessment = () => {
     date: new Date().toISOString().split('T')[0],
     rawDate: new Date().toISOString(),
     time: new Date().toTimeString().substring(0, 5),
-    type: "Department-wide",
-    station: selectedStation,
+    type: "",
+    station: "",
     status: "draft",
     weather: {
-      temperature: "37",
+      temperature: "",
       temperatureUnit: "°F",
-      wind: "18",
-      windDirection: "NW",
-      humidity: "85",
-      precipitation: "Heavy Rain",
-      precipitationRate: "1.2",
-      alerts: "Flash Flood Warning until 5:00 PM"
+      wind: "",
+      windDirection: "N",
+      humidity: "",
+      precipitation: "",
+      precipitationRate: "",
+      alerts: ""
     },
     riskFactors: {
       supervision: 0,
@@ -445,6 +445,36 @@ const GARAssessment = () => {
     fetchData();
   }, [auth, firestoreOperations, id]);
   
+  // Initialize values when component mounts or showAssessment changes
+  useEffect(() => {
+    // After slight delay to ensure refs are set
+    setTimeout(() => {
+      // Handle station field based on assessment type
+      if (typeRef.current && stationRef.current) {
+        const currentType = typeRef.current.value;
+
+        // Set initial station value based on assessment type
+        if (currentType === "Department-wide") {
+          stationRef.current.value = "All Stations";
+          assessmentData.station = "All Stations";
+          stationRef.current.disabled = true;
+        } else if (currentType === "Station-specific") {
+          // Keep existing value if not All Stations
+          if (assessmentData.station === "All Stations") {
+            stationRef.current.value = selectedStation || "";
+            assessmentData.station = selectedStation || "";
+          } else if (assessmentData.station) {
+            stationRef.current.value = assessmentData.station;
+          }
+          stationRef.current.disabled = false;
+        } else {
+          // For empty type, disable station
+          stationRef.current.disabled = true;
+        }
+      }
+    }, 100);
+  }, [showAssessment, selectedStation]);  // Re-run when showAssessment or selectedStation changes
+
   // Calculate total risk score and determine risk level
   const calculateRiskScore = () => {
     const { supervision, planning, teamSelection, teamFitness, environment, complexity } = assessmentData.riskFactors;
@@ -765,16 +795,40 @@ const GARAssessment = () => {
       setTimeout(() => {
         if (dateRef.current) dateRef.current.value = draft.date || new Date().toISOString().split('T')[0];
         if (timeRef.current) timeRef.current.value = draft.time || new Date().toTimeString().substring(0, 5);
-        if (typeRef.current) typeRef.current.value = draft.type || "Department-wide";
-        if (stationRef.current) stationRef.current.value = draft.station || selectedStation;
+        if (typeRef.current) typeRef.current.value = draft.type || "";
 
-        if (tempRef.current) tempRef.current.value = draft.weather?.temperature || "37";
+        // Handle station dropdown and value based on assessment type
+        if (stationRef.current) {
+          if (draft.type === "Department-wide") {
+            // For Department-wide, set to All Stations and disable
+            assessmentData.station = "All Stations";
+            stationRef.current.value = "All Stations";
+            stationRef.current.disabled = true;
+          } else if (draft.type === "Station-specific") {
+            // For Station-specific, set correct value and enable
+            if (draft.station === "All Stations" || !draft.station) {
+              // Reset to current station if it was All Stations or empty
+              assessmentData.station = selectedStation || "";
+              stationRef.current.value = selectedStation || "";
+            } else {
+              // Use the draft's station value
+              assessmentData.station = draft.station;
+              stationRef.current.value = draft.station;
+            }
+            stationRef.current.disabled = false;
+          } else {
+            // For empty type, disable station
+            stationRef.current.disabled = true;
+          }
+        }
+
+        if (tempRef.current) tempRef.current.value = draft.weather?.temperature || "";
         if (tempUnitRef.current) tempUnitRef.current.value = draft.weather?.temperatureUnit || "°F";
-        if (windRef.current) windRef.current.value = draft.weather?.wind || "18";
-        if (windDirRef.current) windDirRef.current.value = draft.weather?.windDirection || "NW";
-        if (humidityRef.current) humidityRef.current.value = draft.weather?.humidity || "85";
-        if (precipRef.current) precipRef.current.value = draft.weather?.precipitation || "Heavy Rain";
-        if (precipRateRef.current) precipRateRef.current.value = draft.weather?.precipitationRate || "1.2";
+        if (windRef.current) windRef.current.value = draft.weather?.wind || "";
+        if (windDirRef.current) windDirRef.current.value = draft.weather?.windDirection || "N";
+        if (humidityRef.current) humidityRef.current.value = draft.weather?.humidity || "";
+        if (precipRef.current) precipRef.current.value = draft.weather?.precipitation || "";
+        if (precipRateRef.current) precipRateRef.current.value = draft.weather?.precipitationRate || "";
         if (alertsRef.current) alertsRef.current.value = draft.weather?.alerts || "";
 
         // Set mitigation values
@@ -809,18 +863,18 @@ const GARAssessment = () => {
       date: new Date().toISOString().split('T')[0],
       rawDate: new Date().toISOString(),
       time: new Date().toTimeString().substring(0, 5),
-      type: "Department-wide",
-      station: selectedStation,
+      type: "",
+      station: "",
       status: "draft",
       weather: {
-        temperature: "37",
+        temperature: "",
         temperatureUnit: "°F",
-        wind: "18",
-        windDirection: "NW",
-        humidity: "85",
-        precipitation: "Heavy Rain",
-        precipitationRate: "1.2",
-        alerts: "Flash Flood Warning until 5:00 PM"
+        wind: "",
+        windDirection: "N",
+        humidity: "",
+        precipitation: "",
+        precipitationRate: "",
+        alerts: ""
       },
       riskFactors: {
         supervision: 0,
@@ -863,7 +917,30 @@ const GARAssessment = () => {
           if (dateRef.current) dateRef.current.value = newAssessmentData.date;
           if (timeRef.current) timeRef.current.value = newAssessmentData.time;
           if (typeRef.current) typeRef.current.value = newAssessmentData.type;
-          if (stationRef.current) stationRef.current.value = newAssessmentData.station;
+
+          // Set station value based on assessment type
+          if (newAssessmentData.type === "Department-wide") {
+            // For Department-wide, always use "All Stations"
+            newAssessmentData.station = "All Stations";
+            if (stationRef.current) {
+              stationRef.current.value = "All Stations";
+              stationRef.current.disabled = true;
+            }
+          } else if (newAssessmentData.type === "Station-specific") {
+            // For Station-specific, set to current station
+            newAssessmentData.station = selectedStation || "";
+            if (stationRef.current) {
+              stationRef.current.value = selectedStation || "";
+              stationRef.current.disabled = false;
+            }
+          } else {
+            // For empty type, leave station empty but disabled
+            newAssessmentData.station = "";
+            if (stationRef.current) {
+              stationRef.current.value = "";
+              stationRef.current.disabled = true;
+            }
+          }
 
           if (tempRef.current) tempRef.current.value = newAssessmentData.weather.temperature;
           if (tempUnitRef.current) tempUnitRef.current.value = newAssessmentData.weather.temperatureUnit;
@@ -1184,9 +1261,8 @@ const GARAssessment = () => {
               ref={dateRef}
               defaultValue={assessmentData.date}
               onBlur={(e) => {
-                // Update data on blur instead of onChange to avoid focus issues
-                const newDate = e.target.value;
-                assessmentData.date = newDate;
+                // Simple direct update
+                assessmentData.date = e.target.value;
                 setHasChanges(true);
               }}
               disabled={readOnlyMode}
@@ -1211,9 +1287,8 @@ const GARAssessment = () => {
               ref={timeRef}
               defaultValue={assessmentData.time}
               onBlur={(e) => {
-                // Update data on blur instead of onChange to avoid focus issues
-                const newTime = e.target.value;
-                assessmentData.time = newTime;
+                // Simple direct update
+                assessmentData.time = e.target.value;
                 setHasChanges(true);
               }}
               disabled={readOnlyMode}
@@ -1234,15 +1309,49 @@ const GARAssessment = () => {
           <select
             className={`w-full p-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white ${readOnlyMode ? 'cursor-not-allowed opacity-90' : ''}`}
             ref={typeRef}
-            defaultValue={assessmentData.type}
-            onBlur={(e) => {
-              // Update data on blur instead of onChange to avoid focus issues
+            onChange={(e) => {
+              // Update data on change for the type
               const newType = e.target.value;
               assessmentData.type = newType;
+
+              // Update station value based on assessment type
+              if (newType === "Department-wide") {
+                // For Department-wide, always set to All Stations
+                assessmentData.station = "All Stations";
+
+                // Update the select element to show All Stations and disable it
+                if (stationRef.current) {
+                  stationRef.current.value = "All Stations";
+                  stationRef.current.disabled = true;
+                }
+              } else if (newType === "Station-specific") {
+                // If previously All Stations, initialize with selected station
+                if (assessmentData.station === "All Stations") {
+                  const stationValue = selectedStation || "";
+                  assessmentData.station = stationValue;
+
+                  // Initialize with current station
+                  if (stationRef.current) {
+                    stationRef.current.value = stationValue;
+                  }
+                }
+
+                // Make sure station selector is enabled
+                if (stationRef.current) {
+                  stationRef.current.disabled = false;
+                }
+              } else {
+                // For no selection, disable station
+                if (stationRef.current) {
+                  stationRef.current.disabled = true;
+                }
+              }
+
               setHasChanges(true);
             }}
             disabled={readOnlyMode}
           >
+            <option value="">Select assessment type</option>
             <option value="Department-wide">Department-wide</option>
             <option value="Station-specific">Station-specific</option>
           </select>
@@ -1252,20 +1361,31 @@ const GARAssessment = () => {
           <select
             className={`w-full p-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white ${readOnlyMode ? 'cursor-not-allowed opacity-90' : ''}`}
             ref={stationRef}
-            defaultValue={assessmentData.station}
-            onBlur={(e) => {
-              // Update data on blur instead of onChange to avoid focus issues
-              const newStation = e.target.value;
-              assessmentData.station = newStation;
+            onChange={(e) => {
+              const selectedStationValue = e.target.value;
+
+              // If All Stations is selected, switch assessment type to Department-wide
+              if (selectedStationValue === "All Stations" && typeRef.current) {
+                // Update assessment type to Department-wide
+                typeRef.current.value = "Department-wide";
+                assessmentData.type = "Department-wide";
+
+                // Disable the station selector
+                e.target.disabled = true;
+              }
+
+              // Update the station value
+              assessmentData.station = selectedStationValue;
               setHasChanges(true);
             }}
-            disabled={readOnlyMode}
+            disabled={readOnlyMode || !typeRef.current || typeRef.current.value !== "Station-specific"}
           >
+            <option value="">Select station</option>
+            <option value="All Stations">All Stations</option>
             {/* Only show the current station once */}
             {!stations.includes(selectedStation) && (
               <option value={selectedStation}>{selectedStation}</option>
             )}
-            <option value="All Stations">All Stations</option>
             {stations.map(station => (
               <option key={station} value={station}>{station}</option>
             ))}
@@ -1284,7 +1404,7 @@ const GARAssessment = () => {
                   type="text"
                   className={`w-full p-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white ${readOnlyMode ? 'cursor-not-allowed opacity-90' : ''}`}
                   ref={tempRef}
-                  defaultValue={assessmentData.weather.temperature}
+                  placeholder="Enter temperature"
                   onBlur={(e) => {
                     // Update data on blur instead of onChange to avoid focus issues
                     const newTemp = e.target.value;
@@ -1296,7 +1416,6 @@ const GARAssessment = () => {
                 <select
                   className={`p-2 border border-gray-300 dark:border-gray-600 rounded-md bg-gray-50 dark:bg-gray-600 text-gray-900 dark:text-white ${readOnlyMode ? 'cursor-not-allowed opacity-90' : ''}`}
                   ref={tempUnitRef}
-                  defaultValue={assessmentData.weather.temperatureUnit}
                   onBlur={(e) => {
                     // Update data on blur instead of onChange to avoid focus issues
                     const newTempUnit = e.target.value;
@@ -1318,7 +1437,7 @@ const GARAssessment = () => {
                   type="text"
                   className={`w-full p-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white ${readOnlyMode ? 'cursor-not-allowed opacity-90' : ''}`}
                   ref={windRef}
-                  defaultValue={assessmentData.weather.wind}
+                  placeholder="Enter wind speed"
                   onBlur={(e) => {
                     // Update data on blur instead of onChange to avoid focus issues
                     const newWind = e.target.value;
@@ -1330,7 +1449,6 @@ const GARAssessment = () => {
                 <select
                   className={`p-2 border border-gray-300 dark:border-gray-600 rounded-md bg-gray-50 dark:bg-gray-600 text-gray-900 dark:text-white w-20 ${readOnlyMode ? 'cursor-not-allowed opacity-90' : ''}`}
                   ref={windDirRef}
-                  defaultValue={assessmentData.weather.windDirection}
                   onBlur={(e) => {
                     // Update data on blur instead of onChange to avoid focus issues
                     const newWindDir = e.target.value;
@@ -1357,7 +1475,7 @@ const GARAssessment = () => {
                 type="text"
                 className={`w-full p-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white ${readOnlyMode ? 'cursor-not-allowed opacity-90' : ''}`}
                 ref={humidityRef}
-                defaultValue={assessmentData.weather.humidity}
+                placeholder="Enter humidity percentage"
                 onBlur={(e) => {
                   // Update data on blur instead of onChange to avoid focus issues
                   const newHumidity = e.target.value;
@@ -1392,7 +1510,7 @@ const GARAssessment = () => {
                 type="text"
                 className={`w-full p-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white ${readOnlyMode ? 'cursor-not-allowed opacity-90' : ''}`}
                 ref={precipRateRef}
-                defaultValue={assessmentData.weather.precipitationRate}
+                placeholder="Enter rate (e.g., 0.5)"
                 onBlur={(e) => {
                   // Update data on blur instead of onChange to avoid focus issues
                   const newPrecipRate = e.target.value;
@@ -2041,7 +2159,7 @@ const GARAssessment = () => {
                         <div className="flex items-center">
                           <h3 className="font-medium text-gray-900 dark:text-white">{assessment.type || "Unknown Type"}</h3>
                           <span className="ml-2 px-2 py-0.5 bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-300 rounded text-xs">
-                            {assessment.station || "All Stations"}
+                            {assessment.type === "Department-wide" ? "All Stations" : assessment.station || "All Stations"}
                           </span>
                           {assessment.status && (
                             <span className={`ml-2 px-2 py-0.5 rounded text-xs ${
