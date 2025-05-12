@@ -134,6 +134,8 @@ const GARAssessment = () => {
     const searchParams = new URLSearchParams(location.search);
     const queryId = searchParams.get('a');
 
+    console.log("[DEBUG] URL changed, id:", id, "queryId:", queryId, "pathname:", location.pathname);
+
     if (id) {
       console.log("[DEBUG] Found assessment ID in URL path:", id);
       setLoading(true);
@@ -142,8 +144,46 @@ const GARAssessment = () => {
       console.log("[DEBUG] Found assessment ID in query param:", queryId);
       setLoading(true);
       loadAssessmentById(queryId);
+    } else if (location.pathname === '/gar-assessment') {
+      // When we're on the main GAR assessment page with no ID, always reset to list view
+      console.log("[DEBUG] On main GAR assessment page, resetting to list view");
+      setShowAssessment(false);
+      setCurrentStep(1);
+      setCurrentAssessmentId(null);
+
+      // Clear any temporary assessment data from localStorage - same as in closeAssessment
+      try {
+        localStorage.removeItem('currentAssessmentRiskFactors');
+      } catch (err) {
+        console.error('[DEBUG] Error clearing localStorage:', err);
+      }
+
+      // Refresh the assessments list
+      fetchAssessments(selectedStation);
     }
-  }, [id, location.search]);
+  }, [id, location.search, location.pathname]);
+
+  // Handle browser back button
+  useEffect(() => {
+    // This handles the browser back button specifically
+    const handlePopState = (event) => {
+      console.log("[DEBUG] PopState detected, current path:", window.location.pathname);
+
+      // If we navigated back to the main GAR assessment page (from a detail page)
+      if (window.location.pathname === '/gar-assessment' && !window.location.search) {
+        // Force a full page reload to ensure clean state
+        window.location.reload();
+      }
+    };
+
+    // Add event listener for browser back/forward buttons
+    window.addEventListener('popstate', handlePopState);
+
+    // Clean up
+    return () => {
+      window.removeEventListener('popstate', handlePopState);
+    };
+  }, []);
 
   // Load assessment by ID from URL parameter
   const loadAssessmentById = async (assessmentId) => {
@@ -984,17 +1024,8 @@ const GARAssessment = () => {
       console.error('[DEBUG] Error clearing localStorage:', err);
     }
 
-    setShowAssessment(false);
-    setCurrentStep(1);
-    setCurrentAssessmentId(null);
-
-    // Refresh assessment list to show any new drafts
-    await fetchAssessments(selectedStation);
-
-    // Go back to assessment list without ID param
-    if (id) {
-      navigate('/gar-assessment');
-    }
+    // Use direct browser navigation - same as the working GAR Assessment button
+    window.location.href = '/gar-assessment';
   };
 
   // View assessment function now navigates to URL with ID
@@ -2093,9 +2124,13 @@ const GARAssessment = () => {
             
             <div className="flex mt-4 space-x-4">
               <button
-                className="flex items-center px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
+                className={`flex items-center px-4 py-2 ${
+                  id || location.search.includes('a=')
+                  ? 'bg-gray-400 cursor-not-allowed'
+                  : 'bg-blue-600 hover:bg-blue-700'
+                } text-white rounded-md`}
                 onClick={startAssessment}
-                disabled={readOnlyMode}
+                disabled={readOnlyMode || id || location.search.includes('a=')}
               >
                 <AlertTriangle className="w-4 h-4 mr-2" />
                 {draftAssessment ? "Continue Draft Assessment" : "Create New Assessment"}

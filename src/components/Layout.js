@@ -240,16 +240,8 @@ const Layout = ({ children, darkMode, setDarkMode, selectedStation, setSelectedS
             >
               Past Reports
             </Link>
-            <Link
-              to="/gar-assessment"
-              onClick={(e) => {
-                // If we're on a GAR assessment details page, this link should always
-                // go back to the assessment list rather than staying on the same page
-                if (location.pathname.startsWith('/gar-assessment/') || location.search.includes('a=')) {
-                  e.preventDefault();
-                  navigate('/gar-assessment');
-                }
-              }}
+            <a
+              href="/gar-assessment"
               className={`px-3 py-2 rounded-md text-sm font-medium ${
                 isActivePath('/gar-assessment')
                   ? `${darkMode ? 'bg-blue-900 text-blue-200' : 'bg-blue-100 text-blue-800'}`
@@ -258,7 +250,7 @@ const Layout = ({ children, darkMode, setDarkMode, selectedStation, setSelectedS
             >
               <AlertTriangle className="h-4 w-4 inline mr-1" />
               GAR Assessment
-            </Link>
+            </a>
           </div>
         </div>
       </nav>
