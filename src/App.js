@@ -10,6 +10,7 @@ import Reports from './components/Reports';
 import ReportDetail from './components/ReportDetail';
 import Login from './components/Login';
 import Signup from './components/Signup';
+import GARAssessment from './components/SimpleGARAssessment';
 import './App.css';
 
 // Initialize dark mode on app load
@@ -343,6 +344,188 @@ const App = () => {
         console.error("Error getting users by role:", error);
         return [];
       }
+    },
+
+    // GAR Assessment operations
+    // Create a new GAR assessment
+    createAssessment: async (assessmentData) => {
+      try {
+        const newAssessment = {
+          ...assessmentData,
+          createdAt: serverTimestamp(),
+          updatedAt: serverTimestamp()
+        };
+
+        const docRef = await addDoc(collection(db, "assessments"), newAssessment);
+        return {
+          id: docRef.id,
+          ...newAssessment
+        };
+      } catch (error) {
+        console.error("Error creating assessment:", error);
+        return null;
+      }
+    },
+
+    // Get a specific assessment
+    getAssessment: async (assessmentId) => {
+      try {
+        console.log(`[FIREBASE DEBUG] Getting assessment with ID: ${assessmentId}`);
+
+        if (!assessmentId) {
+          console.error("[FIREBASE DEBUG] Invalid assessment ID provided");
+          return null;
+        }
+
+        // Try to get all assessments first to debug
+        console.log("[FIREBASE DEBUG] Fetching all assessments to check if ID exists");
+        try {
+          const assessmentsRef = collection(db, "assessments");
+          const snapshot = await getDocs(assessmentsRef);
+          const allIds = snapshot.docs.map(doc => doc.id);
+          console.log("[FIREBASE DEBUG] All assessment IDs:", allIds);
+          console.log("[FIREBASE DEBUG] Checking if ID exists:", allIds.includes(assessmentId));
+
+          // If ID doesn't exist in collection, try to find an assessment with this ID as a field
+          if (!allIds.includes(assessmentId)) {
+            console.log("[FIREBASE DEBUG] ID not found in document IDs, checking if exists as field");
+            const q = query(assessmentsRef);
+            const allDocs = await getDocs(q);
+            const matchingDocs = [];
+
+            allDocs.forEach(doc => {
+              const data = doc.data();
+              if (data.id === assessmentId) {
+                console.log("[FIREBASE DEBUG] Found document with matching field ID:", doc.id);
+                matchingDocs.push({...data, id: doc.id});
+              }
+            });
+
+            if (matchingDocs.length > 0) {
+              console.log("[FIREBASE DEBUG] Returning first matching document");
+              return matchingDocs[0];
+            }
+          }
+        } catch (e) {
+          console.error("[FIREBASE DEBUG] Error fetching all assessments:", e);
+        }
+
+        const assessmentRef = doc(db, "assessments", assessmentId);
+        console.log("[FIREBASE DEBUG] Created doc reference:", assessmentRef.path);
+
+        const assessmentSnap = await getDoc(assessmentRef);
+        console.log("[FIREBASE DEBUG] Document exists?", assessmentSnap.exists());
+
+        if (assessmentSnap.exists()) {
+          const data = assessmentSnap.data();
+          console.log("[FIREBASE DEBUG] Assessment data retrieved successfully", data);
+
+          // Ensure we always have an ID in the assessment object
+          const assessment = {
+            id: assessmentSnap.id,
+            ...data
+          };
+
+          console.log("[FIREBASE DEBUG] Returning assessment with ID:", assessment.id);
+          return assessment;
+        } else {
+          console.log(`[FIREBASE DEBUG] No assessment found with ID ${assessmentId}`);
+          return null;
+        }
+      } catch (error) {
+        console.error(`[FIREBASE DEBUG] Error getting assessment ${assessmentId}:`, error);
+        return null;
+      }
+    },
+
+    // Get all assessments
+    getAllAssessments: async () => {
+      try {
+        const assessmentsRef = collection(db, "assessments");
+        const q = query(assessmentsRef, orderBy("rawDate", "desc"));
+        const snapshot = await getDocs(q);
+        const assessmentsList = snapshot.docs.map(doc => ({
+          id: doc.id,
+          ...doc.data()
+        }));
+        return assessmentsList;
+      } catch (error) {
+        console.error("Error getting all assessments:", error);
+        return [];
+      }
+    },
+
+    // Get assessments for a station
+    getAssessmentsByStation: async (stationId, status = null) => {
+      try {
+        console.log(`Fetching assessments for station: ${stationId}, status: ${status || 'any'}`);
+        const assessmentsRef = collection(db, "assessments");
+        let q;
+
+        if (status) {
+          q = query(assessmentsRef,
+            where("station", "==", stationId),
+            where("status", "==", status),
+            orderBy("rawDate", "desc")
+          );
+        } else {
+          q = query(assessmentsRef,
+            where("station", "==", stationId),
+            orderBy("rawDate", "desc")
+          );
+        }
+
+        const snapshot = await getDocs(q);
+        console.log(`Found ${snapshot.docs.length} assessments`);
+
+        const assessmentsList = snapshot.docs.map(doc => {
+          const data = doc.data();
+          return {
+            id: doc.id,
+            ...data
+          };
+        });
+
+        // Verify all assessments have IDs
+        const missingIds = assessmentsList.filter(a => !a.id).length;
+        if (missingIds > 0) {
+          console.error(`Warning: ${missingIds} assessments are missing IDs`);
+        }
+
+        return assessmentsList;
+      } catch (error) {
+        console.error("Error getting assessments:", error);
+        return [];
+      }
+    },
+
+    // Update an existing assessment
+    updateAssessment: async (assessmentId, assessmentData) => {
+      try {
+        const assessmentRef = doc(db, "assessments", assessmentId);
+
+        const updateData = {
+          ...assessmentData,
+          updatedAt: serverTimestamp()
+        };
+
+        await updateDoc(assessmentRef, updateData);
+        return true;
+      } catch (error) {
+        console.error("Error updating assessment:", error);
+        return false;
+      }
+    },
+
+    // Delete an assessment
+    deleteAssessment: async (assessmentId) => {
+      try {
+        await deleteDoc(doc(db, "assessments", assessmentId));
+        return true;
+      } catch (error) {
+        console.error("Error deleting assessment:", error);
+        return false;
+      }
     }
   };
 
@@ -372,6 +555,16 @@ const App = () => {
               <Route path="/report/:id" element={
                 <ProtectedRoute>
                   <ReportDetail />
+                </ProtectedRoute>
+              } />
+              <Route path="/gar-assessment" element={
+                <ProtectedRoute>
+                  <GARAssessment />
+                </ProtectedRoute>
+              } />
+              <Route path="/gar-assessment/:id" element={
+                <ProtectedRoute>
+                  <GARAssessment />
                 </ProtectedRoute>
               } />
               <Route path="/" element={<Navigate to="/login" replace />} />

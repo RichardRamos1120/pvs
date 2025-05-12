@@ -2,16 +2,17 @@
 import React, { useState } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { getAuth, signOut } from 'firebase/auth';
-import { 
-  Clipboard, 
-  Calendar, 
-  User, 
+import {
+  Clipboard,
+  Calendar,
+  User,
   Home,
   LogOut,
   Moon,
   Sun,
   Menu,
-  X
+  X,
+  AlertTriangle
 } from 'lucide-react';
 
 const Layout = ({ children, darkMode, setDarkMode, selectedStation, setSelectedStation }) => {
@@ -52,6 +53,7 @@ const Layout = ({ children, darkMode, setDarkMode, selectedStation, setSelectedS
     if (path === '/dashboard' && location.pathname === '/dashboard') return true;
     if (path === '/today' && location.pathname === '/today') return true;
     if (path === '/reports' && (location.pathname === '/reports' || location.pathname.startsWith('/report/'))) return true;
+    if (path === '/gar-assessment' && location.pathname === '/gar-assessment') return true;
     return false;
   };
 
@@ -67,8 +69,11 @@ const Layout = ({ children, darkMode, setDarkMode, selectedStation, setSelectedS
             </div>
             
             <div className="hidden md:flex items-center space-x-6">
-              {/* Station selector - disabled on Reports pages */}
-              {location.pathname === '/reports' || location.pathname.startsWith('/report/') ? (
+              {/* Station selector - disabled on Reports pages and GAR Assessment page */}
+              {location.pathname === '/reports' ||
+               location.pathname.startsWith('/report/') ||
+               location.pathname === '/gar-assessment' ||
+               location.pathname.startsWith('/gar-assessment/') ? (
                 <div className={`${darkMode ? 'bg-gray-700' : 'bg-blue-700'} text-white rounded-md px-3 py-1 text-sm min-w-[120px] opacity-50`}>
                   {selectedStation}
                 </div>
@@ -151,8 +156,11 @@ const Layout = ({ children, darkMode, setDarkMode, selectedStation, setSelectedS
                 <span>{auth.currentUser?.displayName || 'Captain'}</span>
               </div>
               
-              {/* Mobile station selector - disabled on Reports pages */}
-              {location.pathname === '/reports' || location.pathname.startsWith('/report/') ? (
+              {/* Mobile station selector - disabled on Reports pages and GAR Assessment */}
+              {location.pathname === '/reports' ||
+               location.pathname.startsWith('/report/') ||
+               location.pathname === '/gar-assessment' ||
+               location.pathname.startsWith('/gar-assessment/') ? (
                 <div className={`w-full ${darkMode ? 'bg-gray-700' : 'bg-blue-700'} text-white rounded-md px-3 py-2 text-sm mb-2 opacity-50 flex items-center`}>
                   <span>Station: </span>
                   <span className="ml-2 font-medium">{selectedStation}</span>
@@ -225,12 +233,31 @@ const Layout = ({ children, darkMode, setDarkMode, selectedStation, setSelectedS
             <Link
               to="/reports"
               className={`px-3 py-2 rounded-md text-sm font-medium ${
-                isActivePath('/reports') 
+                isActivePath('/reports')
                   ? `${darkMode ? 'bg-blue-900 text-blue-200' : 'bg-blue-100 text-blue-800'}`
                   : `${darkMode ? 'text-gray-300 hover:bg-gray-700' : 'text-gray-600 hover:bg-gray-100'}`
               }`}
             >
               Past Reports
+            </Link>
+            <Link
+              to="/gar-assessment"
+              onClick={(e) => {
+                // If we're on a GAR assessment details page, this link should always
+                // go back to the assessment list rather than staying on the same page
+                if (location.pathname.startsWith('/gar-assessment/') || location.search.includes('a=')) {
+                  e.preventDefault();
+                  navigate('/gar-assessment');
+                }
+              }}
+              className={`px-3 py-2 rounded-md text-sm font-medium ${
+                isActivePath('/gar-assessment')
+                  ? `${darkMode ? 'bg-blue-900 text-blue-200' : 'bg-blue-100 text-blue-800'}`
+                  : `${darkMode ? 'text-gray-300 hover:bg-gray-700' : 'text-gray-600 hover:bg-gray-100'}`
+              }`}
+            >
+              <AlertTriangle className="h-4 w-4 inline mr-1" />
+              GAR Assessment
             </Link>
           </div>
         </div>

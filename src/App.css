@@ -450,6 +450,16 @@ body.dark-mode .bg-category-iso {
   color: #111827;
 }
 
+/* Custom icon colors for form inputs */
+.form-icon {
+  color: #3b82f6 !important;
+}
+
+body.dark-mode .form-icon,
+.dark .form-icon {
+  color: #60a5fa !important;
+}
+
 /* Fix for select elements and options */
 select {
   color: #1f2937 !important;

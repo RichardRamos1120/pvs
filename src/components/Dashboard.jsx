@@ -694,6 +694,14 @@ const Dashboard = () => {
                             <FileText className="h-8 w-8 text-green-600 dark:text-green-400 mb-2" />
                             <span className="text-sm font-medium">All Reports</span>
                         </button>
+
+                        <button
+                            onClick={() => navigate('/gar-assessment')}
+                            className="flex flex-col items-center justify-center p-4 bg-amber-50 dark:bg-amber-900/20 rounded-lg hover:bg-amber-100 dark:hover:bg-amber-900/30 transition-colors"
+                        >
+                            <AlertTriangle className="h-8 w-8 text-amber-600 dark:text-amber-400 mb-2" />
+                            <span className="text-sm font-medium">GAR Assessment</span>
+                        </button>
                     </div>
                 </div>
             </div>
