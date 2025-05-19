@@ -24,7 +24,8 @@ import {
   Lock,
   ShieldAlert,
   Eye,
-  Save
+  Save,
+  AlertTriangle
 } from 'lucide-react';
 import NewActivityModal from './NewActivityModal.jsx';
 
@@ -138,6 +139,12 @@ const TodayLog = () => {
   // Function to create a new log for today
   const createNewLog = async () => {
     try {
+      // Check if we have a valid station
+      if (selectedStation === 'No Stations Available' || selectedStation === 'Error Loading Stations') {
+        setError('Cannot create log: No stations are available. Please contact an administrator to set up stations.');
+        return;
+      }
+      
       setLoading(true);
 
       // Get today's date
@@ -778,20 +785,36 @@ const TodayLog = () => {
 
   // No log state
   if (!todayLog) {
+    // Check if we have a no stations case
+    const noStations = selectedStation === 'No Stations Available' || selectedStation === 'Error Loading Stations';
+    
     return (
       <Layout darkMode={darkMode} setDarkMode={handleDarkModeChange} selectedStation={selectedStation} setSelectedStation={handleStationChange}>
         <div className="bg-white dark:bg-gray-800 shadow rounded-lg p-8 text-center">
           <div className="text-gray-500 dark:text-gray-400 mb-4">
             <Clipboard className="h-12 w-12 mx-auto mb-2" />
             <p className="text-lg">No log found for today</p>
-            {!readOnlyMode ? (
+            {noStations ? (
+              <div className="mt-3 p-4 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-700 rounded-md inline-block mx-auto text-left">
+                <div className="flex items-start">
+                  <AlertTriangle className="text-yellow-500 dark:text-yellow-400 w-5 h-5 mr-2 mt-0.5" />
+                  <div>
+                    <h3 className="text-sm font-medium text-yellow-800 dark:text-yellow-300">No Stations Available</h3>
+                    <p className="mt-1 text-sm text-yellow-700 dark:text-yellow-400">
+                      Cannot create logs because no fire stations have been set up in the system.
+                      Please contact an administrator to set up stations before creating logs.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            ) : !readOnlyMode ? (
               <p className="text-sm mt-1">Would you like to create a new log for today?</p>
             ) : (
               <p className="text-sm mt-1">No log has been created for today yet. Please check back later.</p>
             )}
           </div>
           <div className="flex justify-center space-x-4">
-            {!readOnlyMode && hasEditPermission && noLogExists && (
+            {!readOnlyMode && hasEditPermission && noLogExists && !noStations && (
               <button
                 onClick={createNewLog}
                 className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-green-600 hover:bg-green-700"

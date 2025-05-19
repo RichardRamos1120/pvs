@@ -16,7 +16,8 @@ import {
   FileText,
   Edit3,
   Trash2,
-  AlertCircle
+  AlertCircle,
+  AlertTriangle
 } from 'lucide-react';
 
 const Reports = () => {
@@ -190,10 +191,34 @@ const Reports = () => {
     }
   };
   
-  // Create new log
+  // Create new log or navigate to existing today's log
   const createNewLog = async () => {
     try {
+      // Check if station is valid first
+      if (selectedStation === 'No Stations Available' || selectedStation === 'Error Loading Stations') {
+        // Show an error about no stations
+        setError('Cannot create log: No stations are available. Please contact an administrator to set up stations.');
+        return;
+      }
+      
+      // First check if there's already a log for today for this station
       const today = new Date();
+      const todayLog = pastLogs.find(log => {
+        const logDate = new Date(log.rawDate);
+        return (
+          logDate.setHours(0, 0, 0, 0) === today.setHours(0, 0, 0, 0) &&
+          log.station === selectedStation
+        );
+      });
+
+      // If a log for today already exists, navigate to it
+      if (todayLog) {
+        console.log("Log for today already exists, navigating to it:", todayLog.id);
+        navigate('/today', { state: { logId: todayLog.id } });
+        return;
+      }
+
+      // Otherwise, create a new log
       const formattedToday = today.toLocaleDateString('en-US', {
         weekday: 'short',
         month: 'short',
@@ -435,14 +460,32 @@ const Reports = () => {
             </div>
             
             <div className="flex flex-col sm:flex-row space-y-2 sm:space-y-0 sm:space-x-2">
-              {(userProfile?.role === 'captain' || userProfile?.role === 'admin') && (
+              {/* Only show "Create New Log" button for captains/admins if stations exist */}
+              {(userProfile?.role === 'captain' || userProfile?.role === 'admin') && 
+               !(selectedStation === 'No Stations Available' || selectedStation === 'Error Loading Stations') && (
                 <button 
                   onClick={createNewLog}
                   className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700"
                 >
                   <Plus className="h-4 w-4 mr-1" />
-                  Create New Log
+                  {pastLogs.some(log => {
+                    const logDate = new Date(log.rawDate);
+                    const today = new Date();
+                    return (
+                      logDate.setHours(0, 0, 0, 0) === today.setHours(0, 0, 0, 0) &&
+                      log.station === selectedStation
+                    );
+                  }) ? "View Today's Log" : "Create New Log"}
                 </button>
+              )}
+              
+              {/* Show a warning when no stations exist */}
+              {(userProfile?.role === 'captain' || userProfile?.role === 'admin') && 
+               (selectedStation === 'No Stations Available' || selectedStation === 'Error Loading Stations') && (
+                <div className="inline-flex items-center px-4 py-2 border border-yellow-300 dark:border-yellow-600 text-sm font-medium rounded-md text-yellow-800 dark:text-yellow-200 bg-yellow-50 dark:bg-yellow-900/20">
+                  <AlertTriangle className="h-4 w-4 mr-1 text-yellow-500 dark:text-yellow-400" />
+                  No Stations Available
+                </div>
               )}
             </div>
           </div>

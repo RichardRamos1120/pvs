@@ -16,12 +16,22 @@ const Login = () => {
   const auth = getAuth();
   const firestoreOperations = useContext(FirestoreContext);
   
+  // Allowed email domains
+  const ALLOWED_DOMAINS = ['smfd.org', 'eirene.ai'];
+  
   const from = location.state?.from?.pathname || '/dashboard';
   
   const handleLogin = async (e) => {
     e.preventDefault();
     setError('');
     setLoading(true);
+    
+    // Check email domain for email/password login too
+    if (!validateEmailDomain(email)) {
+      setError(`Access restricted to authorized email domains only.`);
+      setLoading(false);
+      return;
+    }
     
     try {
       const userCredential = await signInWithEmailAndPassword(auth, email, password);
@@ -55,14 +65,34 @@ const Login = () => {
     }
   };
   
+  const validateEmailDomain = (email) => {
+    if (!email) return false;
+    
+    const domain = email.split('@').pop()?.toLowerCase();
+    if (!domain) return false;
+    
+    return ALLOWED_DOMAINS.includes(domain);
+  };
+  
   const handleGoogleLogin = async () => {
     setError('');
     setLoading(true);
     
     try {
       const provider = new GoogleAuthProvider();
+      
+      // First step: Get the credential but don't sign in yet
       const result = await signInWithPopup(auth, provider);
       const user = result.user;
+      
+      // Check if the email domain is allowed
+      if (!validateEmailDomain(user.email)) {
+        // Immediately sign out the user
+        await auth.signOut();
+        throw new Error(`Access restricted to authorized email domains only.`);
+      }
+      
+      // Email domain is allowed, proceed with the login flow
       
       // Check if the user profile already exists in Firestore
       const existingProfile = await firestoreOperations.getUserProfile(user.uid);
@@ -89,18 +119,22 @@ const Login = () => {
       console.error('Google login error:', error);
       let errorMessage = 'Failed to log in with Google. Please try again.';
       
-      switch(error.code) {
-        case 'auth/account-exists-with-different-credential':
-          errorMessage = 'An account already exists with the same email address but different sign-in credentials.';
-          break;
-        case 'auth/popup-blocked':
-          errorMessage = 'The popup was blocked by your browser. Please allow popups for this site.';
-          break;
-        case 'auth/popup-closed-by-user':
-          errorMessage = 'The login popup was closed before authentication was completed.';
-          break;
-        default:
-          errorMessage = error.message;
+      if (error.message.includes('Sign-in restricted')) {
+        errorMessage = error.message;
+      } else {
+        switch(error.code) {
+          case 'auth/account-exists-with-different-credential':
+            errorMessage = 'An account already exists with the same email address but different sign-in credentials.';
+            break;
+          case 'auth/popup-blocked':
+            errorMessage = 'The popup was blocked by your browser. Please allow popups for this site.';
+            break;
+          case 'auth/popup-closed-by-user':
+            errorMessage = 'The login popup was closed before authentication was completed.';
+            break;
+          default:
+            errorMessage = error.message;
+        }
       }
       
       setError(errorMessage);

@@ -19,8 +19,21 @@ const Signup = () => {
   const auth = getAuth();
   const firestoreOperations = useContext(FirestoreContext);
   
+  // Allowed email domains
+  const ALLOWED_DOMAINS = ['smfd.org', 'eirene.ai'];
+  
   // List of stations (this could be fetched from Firestore)
   const stations = ['Station 1', 'Station 4', 'Station 7', 'Station 10', 'Station 11', 'Station 14', 'Station 23'];
+  
+  // Validate email domain
+  const validateEmailDomain = (email) => {
+    if (!email) return false;
+    
+    const domain = email.split('@').pop()?.toLowerCase();
+    if (!domain) return false;
+    
+    return ALLOWED_DOMAINS.includes(domain);
+  };
   
   const handleSignup = async (e) => {
     e.preventDefault();
@@ -32,6 +45,11 @@ const Signup = () => {
     
     if (password.length < 6) {
       return setError('Password must be at least 6 characters.');
+    }
+    
+    // Check email domain
+    if (!validateEmailDomain(email)) {
+      return setError(`Access restricted to authorized email domains only.`);
     }
     
     setError('');

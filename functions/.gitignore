@@ -1,0 +1,26 @@
+# Dependencies
+node_modules/
+
+# Local development
+.env
+.env.local
+.env.*.local
+
+# Firebase generated files
+firebase-debug.log
+ui-debug.log
+.firebase/
+.runtimeconfig.json
+coverage/
+
+# IDE
+.idea/
+*.iml
+*.iws
+*.ipr
+.vscode/
+*.swp
+
+# OS
+.DS_Store
+Thumbs.db

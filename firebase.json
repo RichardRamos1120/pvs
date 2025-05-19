@@ -1,0 +1,24 @@
+{
+  "functions": {
+    "source": "functions",
+    "serviceAccountId": "firebase-adminsdk-fbsvc@pvs-app-61e6b.iam.gserviceaccount.com"
+  },
+  "firestore": {
+    "rules": "firestore.rules",
+    "indexes": "firestore.indexes.json"
+  },
+  "hosting": {
+    "public": "build",
+    "ignore": [
+      "firebase.json",
+      "**/.*",
+      "**/node_modules/**"
+    ],
+    "rewrites": [
+      {
+        "source": "**",
+        "destination": "/index.html"
+      }
+    ]
+  }
+}

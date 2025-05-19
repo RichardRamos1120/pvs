@@ -121,6 +121,14 @@ const Dashboard = () => {
     // Create new log
     const createNewLog = () => {
         console.log("Dashboard: Creating new log...");
+        
+        // Check if station is valid first
+        if (selectedStation === 'No Stations Available' || selectedStation === 'Error Loading Stations') {
+            // Show an error about no stations
+            setError('Cannot create log: No stations are available. Please contact an administrator to set up stations.');
+            return;
+        }
+        
         // Create today log immediately and then navigate to it
         const tryCreateLog = async () => {
             try {
@@ -351,8 +359,9 @@ const Dashboard = () => {
                             </p>
                         </div>
                         <div className="mt-4 md:mt-0 flex flex-wrap gap-2">
-                            {/* Only show "Start New Log" button for admins and captains if no active log exists */}
-                            {!hasActiveLog && (userProfile?.role === 'admin' || userProfile?.role === 'captain') && (
+                            {/* Only show "Start New Log" button for admins and captains if no active log exists and stations exist */}
+                            {!hasActiveLog && (userProfile?.role === 'admin' || userProfile?.role === 'captain') && 
+                             !(selectedStation === 'No Stations Available' || selectedStation === 'Error Loading Stations') && (
                                 <button
                                     onClick={createNewLog}
                                     className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-green-600 hover:bg-green-700"
@@ -360,6 +369,14 @@ const Dashboard = () => {
                                     <PlusCircle className="h-4 w-4 mr-1" />
                                     Start New Log
                                 </button>
+                            )}
+                            
+                            {/* Show a warning if no stations are available */}
+                            {(selectedStation === 'No Stations Available' || selectedStation === 'Error Loading Stations') && (
+                                <div className="inline-flex items-center px-4 py-2 border border-yellow-300 dark:border-yellow-600 text-sm font-medium rounded-md text-yellow-800 dark:text-yellow-200 bg-yellow-50 dark:bg-yellow-900/20">
+                                    <AlertTriangle className="h-4 w-4 mr-1 text-yellow-500 dark:text-yellow-400" />
+                                    No Stations Available
+                                </div>
                             )}
                             <button
                                 onClick={() => navigate('/reports')}
@@ -665,8 +682,9 @@ const Dashboard = () => {
                 <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
                     <h3 className="text-lg font-semibold mb-4">Quick Links</h3>
                     <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-                        {/* Only show "New Log" button for admins and captains when no active log exists */}
-                        {!hasActiveLog && (userProfile?.role === 'admin' || userProfile?.role === 'captain') && (
+                        {/* Only show "New Log" button for admins and captains when no active log exists and stations exist */}
+                        {!hasActiveLog && (userProfile?.role === 'admin' || userProfile?.role === 'captain') && 
+                         !(selectedStation === 'No Stations Available' || selectedStation === 'Error Loading Stations') && (
                             <button
                                 onClick={createNewLog}
                                 className="flex flex-col items-center justify-center p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg hover:bg-blue-100 dark:hover:bg-blue-900/30 transition-colors"
@@ -674,6 +692,16 @@ const Dashboard = () => {
                                 <PlusCircle className="h-8 w-8 text-blue-600 dark:text-blue-400 mb-2" />
                                 <span className="text-sm font-medium">New Log</span>
                             </button>
+                        )}
+                        
+                        {/* Show a disabled button when no stations exist */}
+                        {!hasActiveLog && (userProfile?.role === 'admin' || userProfile?.role === 'captain') && 
+                         (selectedStation === 'No Stations Available' || selectedStation === 'Error Loading Stations') && (
+                            <div className="flex flex-col items-center justify-center p-4 bg-gray-100 dark:bg-gray-800 rounded-lg text-gray-400 dark:text-gray-500 cursor-not-allowed">
+                                <PlusCircle className="h-8 w-8 mb-2" />
+                                <span className="text-sm font-medium">New Log</span>
+                                <span className="text-xs mt-1">No Stations</span>
+                            </div>
                         )}
 
                         {/* Show a button to navigate to today's log when one exists */}

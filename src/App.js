@@ -1,9 +1,9 @@
 // src/App.js
 import React, { useState, useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate, useNavigate, useLocation } from 'react-router-dom';
-import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut } from 'firebase/auth';
+import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, deleteUser } from 'firebase/auth';
 import { initializeApp } from 'firebase/app';
-import { getFirestore, collection, getDocs, addDoc, updateDoc, doc, getDoc, query, where, orderBy, serverTimestamp, deleteDoc, setDoc } from 'firebase/firestore';
+import { getFirestore, collection, getDocs, addDoc, updateDoc, doc, getDoc, query, where, orderBy, serverTimestamp, deleteDoc, setDoc, writeBatch } from 'firebase/firestore';
 import Dashboard from './components/Dashboard';
 import TodayLog from './components/TodayLog';
 import Reports from './components/Reports';
@@ -11,6 +11,7 @@ import ReportDetail from './components/ReportDetail';
 import Login from './components/Login';
 import Signup from './components/Signup';
 import GARAssessment from './components/SimpleGARAssessment';
+import AdminPortal from './components/AdminPortal';
 import './App.css';
 
 // Initialize dark mode on app load
@@ -345,6 +346,347 @@ const App = () => {
         return [];
       }
     },
+    
+    // Get users by station name
+    getUsersByStation: async (stationName) => {
+      try {
+        if (!stationName) return [];
+        
+        const usersRef = collection(db, "users");
+        const q = query(usersRef, where("station", "==", stationName));
+        const snapshot = await getDocs(q);
+        
+        const usersList = snapshot.docs.map(doc => ({
+          id: doc.id,
+          ...doc.data()
+        }));
+        return usersList;
+      } catch (error) {
+        console.error("Error getting users by station:", error);
+        return [];
+      }
+    },
+    
+    // Get users by station ID
+    getUsersByStationId: async (stationId) => {
+      try {
+        if (!stationId) return [];
+        
+        const usersRef = collection(db, "users");
+        const q = query(usersRef, where("stationId", "==", stationId));
+        const snapshot = await getDocs(q);
+        
+        const usersList = snapshot.docs.map(doc => ({
+          id: doc.id,
+          ...doc.data()
+        }));
+        return usersList;
+      } catch (error) {
+        console.error("Error getting users by stationId:", error);
+        return [];
+      }
+    },
+
+    // Get all users
+    getAllUsers: async () => {
+      try {
+        console.log("Fetching all users from the 'users' collection");
+        const usersRef = collection(db, "users");
+        const snapshot = await getDocs(usersRef);
+        const usersList = snapshot.docs.map(doc => ({
+          id: doc.id,
+          ...doc.data()
+        }));
+        console.log(`Found ${usersList.length} users`);
+        return usersList;
+      } catch (error) {
+        console.error("Error getting all users:", error);
+        return [];
+      }
+    },
+    
+    // Get all deleted users
+    getDeletedUsers: async () => {
+      try {
+        console.log("Fetching users from the 'deletedUsers' collection");
+        const deletedUsersRef = collection(db, "deletedUsers");
+        // Order by deletedAt timestamp descending (newest first)
+        const q = query(deletedUsersRef, orderBy("deletedAt", "desc"));
+        const snapshot = await getDocs(q);
+        
+        const deletedUsersList = snapshot.docs.map(doc => {
+          const data = doc.data();
+          
+          // Convert serverTimestamp to JS Date for display
+          const deletedAt = data.deletedAt ? 
+            new Date(data.deletedAt.seconds * 1000) : 
+            new Date();
+            
+          return {
+            id: doc.id,
+            ...data,
+            deletedAtFormatted: deletedAt.toLocaleString()
+          };
+        });
+        
+        console.log(`Found ${deletedUsersList.length} deleted users`);
+        return deletedUsersList;
+      } catch (error) {
+        console.error("Error getting deleted users:", error);
+        return [];
+      }
+    },
+    
+    // Soft delete a user (move to deletedUsers collection)
+    softDeleteUser: async (userId) => {
+      try {
+        // 1. Get the user data
+        const userRef = doc(db, "users", userId);
+        const userSnap = await getDoc(userRef);
+        
+        if (!userSnap.exists()) {
+          console.error(`User ${userId} not found`);
+          return { success: false, message: "User not found" };
+        }
+        
+        const userData = userSnap.data();
+        
+        // 2. Add to deletedUsers collection with timestamp
+        const deletedUserData = {
+          ...userData,
+          originalId: userId,
+          deletedAt: serverTimestamp()
+        };
+        
+        await setDoc(doc(db, "deletedUsers", userId), deletedUserData);
+        console.log(`User ${userId} moved to deletedUsers collection`);
+        
+        // 3. Delete from users collection
+        await deleteDoc(userRef);
+        console.log(`User ${userId} removed from users collection`);
+        
+        return { 
+          success: true, 
+          message: "User has been moved to deletedUsers collection",
+          requiresAuthDeletion: true,
+          email: userData.email
+        };
+      } catch (error) {
+        console.error("Error soft-deleting user:", error);
+        return { success: false, message: error.message };
+      }
+    },
+    
+    // Hard delete a user from Firestore (for backward compatibility)
+    deleteUser: async (userId) => {
+      try {
+        await deleteDoc(doc(db, "users", userId));
+        console.log(`User ${userId} deleted successfully from Firestore`);
+        return true;
+      } catch (error) {
+        console.error("Error deleting user from Firestore:", error);
+        return false;
+      }
+    },
+    
+    // For reference only - can't be used in client SDK
+    // Delete a user from Firebase Authentication
+    deleteUserAuth: async (userEmail) => {
+      try {
+        console.log(`To delete this user from Firebase Authentication, 
+          please go to the Firebase Console > Authentication > Users 
+          and delete the user with email: ${userEmail}`);
+          
+        return {
+          success: false,
+          message: "Cannot delete users from Authentication via client SDK. Please use Firebase Console."
+        };
+      } catch (error) {
+        console.error("Error with auth user deletion:", error);
+        return {
+          success: false,
+          message: error.message
+        };
+      }
+    },
+    
+    // Create or update a user
+    saveUser: async (userData) => {
+      try {
+        // Generate ID if it's a new user
+        let userId = userData.id;
+        if (!userId) {
+          userId = `user_${Date.now()}`;
+        }
+        
+        const { id, ...dataWithoutId } = userData;
+        const userRef = doc(db, "users", userId);
+        
+        // Add createdAt for new users, updatedAt for all
+        const dataToSave = {
+          ...dataWithoutId,
+          updatedAt: serverTimestamp()
+        };
+        
+        if (id) {
+          // Update existing user
+          await updateDoc(userRef, dataToSave);
+        } else {
+          // Create new user with generated ID
+          dataToSave.createdAt = serverTimestamp();
+          await setDoc(userRef, dataToSave);
+        }
+        
+        // Return the complete user data with ID
+        return {
+          id: userId,
+          ...dataWithoutId
+        };
+      } catch (error) {
+        console.error("Error saving user:", error);
+        return null;
+      }
+    },
+    
+    // Create or update a station
+    saveStation: async (stationData) => {
+      try {
+        // Generate ID if it's a new station
+        let stationId = stationData.id;
+        if (!stationId) {
+          stationId = `station_${Date.now()}`;
+        }
+        
+        const { id, ...dataWithoutId } = stationData;
+        const stationRef = doc(db, "stations", stationId);
+        
+        // Add createdAt for new stations, updatedAt for all
+        const dataToSave = {
+          ...dataWithoutId,
+          updatedAt: serverTimestamp()
+        };
+        
+        if (id) {
+          // Update existing station
+          await updateDoc(stationRef, dataToSave);
+        } else {
+          // Create new station with generated ID
+          dataToSave.createdAt = serverTimestamp();
+          await setDoc(stationRef, dataToSave);
+        }
+        
+        // Return the complete station data with ID
+        return {
+          id: stationId,
+          ...dataWithoutId
+        };
+      } catch (error) {
+        console.error("Error saving station:", error);
+        return null;
+      }
+    },
+    
+    // Delete a station and handle affected data
+    deleteStation: async (stationId) => {
+      try {
+        // 1. Get the station to be deleted
+        const stationRef = doc(db, "stations", stationId);
+        const stationSnap = await getDoc(stationRef);
+        
+        if (!stationSnap.exists()) {
+          console.error(`Station ${stationId} not found`);
+          return { 
+            success: false, 
+            message: "Station not found" 
+          };
+        }
+        
+        const stationData = stationSnap.data();
+        const stationNumber = stationData.number || stationId.replace('s', '');
+        const stationName = `Station ${stationNumber}`;
+        
+        // Start a batch for atomic updates
+        const batch = writeBatch(db);
+        const affectedItems = { users: 0, logs: 0, assessments: 0 };
+        
+        // 2. Get all users assigned to this station and update them
+        const usersRef = collection(db, "users");
+        const usersQuery = query(usersRef, where("stationId", "==", stationId));
+        const userSnap = await getDocs(usersQuery);
+        
+        userSnap.forEach(userDoc => {
+          // Update each user to remove station assignment
+          batch.update(userDoc.ref, { 
+            stationId: "",
+            station: "",
+            updatedAt: serverTimestamp()
+          });
+          affectedItems.users++;
+        });
+        
+        // 3. Also check for users that might be using station name instead of ID
+        const usersStationNameQuery = query(usersRef, where("station", "==", stationName));
+        const userNameSnap = await getDocs(usersStationNameQuery);
+        
+        userNameSnap.forEach(userDoc => {
+          if (!userSnap.docs.some(d => d.id === userDoc.id)) { // Avoid duplicates
+            batch.update(userDoc.ref, { 
+              stationId: "",
+              station: "",
+              updatedAt: serverTimestamp()
+            });
+            affectedItems.users++;
+          }
+        });
+        
+        // 4. Mark logs for this station as "archived"
+        const logsRef = collection(db, "logs");
+        const logsQuery = query(logsRef, where("station", "==", stationName));
+        const logsSnap = await getDocs(logsQuery);
+        
+        logsSnap.forEach(logDoc => {
+          batch.update(logDoc.ref, { 
+            stationDeleted: true,
+            originalStation: stationName,
+            updatedAt: serverTimestamp()
+          });
+          affectedItems.logs++;
+        });
+        
+        // 5. Mark assessments for this station as "archived"
+        const assessmentsRef = collection(db, "assessments");
+        const assessmentsQuery = query(assessmentsRef, where("station", "==", stationName));
+        const assessmentsSnap = await getDocs(assessmentsQuery);
+        
+        assessmentsSnap.forEach(assessmentDoc => {
+          batch.update(assessmentDoc.ref, { 
+            stationDeleted: true,
+            originalStation: stationName,
+            updatedAt: serverTimestamp()
+          });
+          affectedItems.assessments++;
+        });
+        
+        // 6. Delete the station document
+        batch.delete(stationRef);
+        
+        // 7. Commit all changes in one atomic operation
+        await batch.commit();
+        
+        console.log(`Station ${stationId} deleted successfully with cleanup:`, affectedItems);
+        return { 
+          success: true, 
+          message: "Station deleted successfully", 
+          affected: affectedItems 
+        };
+      } catch (error) {
+        console.error("Error deleting station:", error);
+        return { 
+          success: false, 
+          message: error.message 
+        };
+      }
+    },
 
     // GAR Assessment operations
     // Create a new GAR assessment
@@ -529,6 +871,17 @@ const App = () => {
     }
   };
 
+  // Initialize dark mode state
+  const [darkMode, setDarkMode] = useState(() => {
+    const savedMode = localStorage.getItem('darkMode');
+    return savedMode !== null ? savedMode === 'true' : true; // Default to true (dark mode)
+  });
+  
+  // Initialize selectedStation from localStorage with default to Station 1
+  const [selectedStation, setSelectedStation] = useState(() => {
+    return localStorage.getItem('selectedStation') || 'Station 1';
+  });
+
   return (
     <Router>
       <AuthProvider>
@@ -565,6 +918,16 @@ const App = () => {
               <Route path="/gar-assessment/:id" element={
                 <ProtectedRoute>
                   <GARAssessment />
+                </ProtectedRoute>
+              } />
+              <Route path="/admin" element={
+                <ProtectedRoute>
+                  <AdminPortal 
+                    darkMode={darkMode} 
+                    setDarkMode={setDarkMode}
+                    selectedStation={selectedStation}
+                    setSelectedStation={setSelectedStation}
+                  />
                 </ProtectedRoute>
               } />
               <Route path="/" element={<Navigate to="/login" replace />} />

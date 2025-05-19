@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Email Test Page</title>
+    <script type="text/javascript" src="https://cdn.jsdelivr.net/npm/@emailjs/browser@3/dist/email.min.js"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width:
+            800px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        h1 {
+            color: #003366;
+        }
+        .form-group {
+            margin-bottom: 15px;
+        }
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+        }
+        input, textarea {
+            width: 100%;
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+        button {
+            background-color: #003366;
+            color: white;
+            border: none;
+            padding: 10px 15px;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        button:hover {
+            background-color: #002244;
+        }
+        .result {
+            margin-top: 20px;
+            padding: 10px;
+            border-radius: 4px;
+        }
+        .success {
+            background-color: #d4edda;
+            color: #155724;
+        }
+        .error {
+            background-color: #f8d7da;
+            color: #721c24;
+        }
+    </style>
+</head>
+<body>
+    <h1>EmailJS Test Page</h1>
+    <p>Use this page to test if your EmailJS configuration is working properly.</p>
+    
+    <form id="test-form">
+        <div class="form-group">
+            <label for="recipient">Recipient Email:</label>
+            <input type="email" id="recipient" name="recipient" required placeholder="Enter recipient email">
+        </div>
+        
+        <div class="form-group">
+            <label for="recipient-name">Recipient Name:</label>
+            <input type="text" id="recipient-name" name="recipient-name" placeholder="Enter recipient name">
+        </div>
+        
+        <div class="form-group">
+            <label for="subject">Subject:</label>
+            <input type="text" id="subject" name="subject" value="Test Email from Fire Department System">
+        </div>
+        
+        <div class="form-group">
+            <label for="message">Test Message:</label>
+            <textarea id="message" name="message" rows="4" placeholder="Enter a test message">This is a test message from the Fire Department notification system.</textarea>
+        </div>
+        
+        <button type="submit">Send Test Email</button>
+    </form>
+    
+    <div id="result" class="result" style="display: none;"></div>
+    
+    <script>
+        (function() {
+            // Initialize EmailJS with your user ID
+            emailjs.init("V-Mwr4x_iu6FVMCpB");
+            
+            document.getElementById('test-form').addEventListener('submit', function(event) {
+                event.preventDefault();
+                
+                // Show sending message
+                const resultDiv = document.getElementById('result');
+                resultDiv.className = 'result';
+                resultDiv.style.display = 'block';
+                resultDiv.innerHTML = 'Sending email...';
+                
+                // Get form values
+                const recipient = document.getElementById('recipient').value;
+                const recipientName = document.getElementById('recipient-name').value || 'Team Member';
+                const subject = document.getElementById('subject').value;
+                const message = document.getElementById('message').value;
+                
+                // Prepare template parameters - match the same structure as in your app
+                const templateParams = {
+                    from_name: "Fire Department Testing",
+                    to_name: recipientName,
+                    message: `<h2>${subject}</h2><p>${message}</p>`,
+                    reply_to: "noreply@test.com",
+                    to_email: recipient,
+                    subject: subject
+                };
+                
+                // Send the email
+                emailjs.send("service_2umfd2m", "contact_form", templateParams)
+                    .then(function(response) {
+                        console.log('SUCCESS!', response.status, response.text);
+                        resultDiv.className = 'result success';
+                        resultDiv.innerHTML = `
+                            <h3>Email Sent Successfully!</h3>
+                            <p>Status: ${response.status}</p>
+                            <p>Response: ${response.text}</p>
+                            <p>Check the inbox of ${recipient} for the test email.</p>
+                        `;
+                    }, function(error) {
+                        console.log('FAILED...', error);
+                        resultDiv.className = 'result error';
+                        resultDiv.innerHTML = `
+                            <h3>Error Sending Email</h3>
+                            <p>Status: ${error.status || 'N/A'}</p>
+                            <p>Error: ${error.text || error.message || 'Unknown error'}</p>
+                            <p>Check the console for more details.</p>
+                        `;
+                    });
+            });
+        })();
+    </script>
+</body>
+</html>

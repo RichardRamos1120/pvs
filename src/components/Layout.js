@@ -1,7 +1,8 @@
 // src/components/Layout.js
-import React, { useState } from 'react';
+import React, { useState, useEffect, useContext } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { getAuth, signOut } from 'firebase/auth';
+import { FirestoreContext } from '../App';
 import {
   Clipboard,
   Calendar,
@@ -12,17 +13,86 @@ import {
   Sun,
   Menu,
   X,
-  AlertTriangle
+  AlertTriangle,
+  Shield
 } from 'lucide-react';
 
 const Layout = ({ children, darkMode, setDarkMode, selectedStation, setSelectedStation }) => {
   const [menuOpen, setMenuOpen] = useState(false);
+  const [isAdmin, setIsAdmin] = useState(false);
+  const [stations, setStations] = useState([]);
+  const [loading, setLoading] = useState(true);
+  
   const navigate = useNavigate();
   const location = useLocation();
   const auth = getAuth();
+  const firestoreOperations = useContext(FirestoreContext);
   
-  // List of stations (this could be fetched from Firestore)
-  const stations = ['Station 1', 'Station 4', 'Station 7', 'Station 10', 'Station 11', 'Station 14', 'Station 23'];
+  // Fetch stations from Firestore and check admin status
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        setLoading(true);
+        const user = auth.currentUser;
+        if (!user) return;
+        
+        // Get user profile for admin check
+        const userProfile = await firestoreOperations.getUserProfile(user.uid);
+        setIsAdmin(userProfile?.role === 'admin');
+        
+        // Fetch stations from Firestore
+        const stationsData = await firestoreOperations.getStations();
+        if (stationsData && stationsData.length > 0) {
+          // Format station names for the dropdown
+          const stationNames = stationsData.map(station => 
+            `Station ${station.number || station.id.replace('s', '')}`
+          );
+          
+          setStations(stationNames);
+          console.log("Fetched stations:", stationNames);
+          
+          // Check if the current selected station exists in our new list
+          const currentStation = localStorage.getItem('selectedStation');
+          const noStationsMarker = ['No Stations Available', 'Error Loading Stations'];
+          
+          // Only update selection if we have stations and current selection is invalid or a marker
+          if (stationNames.length > 0 && 
+              (!currentStation || 
+               !stationNames.includes(currentStation) || 
+               noStationsMarker.includes(currentStation))) {
+            setSelectedStation(stationNames[0]);
+            localStorage.setItem('selectedStation', stationNames[0]);
+          }
+        } else {
+          // Clear stations if none found in Firestore
+          console.log("No stations found in Firestore");
+          setStations([]);
+          const noStationMessage = 'No Stations Available';
+          
+          // Only update if the current value is not already the message
+          if (selectedStation !== noStationMessage) {
+            setSelectedStation(noStationMessage);
+            localStorage.setItem('selectedStation', noStationMessage);
+          }
+        }
+      } catch (error) {
+        console.error('Error fetching data:', error);
+        // No fallback, just show a message
+        setStations([]);
+        const errorMessage = 'Error Loading Stations';
+        
+        // Only update if the current value is not already the error message
+        if (selectedStation !== errorMessage) {
+          setSelectedStation(errorMessage);
+          localStorage.setItem('selectedStation', errorMessage);
+        }
+      } finally {
+        setLoading(false);
+      }
+    };
+    
+    fetchData();
+  }, [auth.currentUser, firestoreOperations]);  // Removed selectedStation dependency to prevent re-fetching loop
   
   // Toggle dark mode
   const toggleDarkMode = () => {
@@ -54,6 +124,7 @@ const Layout = ({ children, darkMode, setDarkMode, selectedStation, setSelectedS
     if (path === '/today' && location.pathname === '/today') return true;
     if (path === '/reports' && (location.pathname === '/reports' || location.pathname.startsWith('/report/'))) return true;
     if (path === '/gar-assessment' && location.pathname === '/gar-assessment') return true;
+    if (path === '/admin' && location.pathname === '/admin') return true;
     return false;
   };
 
@@ -69,23 +140,41 @@ const Layout = ({ children, darkMode, setDarkMode, selectedStation, setSelectedS
             </div>
             
             <div className="hidden md:flex items-center space-x-6">
-              {/* Station selector - disabled on Reports pages and GAR Assessment page */}
+              {/* Station selector - disabled on Reports pages, GAR Assessment, Admin pages, or when no stations */}
               {location.pathname === '/reports' ||
                location.pathname.startsWith('/report/') ||
                location.pathname === '/gar-assessment' ||
-               location.pathname.startsWith('/gar-assessment/') ? (
-                <div className={`${darkMode ? 'bg-gray-700' : 'bg-blue-700'} text-white rounded-md px-3 py-1 text-sm min-w-[120px] opacity-50`}>
-                  {selectedStation}
+               location.pathname.startsWith('/gar-assessment/') ||
+               location.pathname === '/admin' ||
+               location.pathname.startsWith('/admin/') ||
+               stations.length === 0 ? (
+                <div className={`${darkMode ? 'bg-gray-700' : 'bg-blue-700'} text-white rounded-md px-3 py-1 text-sm min-w-[120px] ${stations.length === 0 ? 'bg-opacity-60 dark:bg-opacity-60' : 'opacity-50'}`}>
+                  {location.pathname === '/admin' || location.pathname.startsWith('/admin/') ? 
+                    'All Stations' : 
+                    stations.length === 0 ?
+                    (selectedStation === 'Error Loading Stations' ? 
+                      <span className="text-red-300">Error Loading</span> : 'No Stations') :
+                    selectedStation}
                 </div>
               ) : (
                 <select
                   className={`${darkMode ? 'bg-gray-700' : 'bg-blue-700'} text-white rounded-md px-3 py-1 text-sm border-none focus:ring-2 focus:ring-blue-400 min-w-[120px]`}
                   value={selectedStation}
-                  onChange={(e) => setSelectedStation(e.target.value)}
+                  onChange={(e) => {
+                    setSelectedStation(e.target.value);
+                    localStorage.setItem('selectedStation', e.target.value);
+                  }}
+                  disabled={loading}
                 >
-                  {stations.map(station => (
-                    <option key={station} value={station}>{station}</option>
-                  ))}
+                  {loading ? (
+                    <option>Loading...</option>
+                  ) : stations.length > 0 ? (
+                    stations.map(station => (
+                      <option key={station} value={station}>{station}</option>
+                    ))
+                  ) : (
+                    <option value={selectedStation}>{selectedStation}</option>
+                  )}
                 </select>
               )}
               
@@ -156,14 +245,24 @@ const Layout = ({ children, darkMode, setDarkMode, selectedStation, setSelectedS
                 <span>{auth.currentUser?.displayName || 'Captain'}</span>
               </div>
               
-              {/* Mobile station selector - disabled on Reports pages and GAR Assessment */}
+              {/* Mobile station selector - disabled on Reports pages, GAR Assessment, Admin pages, or when no stations */}
               {location.pathname === '/reports' ||
                location.pathname.startsWith('/report/') ||
                location.pathname === '/gar-assessment' ||
-               location.pathname.startsWith('/gar-assessment/') ? (
-                <div className={`w-full ${darkMode ? 'bg-gray-700' : 'bg-blue-700'} text-white rounded-md px-3 py-2 text-sm mb-2 opacity-50 flex items-center`}>
+               location.pathname.startsWith('/gar-assessment/') ||
+               location.pathname === '/admin' ||
+               location.pathname.startsWith('/admin/') || 
+               stations.length === 0 ? (
+                <div className={`w-full ${darkMode ? 'bg-gray-700' : 'bg-blue-700'} text-white rounded-md px-3 py-2 text-sm mb-2 ${stations.length === 0 ? 'bg-opacity-60 dark:bg-opacity-60' : 'opacity-50'} flex items-center`}>
                   <span>Station: </span>
-                  <span className="ml-2 font-medium">{selectedStation}</span>
+                  <span className="ml-2 font-medium">
+                    {location.pathname === '/admin' || location.pathname.startsWith('/admin/') ? 
+                      'All Stations' : 
+                      stations.length === 0 ?
+                      (selectedStation === 'Error Loading Stations' ? 
+                        <span className="text-red-300">Error Loading</span> : 'No Stations') :
+                      selectedStation}
+                  </span>
                 </div>
               ) : (
                 <select
@@ -171,12 +270,20 @@ const Layout = ({ children, darkMode, setDarkMode, selectedStation, setSelectedS
                   value={selectedStation}
                   onChange={(e) => {
                     setSelectedStation(e.target.value);
+                    localStorage.setItem('selectedStation', e.target.value);
                     setMenuOpen(false);
                   }}
+                  disabled={loading}
                 >
-                  {stations.map(station => (
-                    <option key={station} value={station}>{station}</option>
-                  ))}
+                  {loading ? (
+                    <option>Loading...</option>
+                  ) : stations.length > 0 ? (
+                    stations.map(station => (
+                      <option key={station} value={station}>{station}</option>
+                    ))
+                  ) : (
+                    <option value={selectedStation}>{selectedStation}</option>
+                  )}
                 </select>
               )}
               
@@ -251,6 +358,20 @@ const Layout = ({ children, darkMode, setDarkMode, selectedStation, setSelectedS
               <AlertTriangle className="h-4 w-4 inline mr-1" />
               GAR Assessment
             </a>
+            
+            {isAdmin && (
+              <Link
+                to="/admin"
+                className={`px-3 py-2 rounded-md text-sm font-medium ${
+                  isActivePath('/admin')
+                    ? `${darkMode ? 'bg-blue-900 text-blue-200' : 'bg-blue-100 text-blue-800'}`
+                    : `${darkMode ? 'text-gray-300 hover:bg-gray-700' : 'text-gray-600 hover:bg-gray-100'}`
+                }`}
+              >
+                <Shield className="h-4 w-4 inline mr-1" />
+                Admin Portal
+              </Link>
+            )}
           </div>
         </div>
       </nav>

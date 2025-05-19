@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      margin: 0;
+      padding: 0;
+      color: #333333;
+      background-color: #f7f7f7;
+    }
+    .container {
+      max-width: 600px;
+      margin: 0 auto;
+      padding: 20px;
+      background-color: #ffffff;
+      border: 1px solid #dddddd;
+      border-radius: 5px;
+      box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+    }
+    .header {
+      text-align: center;
+      padding-bottom: 10px;
+      border-bottom: 2px solid #003366;
+      margin-bottom: 20px;
+    }
+    .logo {
+      max-width: 150px;
+      margin-bottom: 10px;
+    }
+    h1 {
+      color: #003366;
+      font-size: 24px;
+      margin: 0;
+      padding: 0;
+    }
+    h2 {
+      color: #003366;
+      font-size: 20px;
+      margin-top: 20px;
+    }
+    .content {
+      padding: 20px 0;
+    }
+    .assessment-info {
+      background-color: #f5f5f5;
+      padding: 15px;
+      border-radius: 5px;
+      margin-bottom: 20px;
+    }
+    .risk-level {
+      display: inline-block;
+      padding: 5px 10px;
+      border-radius: 3px;
+      color: white;
+      font-weight: bold;
+      margin-top: 5px;
+    }
+    .green {
+      background-color: #4CAF50;
+    }
+    .amber {
+      background-color: #FFC107;
+    }
+    .red {
+      background-color: #F44336;
+    }
+    .details-table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 15px;
+    }
+    .details-table td {
+      padding: 8px;
+      border-bottom: 1px solid #eeeeee;
+    }
+    .details-table td:first-child {
+      font-weight: bold;
+      width: 40%;
+    }
+    .footer {
+      margin-top: 30px;
+      padding-top: 15px;
+      border-top: 1px solid #dddddd;
+      font-size: 12px;
+      color: #777777;
+      text-align: center;
+    }
+    .button {
+      display: inline-block;
+      background-color: #003366;
+      color: white;
+      text-decoration: none;
+      padding: 10px 20px;
+      border-radius: 5px;
+      margin-top: 15px;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <img src="https://firebasestorage.googleapis.com/v0/b/pvs-v1-9eb01.appspot.com/o/firefighter-helmet.png?alt=media" alt="Fire Department Logo" class="logo" />
+      <h1>Fire Department GAR Assessment</h1>
+    </div>
+    
+    <div class="content">
+      <p>Hello {{to_name}},</p>
+      
+      <p>A new GAR (Green-Amber-Red) assessment has been completed for {{station}}.</p>
+      
+      <div class="assessment-info">
+        <h2>Assessment Details</h2>
+        <table class="details-table">
+          <tr>
+            <td>Date:</td>
+            <td>{{date}}</td>
+          </tr>
+          <tr>
+            <td>Time:</td>
+            <td>{{time}}</td>
+          </tr>
+          <tr>
+            <td>Station:</td>
+            <td>{{station}}</td>
+          </tr>
+          <tr>
+            <td>Type:</td>
+            <td>{{type}}</td>
+          </tr>
+          <tr>
+            <td>Created By:</td>
+            <td>{{captain}}</td>
+          </tr>
+          <tr>
+            <td>Risk Score:</td>
+            <td>{{score}}</td>
+          </tr>
+          <tr>
+            <td>Risk Level:</td>
+            <td>
+              <div class="risk-level {{risk_color}}">{{risk_level}}</div>
+            </td>
+          </tr>
+        </table>
+      </div>
+      
+      <p>Please log into the Fire Department system to view the complete assessment details.</p>
+      
+      <div style="text-align: center;">
+        <a href="{{app_url}}" class="button">View Full Assessment</a>
+      </div>
+    </div>
+    
+    <div class="footer">
+      <p>This is an automated notification from the Fire Department GAR Assessment System.</p>
+      <p>Please do not reply to this email. If you have questions, contact your supervisor.</p>
+      <p>&copy; 2025 Fire Department. All rights reserved.</p>
+    </div>
+  </div>
+</body>
+</html>
