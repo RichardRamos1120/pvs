@@ -12,8 +12,30 @@ const GARAssessment = () => {
   const auth = getAuth();
   const firestoreOperations = useContext(FirestoreContext);
   
-  // List of stations - same as in Layout component
-  const stations = ['Station 1', 'Station 4', 'Station 7', 'Station 10', 'Station 11', 'Station 14', 'Station 23'];
+  // State for stations from Firestore database
+  const [stations, setStations] = useState([]);
+  
+  // Function to fetch stations from Firestore
+  const fetchStations = async () => {
+    try {
+      console.log("Fetching stations from Firestore database...");
+      const stationsData = await firestoreOperations.getStations();
+      
+      if (stationsData && Array.isArray(stationsData) && stationsData.length > 0) {
+        const stationNames = stationsData.map(station => 
+          `Station ${station.number || station.id.replace('station_', '').replace('s', '')}`
+        );
+        console.log("Fetched stations from database:", stationNames);
+        setStations(stationNames);
+      } else {
+        console.log("No stations found in database");
+        setStations([]);
+      }
+    } catch (error) {
+      console.error("Error fetching stations from database:", error);
+      setStations([]);
+    }
+  };
   
   // Initialize darkMode from localStorage with default to true (dark mode)
   const [darkMode, setDarkMode] = useState(() => {
@@ -144,7 +166,7 @@ const GARAssessment = () => {
     }
   };
   
-  // Fetch user profile and assessments on component mount
+  // Fetch user profile, stations, and assessments on component mount
   useEffect(() => {
     const fetchData = async () => {
       try {
@@ -172,14 +194,39 @@ const GARAssessment = () => {
           setReadOnlyMode(true);
         }
         
+        // Fetch stations from Firestore database
+        await fetchStations();
+        
         // Only set station from profile if user hasn't manually selected one
         const savedStation = localStorage.getItem('selectedStation');
-        if (!savedStation && profile && profile.station) {
-          handleStationChange(profile.station);
+        
+        // Get the list of stations from the state
+        const stationsList = stations;
+        
+        let stationToUse;
+        
+        // If we have stations from the database and saved station is valid, use it
+        if (stationsList.length > 0) {
+          if (savedStation && stationsList.includes(savedStation)) {
+            stationToUse = savedStation;
+          } 
+          // Otherwise if profile has a valid station, use that
+          else if (profile?.station && stationsList.includes(profile.station)) {
+            stationToUse = profile.station;
+          }
+          // Otherwise use the first station from the database
+          else {
+            stationToUse = stationsList[0];
+          }
+        } else {
+          // No stations available, use generic placeholder
+          stationToUse = 'No Stations Available';
         }
         
+        // Apply the station selection
+        handleStationChange(stationToUse);
+        
         // Fetch assessments for the selected station
-        const stationToUse = savedStation || (profile && profile.station) || selectedStation;
         await fetchAssessments(stationToUse);
         
         setUserChecked(true);
@@ -446,7 +493,36 @@ const GARAssessment = () => {
     }
   };
 
-  const startAssessment = () => {
+  const startAssessment = async () => {
+    // Check if we have stations from the database before doing anything
+    if (stations.length === 0) {
+      console.log("Attempted to create assessment with no stations in database");
+      setError('Cannot create assessment: No stations are available in the database. Please contact an administrator to set up stations.');
+      return;
+    }
+    
+    // Double-check by fetching stations from database again
+    try {
+      const stationsData = await firestoreOperations.getStations();
+      if (!stationsData || !Array.isArray(stationsData) || stationsData.length === 0) {
+        console.log("Verified no stations in database during startAssessment");
+        setError('Cannot create assessment: No stations are available in the database. Please contact an administrator to set up stations.');
+        setStations([]);
+        return;
+      }
+    } catch (error) {
+      console.error("Error verifying stations in startAssessment:", error);
+      setError('Error checking stations. Please try again.');
+      return;
+    }
+    
+    // At this point we've verified stations exist in the database
+    console.log("Creating new assessment with stations from database");
+    
+    // Use a valid station for the assessment
+    const useStation = stations.includes(selectedStation) ? selectedStation : stations[0];
+    console.log(`Using station: ${useStation} for new assessment`);
+      
     // Create new assessment data object
     const newAssessmentData = {
       id: uuidv4(),
@@ -454,7 +530,7 @@ const GARAssessment = () => {
       rawDate: new Date().toISOString(),
       time: new Date().toTimeString().substring(0, 5),
       type: "Department-wide",
-      station: selectedStation,
+      station: useStation, // Using validated station from database
       status: "draft",
       weather: {
         temperature: "37",
@@ -767,26 +843,35 @@ const GARAssessment = () => {
             onChange={(e) => handleInputChange(null, 'type', e.target.value)}
           >
             <option value="Department-wide">Department-wide</option>
-            <option value="Station-specific">Station-specific</option>
+            <option value="Station-specific">Mission-specific</option>
           </select>
         </div>
         <div>
           <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Station</label>
-          <select
-            className="w-full p-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
-            value={localFormData.station}
-            onChange={(e) => handleInputChange(null, 'station', e.target.value)}
-            disabled={localFormData.type !== "Station-specific"}
-          >
-            {/* Only show the current station once */}
-            {!stations.includes(selectedStation) && (
-              <option value={selectedStation}>{selectedStation}</option>
-            )}
-            <option value="All Stations">All Stations</option>
-            {stations.map(station => (
-              <option key={station} value={station}>{station}</option>
-            ))}
-          </select>
+          {stations.length === 0 ? (
+            // No stations found in database
+            <div className="w-full p-2 border border-yellow-300 dark:border-yellow-600 rounded-md bg-yellow-50 dark:bg-yellow-900/20 text-yellow-800 dark:text-yellow-200 flex items-center">
+              <AlertTriangle className="h-4 w-4 mr-1 text-yellow-500 dark:text-yellow-400" />
+              No Stations Available in Database
+            </div>
+          ) : (
+            // Stations found in database - show dropdown with database stations
+            <select
+              className="w-full p-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+              value={localFormData.station}
+              onChange={(e) => handleInputChange(null, 'station', e.target.value)}
+              disabled={localFormData.type !== "Station-specific"}
+            >
+              {localFormData.type !== "Station-specific" && (
+                <option value="All Stations">All Stations</option>
+              )}
+              
+              {/* Map through the actual database stations */}
+              {stations.map(station => (
+                <option key={station} value={station}>{station}</option>
+              ))}
+            </select>
+          )}
         </div>
       </div>
       
@@ -1303,15 +1388,43 @@ const GARAssessment = () => {
               <h1 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">GAR Risk Assessment</h1>
               <p className="text-gray-600 dark:text-gray-400">Create and manage risk assessments for your department</p>
               
-              <div className="flex mt-4 space-x-4">
-                <button 
-                  className="flex items-center px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
-                  onClick={startAssessment}
-                  disabled={readOnlyMode}
-                >
-                  <AlertTriangle className="w-4 h-4 mr-2" />
-                  Create New Assessment
-                </button>
+              {/* COMPLETELY REWROTE THIS SECTION FOR BUTTON DISPLAY */}
+              <div className="mt-4">
+                {/* Force display warning when no stations exist */}
+                {stations.length === 0 && (
+                  <div className="space-y-4">
+                    <div className="inline-flex items-center px-4 py-2 border border-red-300 dark:border-red-600 text-sm font-medium rounded-md text-red-800 dark:text-red-200 bg-red-50 dark:bg-red-900/20">
+                      <AlertTriangle className="h-4 w-4 mr-1 text-red-500 dark:text-red-400" />
+                      NO STATIONS FOUND IN DATABASE
+                    </div>
+                    
+                    <div className="p-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-700 rounded-md">
+                      <div className="flex items-start">
+                        <AlertTriangle className="text-red-500 dark:text-red-400 w-5 h-5 mr-2 mt-0.5" />
+                        <div>
+                          <h3 className="text-sm font-medium text-red-800 dark:text-red-300">Cannot Create Assessments</h3>
+                          <p className="mt-1 text-sm text-red-700 dark:text-red-400">
+                            No fire stations exist in the Firestore database. An administrator must create at least one station in the database before any assessments can be created.
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
+                
+                {/* Only show button when stations exist and user has permissions */}
+                {stations.length > 0 && !readOnlyMode && (
+                  <div className="flex space-x-4">
+                    <button 
+                      className="flex items-center px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
+                      onClick={startAssessment}
+                      disabled={stations.length === 0}
+                    >
+                      <AlertTriangle className="w-4 h-4 mr-2" />
+                      Create New Assessment
+                    </button>
+                  </div>
+                )}
               </div>
             </div>
             

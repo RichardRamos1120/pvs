@@ -452,31 +452,41 @@ const Reports = () => {
                 <ArrowLeft className="h-5 w-5" />
               </button>
               <div>
-                <h2 className="text-xl font-bold text-gray-900 dark:text-white">Daily Activity Logs</h2>
+                <h2 className="text-xl font-bold text-gray-900 dark:text-white">Reports</h2>
                 <p className="text-sm text-gray-500 dark:text-gray-400">
-                  View and manage all activity reports
+                  View and manage all activity logs and risk assessments
                 </p>
               </div>
             </div>
             
             <div className="flex flex-col sm:flex-row space-y-2 sm:space-y-0 sm:space-x-2">
-              {/* Only show "Create New Log" button for captains/admins if stations exist */}
+              {/* Only show buttons for captains/admins if stations exist */}
               {(userProfile?.role === 'captain' || userProfile?.role === 'admin') && 
                !(selectedStation === 'No Stations Available' || selectedStation === 'Error Loading Stations') && (
-                <button 
-                  onClick={createNewLog}
-                  className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700"
-                >
-                  <Plus className="h-4 w-4 mr-1" />
-                  {pastLogs.some(log => {
-                    const logDate = new Date(log.rawDate);
-                    const today = new Date();
-                    return (
-                      logDate.setHours(0, 0, 0, 0) === today.setHours(0, 0, 0, 0) &&
-                      log.station === selectedStation
-                    );
-                  }) ? "View Today's Log" : "Create New Log"}
-                </button>
+                <>
+                  <button 
+                    onClick={createNewLog}
+                    className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700"
+                  >
+                    <Plus className="h-4 w-4 mr-1" />
+                    {pastLogs.some(log => {
+                      const logDate = new Date(log.rawDate);
+                      const today = new Date();
+                      return (
+                        logDate.setHours(0, 0, 0, 0) === today.setHours(0, 0, 0, 0) &&
+                        log.station === selectedStation
+                      );
+                    }) ? "View Today's Log" : "Create New Log"}
+                  </button>
+                  
+                  <button 
+                    onClick={() => navigate('/gar')}
+                    className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-amber-600 hover:bg-amber-700"
+                  >
+                    <AlertTriangle className="h-4 w-4 mr-1" />
+                    Risk Assessments
+                  </button>
+                </>
               )}
               
               {/* Show a warning when no stations exist */}
@@ -579,7 +589,7 @@ const Reports = () => {
           </div>
         </div>
         
-        {/* Reports List - Always Grouped by Station */}
+        {/* Past Logs - Always Grouped by Station */}
         <div className="bg-white dark:bg-gray-800 shadow rounded-lg overflow-hidden">
           <div className="space-y-4 p-4">
             {Object.entries(getReportsByStation()).length > 0 ? (

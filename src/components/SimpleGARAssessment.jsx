@@ -17,8 +17,30 @@ const GARAssessment = () => {
   const auth = getAuth();
   const firestoreOperations = useContext(FirestoreContext);
   
-  // List of stations - same as in Layout component
-  const stations = ['Station 1', 'Station 4', 'Station 7', 'Station 10', 'Station 11', 'Station 14', 'Station 23'];
+  // State for stations from Firestore database
+  const [stations, setStations] = useState([]);
+  
+  // Function to fetch stations from Firestore
+  const fetchStations = async () => {
+    try {
+      console.log("Fetching stations from Firestore database...");
+      const stationsData = await firestoreOperations.getStations();
+      
+      if (stationsData && Array.isArray(stationsData) && stationsData.length > 0) {
+        const stationNames = stationsData.map(station => 
+          `Station ${station.number || station.id.replace('station_', '').replace('s', '')}`
+        );
+        console.log("Fetched stations from database:", stationNames);
+        setStations(stationNames);
+      } else {
+        console.log("No stations found in database");
+        setStations([]);
+      }
+    } catch (error) {
+      console.error("Error fetching stations from database:", error);
+      setStations([]);
+    }
+  };
   
   // Refs for form inputs to keep them uncontrolled
   const dateRef = useRef();
@@ -32,6 +54,9 @@ const GARAssessment = () => {
   const humidityRef = useRef();
   const precipRef = useRef();
   const precipRateRef = useRef();
+  const waveHeightRef = useRef();
+  const wavePeriodRef = useRef();
+  const waveDirectionRef = useRef();
   const alertsRef = useRef();
   const mitigationRefs = {
     supervision: useRef(),
@@ -115,6 +140,9 @@ const GARAssessment = () => {
       humidity: "",
       precipitation: "",
       precipitationRate: "",
+      waveHeight: "",
+      wavePeriod: "",
+      waveDirection: "N",
       alerts: ""
     },
     riskFactors: {
@@ -313,6 +341,18 @@ const GARAssessment = () => {
           if (precipRateRef.current) {
             precipRateRef.current.value = assessment.weather?.precipitationRate || "";
             precipRateRef.current.disabled = true;
+          }
+          if (waveHeightRef.current) {
+            waveHeightRef.current.value = assessment.weather?.waveHeight || "";
+            waveHeightRef.current.disabled = true;
+          }
+          if (wavePeriodRef.current) {
+            wavePeriodRef.current.value = assessment.weather?.wavePeriod || "";
+            wavePeriodRef.current.disabled = true;
+          }
+          if (waveDirectionRef.current) {
+            waveDirectionRef.current.value = assessment.weather?.waveDirection || "N";
+            waveDirectionRef.current.disabled = true;
           }
           if (alertsRef.current) {
             alertsRef.current.value = assessment.weather?.alerts || "";
@@ -698,6 +738,9 @@ const GARAssessment = () => {
           setReadOnlyMode(true);
         }
 
+        // Fetch stations from database
+        await fetchStations();
+        
         // Only set station from profile if user hasn't manually selected one
         const savedStation = localStorage.getItem('selectedStation');
         if (!savedStation && profile && profile.station) {
@@ -1849,7 +1892,7 @@ const GARAssessment = () => {
           >
             <option value="">Select assessment type</option>
             <option value="Department-wide">Department-wide</option>
-            <option value="Station-specific">Station-specific</option>
+            <option value="Station-specific">Mission-specific</option>
           </select>
         </div>
         <div>
@@ -2015,6 +2058,66 @@ const GARAssessment = () => {
                 }}
                 disabled={readOnlyMode}
               />
+            </div>
+          </div>
+
+          <div className="mt-4 grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Wave Height (ft)</label>
+              <input
+                type="text"
+                className={`w-full p-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white ${readOnlyMode ? 'cursor-not-allowed opacity-90' : ''}`}
+                ref={waveHeightRef}
+                placeholder="Enter height (e.g., 3.5)"
+                defaultValue={assessmentData.weather.waveHeight}
+                onBlur={(e) => {
+                  const newWaveHeight = e.target.value;
+                  assessmentData.weather.waveHeight = newWaveHeight;
+                  setHasChanges(true);
+                }}
+                disabled={readOnlyMode}
+              />
+            </div>
+            
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Wave Period (sec)</label>
+              <input
+                type="text"
+                className={`w-full p-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white ${readOnlyMode ? 'cursor-not-allowed opacity-90' : ''}`}
+                ref={wavePeriodRef}
+                placeholder="Enter period (e.g., 8)"
+                defaultValue={assessmentData.weather.wavePeriod}
+                onBlur={(e) => {
+                  const newWavePeriod = e.target.value;
+                  assessmentData.weather.wavePeriod = newWavePeriod;
+                  setHasChanges(true);
+                }}
+                disabled={readOnlyMode}
+              />
+            </div>
+            
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Wave Direction</label>
+              <select
+                className={`w-full p-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white ${readOnlyMode ? 'cursor-not-allowed opacity-90' : ''}`}
+                ref={waveDirectionRef}
+                defaultValue={assessmentData.weather.waveDirection || "N"}
+                onBlur={(e) => {
+                  const newWaveDirection = e.target.value;
+                  assessmentData.weather.waveDirection = newWaveDirection;
+                  setHasChanges(true);
+                }}
+                disabled={readOnlyMode}
+              >
+                <option value="N">N</option>
+                <option value="NE">NE</option>
+                <option value="E">E</option>
+                <option value="SE">SE</option>
+                <option value="S">S</option>
+                <option value="SW">SW</option>
+                <option value="W">W</option>
+                <option value="NW">NW</option>
+              </select>
             </div>
           </div>
 
@@ -2349,6 +2452,27 @@ const GARAssessment = () => {
                 
                 <div className="text-gray-600 dark:text-gray-400">Precipitation:</div>
                 <div className="text-gray-900 dark:text-white">{assessmentData.weather.precipitation} ({assessmentData.weather.precipitationRate}"/hr)</div>
+                
+                {assessmentData.weather.waveHeight && (
+                  <>
+                    <div className="text-gray-600 dark:text-gray-400">Wave Height:</div>
+                    <div className="text-gray-900 dark:text-white">{assessmentData.weather.waveHeight} ft</div>
+                  </>
+                )}
+                
+                {assessmentData.weather.wavePeriod && (
+                  <>
+                    <div className="text-gray-600 dark:text-gray-400">Wave Period:</div>
+                    <div className="text-gray-900 dark:text-white">{assessmentData.weather.wavePeriod} sec</div>
+                  </>
+                )}
+                
+                {assessmentData.weather.waveDirection && (
+                  <>
+                    <div className="text-gray-600 dark:text-gray-400">Wave Direction:</div>
+                    <div className="text-gray-900 dark:text-white">{assessmentData.weather.waveDirection}</div>
+                  </>
+                )}
                 
                 <div className="text-gray-600 dark:text-gray-400">Alerts:</div>
                 <div className="text-amber-600 dark:text-amber-400">{assessmentData.weather.alerts}</div>

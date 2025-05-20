@@ -906,7 +906,7 @@ const GARAssessment = () => {
             onChange={(e) => handleInputChange(null, 'type', e.target.value)}
           >
             <option value="Department-wide">Department-wide</option>
-            <option value="Station-specific">Station-specific</option>
+            <option value="Station-specific">Mission-specific</option>
           </select>
         </div>
         <div>

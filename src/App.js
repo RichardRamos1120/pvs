@@ -889,7 +889,8 @@ const App = () => {
           <div className="App">
             <Routes>
               <Route path="/login" element={<Login />} />
-              <Route path="/signup" element={<Signup />} />
+              {/* Redirect signup to login - app is invite-only with Google authentication */}
+              <Route path="/signup" element={<Navigate to="/login" replace />} />
               <Route path="/dashboard" element={
                 <ProtectedRoute>
                   <Dashboard />

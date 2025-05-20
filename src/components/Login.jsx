@@ -236,17 +236,19 @@ const Login = () => {
             </button>
           </div>
           
-          <div className="flex items-center justify-between">
-            <div className="text-sm">
-              <Link to="/signup" className="font-medium text-blue-600 hover:text-blue-500 dark:text-blue-400 dark:hover:text-blue-300">
-                Don't have an account? Sign up
-              </Link>
-            </div>
+          <div className="flex items-center justify-end">
+            {/* Signup link removed - app is invite-only */}
             <div className="text-sm">
               <a href="#" className="font-medium text-blue-600 hover:text-blue-500 dark:text-blue-400 dark:hover:text-blue-300">
                 Forgot your password?
               </a>
             </div>
+          </div>
+          
+          {/* Info message about invite-only access */}
+          <div className="mt-4 text-sm text-center text-gray-600 dark:text-gray-400 bg-blue-50 dark:bg-blue-900/20 p-2 rounded-md">
+            <p>This application is invite-only for authorized personnel.</p>
+            <p className="mt-1">Please use Google Sign-in with your official email.</p>
           </div>
         </form>
       </div>

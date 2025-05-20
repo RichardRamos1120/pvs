@@ -52,7 +52,7 @@ const NewActivityModal = ({ show, onClose, onAddActivity, darkMode }) => {
       "PHYSICAL - DEPARTMENT PHYSICAL"
     ],
     "OPERATIONS": [
-      "ALARM RESPONSE",
+      "CONFERENCE CALL",
       "COVER - STATION COVERAGE OTHER",
       "COVER ST 10",
       "COVER ST 11",
@@ -60,17 +60,17 @@ const NewActivityModal = ({ show, onClose, onAddActivity, darkMode }) => {
       "COVER THROCKMORTON",
       "MEETING",
       "OTHER",
-      "PUBLIC ASSIST",
       "WORK ASSIGNMENTS"
     ],
-    "PR": [
+    "PUBLIC RELATIONS": [
       "COMMUNITY MEETING",
       "STATION TOUR"
     ],
-    "PREV": [
+    "PREVENTION": [
       "ACTIVITIES",
       "ADMIN - DUTIES",
-      "INSPECTIONS - COMPANY"
+      "INSPECTIONS - COMPANY",
+      "TRAINING"
     ],
     "TRAINING": [
       "BLOCK TRAINING - MONTHLY",
@@ -78,15 +78,14 @@ const NewActivityModal = ({ show, onClose, onAddActivity, darkMode }) => {
       "CPR TRAINING",
       "EMS - ROUTINE",
       "GENERAL - COMPANY TRAINING",
+      "ISO - COMPANY TRAINING DOCUMENTATION",
+      "ISO - DRIVER TRAINING DOCUMENTATION",
+      "ISO - FACILITY TRAINING DOCUMENTATION",
       "PT - PHYSICAL TRAINING"
     ],
     "UNION": [
-      "MEET AND CONFER ACTIVITIES"
-    ],
-    "ISO": [
-      "COMPANY TRAINING DOCUMENTATION",
-      "DRIVER TRAINING DOCUMENTATION",
-      "FACILITY TRAINING DOCUMENTATION"
+      "MEET AND CONFER ACTIVITIES",
+      "UNION NEGOTIATION"
     ]
   };
   
