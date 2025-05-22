@@ -100,6 +100,12 @@ const Reports = () => {
         const profile = await firestoreOperations.getUserProfile(user.uid);
         setUserProfile(profile);
 
+        // Track reports page view
+        await firestoreOperations.trackUserActivity(user.uid, 'reports_view', {
+          station: selectedStation,
+          timestamp: new Date().toISOString()
+        });
+
         // Check if we already have a station selection from localStorage
         const savedStation = localStorage.getItem('selectedStation');
 
@@ -480,7 +486,7 @@ const Reports = () => {
                   </button>
                   
                   <button 
-                    onClick={() => navigate('/gar')}
+                    onClick={() => navigate('/gar-assessment')}
                     className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-amber-600 hover:bg-amber-700"
                   >
                     <AlertTriangle className="h-4 w-4 mr-1" />

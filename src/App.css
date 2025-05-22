@@ -14,6 +14,15 @@ body {
   color: #1f2937;
 }
 
+/* Hide scrollbar for mobile navigation */
+.scrollbar-hide {
+  -ms-overflow-style: none;  /* Internet Explorer 10+ */
+  scrollbar-width: none;  /* Firefox */
+}
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;  /* Safari and Chrome */
+}
+
 /* Dark mode - Improved text color for better readability */
 body.dark-mode {
   background-color: #111827;

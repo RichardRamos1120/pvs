@@ -167,7 +167,7 @@ const UserModal = ({ user, stations, setShowModal, saveUser, darkMode }) => {
 
           <div>
             <label className={`block text-sm font-medium ${darkMode ? 'text-gray-300' : 'text-gray-700'} mb-2`}>Permissions</label>
-            <div className="space-y-2">
+            <div className="space-y-3">
               {permissions.map(permission => (
                 <div key={permission.id} className="flex items-center">
                   <input
@@ -175,11 +175,15 @@ const UserModal = ({ user, stations, setShowModal, saveUser, darkMode }) => {
                     id={`permission-${permission.id}`}
                     checked={formData.permissions.includes(permission.id)}
                     onChange={() => handlePermissionChange(permission.id)}
-                    className={`mr-2 ${darkMode ? 'bg-gray-700 border-gray-600' : 'bg-white border-gray-300'}`}
+                    className={`h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded mr-3 ${
+                      darkMode 
+                        ? 'bg-gray-700 border-gray-600 focus:ring-offset-gray-800' 
+                        : 'bg-white border-gray-300 focus:ring-offset-white'
+                    }`}
                   />
                   <label 
                     htmlFor={`permission-${permission.id}`}
-                    className={`text-sm ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}
+                    className={`text-sm cursor-pointer select-none ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}
                   >
                     {permission.label}
                   </label>

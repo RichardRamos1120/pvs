@@ -136,7 +136,7 @@ const StationModal = ({ station, captains, setShowModal, saveStation, darkMode }
               />
             </div>
             <div>
-              <label className={`block text-sm font-medium ${darkMode ? 'text-gray-300' : 'text-gray-700'} mb-1`}>Captain</label>
+              <label className={`block text-sm font-medium ${darkMode ? 'text-gray-300' : 'text-gray-700'} mb-1`}>Station Captain</label>
               <select
                 name="captainId"
                 className={`w-full p-2 border rounded-md ${
@@ -147,12 +147,16 @@ const StationModal = ({ station, captains, setShowModal, saveStation, darkMode }
                 value={formData.captainId}
                 onChange={handleChange}
               >
-                <option value="">Select Captain</option>
-                {captains.map(captain => (
-                  <option key={captain.id} value={captain.id}>
-                    {captain.firstName} {captain.lastName}
-                  </option>
-                ))}
+                <option value="">Select Captain/Officer</option>
+                {captains.length > 0 ? (
+                  captains.map(captain => (
+                    <option key={captain.id} value={captain.id}>
+                      {captain.firstName} {captain.lastName} ({captain.role?.charAt(0).toUpperCase() + captain.role?.slice(1) || 'Unknown'})
+                    </option>
+                  ))
+                ) : (
+                  <option value="" disabled>No captains or admins available</option>
+                )}
               </select>
             </div>
           </div>

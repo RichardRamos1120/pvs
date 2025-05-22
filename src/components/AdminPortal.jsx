@@ -6,6 +6,14 @@ import { FirestoreContext } from '../App';
 import Layout from './Layout';
 import UserModal from './modals/UserModal';
 import StationModal from './modals/StationModal';
+import { 
+  downloadCSV, 
+  formatUserDataForExport, 
+  formatStationDataForExport, 
+  formatGARDataForExport, 
+  formatLogDataForExport,
+  formatActivityDataForExport
+} from '../utils/csvExport';
 import {
   Users,
   Building2,
@@ -24,7 +32,8 @@ import {
   MapPin,
   Phone,
   CheckCircle,
-  Eye
+  Eye,
+  ArrowLeft
 } from 'lucide-react';
 
 const AdminPortal = ({ darkMode, setDarkMode, selectedStation, setSelectedStation }) => {
@@ -46,6 +55,11 @@ const AdminPortal = ({ darkMode, setDarkMode, selectedStation, setSelectedStatio
     message: '', 
     onConfirm: null 
   });
+
+  // Move user filter states to parent level to prevent resets
+  const [userSearchTerm, setUserSearchTerm] = useState('');
+  const [userRoleFilter, setUserRoleFilter] = useState('all');
+  const [userStatusFilter, setUserStatusFilter] = useState('all');
 
   const navigate = useNavigate();
   const auth = getAuth();
@@ -77,8 +91,6 @@ const AdminPortal = ({ darkMode, setDarkMode, selectedStation, setSelectedStatio
           const usersCollection = await firestoreOperations.getAllUsers();
           
           if (usersCollection && usersCollection.length > 0) {
-            console.log("Fetched users from Firestore:", usersCollection);
-            
             // Format data to match our component's expected structure
             const formattedUsers = usersCollection.map(user => ({
               id: user.id || user.userId,
@@ -95,7 +107,6 @@ const AdminPortal = ({ darkMode, setDarkMode, selectedStation, setSelectedStatio
             
             setUsers(formattedUsers);
           } else {
-            console.log("No users found in Firestore");
             // No default user - empty array means no users
             setUsers([]);
           }
@@ -112,8 +123,6 @@ const AdminPortal = ({ darkMode, setDarkMode, selectedStation, setSelectedStatio
           const stationsData = await firestoreOperations.getStations();
           
           if (stationsData && stationsData.length > 0) {
-            console.log("Fetched stations from Firestore:", stationsData);
-            
             // Format stations data
             const formattedStations = stationsData.map(station => ({
               id: station.id,
@@ -129,7 +138,6 @@ const AdminPortal = ({ darkMode, setDarkMode, selectedStation, setSelectedStatio
             
             setStations(formattedStations);
           } else {
-            console.log("No stations found in Firestore");
             // No fallback - an empty array indicates no stations
             setStations([]);
           }
@@ -146,10 +154,8 @@ const AdminPortal = ({ darkMode, setDarkMode, selectedStation, setSelectedStatio
           const deletedUsersData = await firestoreOperations.getDeletedUsers();
           
           if (deletedUsersData && deletedUsersData.length > 0) {
-            console.log("Fetched deleted users from Firestore:", deletedUsersData);
             setDeletedUsers(deletedUsersData);
           } else {
-            console.log("No deleted users found in Firestore");
             setDeletedUsers([]);
           }
         } catch (error) {
@@ -230,62 +236,64 @@ const AdminPortal = ({ darkMode, setDarkMode, selectedStation, setSelectedStatio
 
   // Admin Navigation
   const AdminNavigation = () => (
-    <div className={`${darkMode ? 'bg-gray-800' : 'bg-white'} border-b ${darkMode ? 'border-gray-700' : 'border-gray-200'} mb-6`}>
-      <div className="flex overflow-x-auto">
+    <div className={`${darkMode ? 'bg-gray-800' : 'bg-white'} border-b ${darkMode ? 'border-gray-700' : 'border-gray-200'} mb-4 md:mb-6`}>
+      <div className="flex overflow-x-auto scrollbar-hide">
         <button
           onClick={() => setAdminActiveSection('overview')}
-          className={`px-6 py-3 flex items-center whitespace-nowrap ${
+          className={`px-3 md:px-6 py-3 flex items-center whitespace-nowrap text-sm md:text-base ${
             adminActiveSection === 'overview' 
               ? `${darkMode ? 'bg-gray-700 text-blue-400 font-medium border-b-2 border-blue-500' : 'bg-blue-50 text-blue-600 font-medium border-b-2 border-blue-600'}` 
               : `${darkMode ? 'text-gray-300 hover:bg-gray-700' : 'text-gray-600 hover:bg-gray-100'}`
           }`}
         >
-          <Activity className="w-4 h-4 mr-2" />
-          Overview
+          <Activity className="w-4 h-4 mr-1 md:mr-2" />
+          <span className="hidden sm:inline">Overview</span>
+          <span className="sm:hidden">Overview</span>
         </button>
         <button
           onClick={() => setAdminActiveSection('users')}
-          className={`px-6 py-3 flex items-center whitespace-nowrap ${
+          className={`px-3 md:px-6 py-3 flex items-center whitespace-nowrap text-sm md:text-base ${
             adminActiveSection === 'users' 
               ? `${darkMode ? 'bg-gray-700 text-blue-400 font-medium border-b-2 border-blue-500' : 'bg-blue-50 text-blue-600 font-medium border-b-2 border-blue-600'}` 
               : `${darkMode ? 'text-gray-300 hover:bg-gray-700' : 'text-gray-600 hover:bg-gray-100'}`
           }`}
         >
-          <Users className="w-4 h-4 mr-2" />
-          Users
+          <Users className="w-4 h-4 mr-1 md:mr-2" />
+          <span>Users</span>
         </button>
         <button
           onClick={() => setAdminActiveSection('stations')}
-          className={`px-6 py-3 flex items-center whitespace-nowrap ${
+          className={`px-3 md:px-6 py-3 flex items-center whitespace-nowrap text-sm md:text-base ${
             adminActiveSection === 'stations' 
               ? `${darkMode ? 'bg-gray-700 text-blue-400 font-medium border-b-2 border-blue-500' : 'bg-blue-50 text-blue-600 font-medium border-b-2 border-blue-600'}` 
               : `${darkMode ? 'text-gray-300 hover:bg-gray-700' : 'text-gray-600 hover:bg-gray-100'}`
           }`}
         >
-          <Building2 className="w-4 h-4 mr-2" />
-          Stations
+          <Building2 className="w-4 h-4 mr-1 md:mr-2" />
+          <span>Stations</span>
         </button>
         <button
           onClick={() => setAdminActiveSection('reports')}
-          className={`px-6 py-3 flex items-center whitespace-nowrap ${
-            adminActiveSection === 'reports' 
+          className={`px-3 md:px-6 py-3 flex items-center whitespace-nowrap text-sm md:text-base ${
+            adminActiveSection === 'reports' || adminActiveSection === 'analytics'
               ? `${darkMode ? 'bg-gray-700 text-blue-400 font-medium border-b-2 border-blue-500' : 'bg-blue-50 text-blue-600 font-medium border-b-2 border-blue-600'}` 
               : `${darkMode ? 'text-gray-300 hover:bg-gray-700' : 'text-gray-600 hover:bg-gray-100'}`
           }`}
         >
-          <FileBarChart className="w-4 h-4 mr-2" />
-          Reports
+          <FileBarChart className="w-4 h-4 mr-1 md:mr-2" />
+          <span>Reports</span>
         </button>
         <button
           onClick={() => setAdminActiveSection('deleted-users')}
-          className={`px-6 py-3 flex items-center whitespace-nowrap ${
+          className={`px-3 md:px-6 py-3 flex items-center whitespace-nowrap text-sm md:text-base ${
             adminActiveSection === 'deleted-users' 
               ? `${darkMode ? 'bg-gray-700 text-red-400 font-medium border-b-2 border-red-500' : 'bg-red-50 text-red-600 font-medium border-b-2 border-red-600'}` 
               : `${darkMode ? 'text-gray-300 hover:bg-gray-700' : 'text-gray-600 hover:bg-gray-100'}`
           }`}
         >
-          <Trash className="w-4 h-4 mr-2" />
-          Deleted Users
+          <Trash className="w-4 h-4 mr-1 md:mr-2" />
+          <span className="hidden sm:inline">Deleted Users</span>
+          <span className="sm:hidden">Deleted</span>
         </button>
       </div>
     </div>
@@ -293,9 +301,59 @@ const AdminPortal = ({ darkMode, setDarkMode, selectedStation, setSelectedStatio
 
   // Admin Overview Component
   const AdminOverview = () => {
+    const [recentActivity, setRecentActivity] = useState([]);
+    const [loadingActivity, setLoadingActivity] = useState(true);
+    
     const totalUsers = users.length;
     const activeUsers = users.filter(u => u.status === 'active').length;
     const totalStations = stations.length;
+
+    useEffect(() => {
+      const fetchRecentActivity = async () => {
+        try {
+          setLoadingActivity(true);
+          const activities = await firestoreOperations.getRecentActivity(5);
+          setRecentActivity(activities);
+        } catch (error) {
+          console.error('Error fetching recent activity:', error);
+          setRecentActivity([]);
+        } finally {
+          setLoadingActivity(false);
+        }
+      };
+
+      fetchRecentActivity();
+    }, [firestoreOperations]);
+
+    const getActivityIcon = (type) => {
+      switch (type) {
+        case 'user_login':
+          return <Activity className={`w-4 h-4 ${darkMode ? 'text-blue-400' : 'text-blue-600'} mr-3`} />;
+        case 'assessment':
+          return <AlertTriangle className={`w-4 h-4 ${darkMode ? 'text-amber-400' : 'text-amber-600'} mr-3`} />;
+        case 'log':
+          return <FileText className={`w-4 h-4 ${darkMode ? 'text-green-400' : 'text-green-600'} mr-3`} />;
+        default:
+          return <Activity className={`w-4 h-4 ${darkMode ? 'text-gray-400' : 'text-gray-600'} mr-3`} />;
+      }
+    };
+
+    const getTimeAgo = (timestamp) => {
+      if (!timestamp) return 'Unknown time';
+      
+      const now = new Date();
+      const activityTime = timestamp.seconds ? new Date(timestamp.seconds * 1000) : new Date(timestamp);
+      const diffInMinutes = Math.floor((now - activityTime) / (1000 * 60));
+      
+      if (diffInMinutes < 1) return 'Just now';
+      if (diffInMinutes < 60) return `${diffInMinutes} minutes ago`;
+      
+      const diffInHours = Math.floor(diffInMinutes / 60);
+      if (diffInHours < 24) return `${diffInHours} hours ago`;
+      
+      const diffInDays = Math.floor(diffInHours / 24);
+      return `${diffInDays} days ago`;
+    };
 
     return (
       <div className="space-y-6">
@@ -340,29 +398,63 @@ const AdminPortal = ({ darkMode, setDarkMode, selectedStation, setSelectedStatio
         </div>
 
         <div className={`${darkMode ? 'bg-gray-800' : 'bg-white'} rounded-lg shadow p-6`}>
-          <h3 className={`text-lg font-bold mb-4 ${darkMode ? 'text-white' : 'text-gray-900'}`}>Recent Activity</h3>
+          <div className="flex justify-between items-center mb-4">
+            <h3 className={`text-lg font-bold ${darkMode ? 'text-white' : 'text-gray-900'}`}>Recent Activity</h3>
+            <button
+              onClick={async () => {
+                try {
+                  showStatusMessage("Exporting recent activity...", "info");
+                  const result = await firestoreOperations.exportRecentActivity(50);
+                  
+                  if (result.success) {
+                    const formattedData = formatActivityDataForExport(result.data);
+                    downloadCSV(formattedData, result.filename);
+                    showStatusMessage("Recent activity exported successfully", "success");
+                  } else {
+                    showStatusMessage(`Export failed: ${result.message}`, "error");
+                  }
+                } catch (error) {
+                  console.error('Error exporting recent activity:', error);
+                  showStatusMessage("Export failed: " + error.message, "error");
+                }
+              }}
+              className={`flex items-center px-3 py-1 text-sm border rounded-md transition-colors ${
+                darkMode 
+                  ? 'border-gray-600 text-gray-300 hover:bg-gray-700' 
+                  : 'border-gray-300 text-gray-700 hover:bg-gray-50'
+              }`}
+            >
+              <Download className="w-4 h-4 mr-1" />
+              Export
+            </button>
+          </div>
           <div className="space-y-3">
-            <div className={`flex items-center justify-between py-2 border-b ${darkMode ? 'border-gray-700' : 'border-gray-200'}`}>
-              <div className="flex items-center">
-                <Activity className={`w-4 h-4 ${darkMode ? 'text-blue-400' : 'text-blue-600'} mr-3`} />
-                <span className={darkMode ? 'text-gray-300' : 'text-gray-700'}>User Sarah Chen logged in</span>
+            {loadingActivity ? (
+              <div className={`text-center py-4 ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>
+                Loading recent activity...
               </div>
-              <span className={`text-sm ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>2 hours ago</span>
-            </div>
-            <div className={`flex items-center justify-between py-2 border-b ${darkMode ? 'border-gray-700' : 'border-gray-200'}`}>
-              <div className="flex items-center">
-                <AlertTriangle className={`w-4 h-4 ${darkMode ? 'text-amber-400' : 'text-amber-600'} mr-3`} />
-                <span className={darkMode ? 'text-gray-300' : 'text-gray-700'}>GAR Assessment (AMBER) published for Station 23</span>
+            ) : recentActivity.length > 0 ? (
+              recentActivity.map((activity, index) => (
+                <div 
+                  key={activity.id || index} 
+                  className={`flex items-center justify-between py-2 ${
+                    index < recentActivity.length - 1 ? `border-b ${darkMode ? 'border-gray-700' : 'border-gray-200'}` : ''
+                  }`}
+                >
+                  <div className="flex items-center">
+                    {getActivityIcon(activity.type)}
+                    <span className={darkMode ? 'text-gray-300' : 'text-gray-700'}>{activity.message}</span>
+                  </div>
+                  <span className={`text-sm ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>
+                    {getTimeAgo(activity.timestamp)}
+                  </span>
+                </div>
+              ))
+            ) : (
+              <div className={`text-center py-4 ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>
+                No recent activity found
               </div>
-              <span className={`text-sm ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>3 hours ago</span>
-            </div>
-            <div className="flex items-center justify-between py-2">
-              <div className="flex items-center">
-                <FileText className={`w-4 h-4 ${darkMode ? 'text-green-400' : 'text-green-600'} mr-3`} />
-                <span className={darkMode ? 'text-gray-300' : 'text-gray-700'}>Daily log completed for Station 12</span>
-              </div>
-              <span className={`text-sm ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>1 day ago</span>
-            </div>
+            )}
           </div>
         </div>
       </div>
@@ -371,15 +463,23 @@ const AdminPortal = ({ darkMode, setDarkMode, selectedStation, setSelectedStatio
 
   // User Management Component
   const UserManagement = () => {
-    const [userSearchTerm, setUserSearchTerm] = useState('');
-    
-    // Filter users based on local userSearchTerm state
-    const filteredUsers = users.filter(user =>
-      user.firstName.toLowerCase().includes(userSearchTerm.toLowerCase()) ||
-      user.lastName.toLowerCase().includes(userSearchTerm.toLowerCase()) ||
-      user.email.toLowerCase().includes(userSearchTerm.toLowerCase()) ||
-      user.role.toLowerCase().includes(userSearchTerm.toLowerCase())
-    );
+    // Filter users based on search term and filters (using parent state)
+    const filteredUsers = users.filter(user => {
+      // Text search filter
+      const matchesSearch = userSearchTerm === '' || 
+        user.firstName.toLowerCase().includes(userSearchTerm.toLowerCase()) ||
+        user.lastName.toLowerCase().includes(userSearchTerm.toLowerCase()) ||
+        user.email.toLowerCase().includes(userSearchTerm.toLowerCase()) ||
+        user.role.toLowerCase().includes(userSearchTerm.toLowerCase());
+      
+      // Role filter
+      const matchesRole = userRoleFilter === 'all' || user.role === userRoleFilter;
+      
+      // Status filter
+      const matchesStatus = userStatusFilter === 'all' || user.status === userStatusFilter;
+      
+      return matchesSearch && matchesRole && matchesStatus;
+    });
     
     const handleCreateUser = () => {
       setSelectedUser(null);
@@ -392,13 +492,9 @@ const AdminPortal = ({ darkMode, setDarkMode, selectedStation, setSelectedStatio
     };
 
     const handleDeleteUser = (userId) => {
-      // Let's log what's happening for debugging
-      console.log(`Delete requested for user with ID: ${userId}`);
-      
       // Get the user for the confirmation dialog
       const userToDelete = users.find(u => u.id === userId);
       if (!userToDelete) {
-        console.error(`User with ID ${userId} not found in local state`);
         showStatusMessage(`User with ID ${userId} not found`, "error");
         return;
       }
@@ -411,28 +507,18 @@ const AdminPortal = ({ darkMode, setDarkMode, selectedStation, setSelectedStatio
         onConfirm: async () => {
           try {            
             // Use soft delete (move to deletedUsers collection)
-            console.log(`Calling softDeleteUser for ${userId}`);
             const result = await firestoreOperations.softDeleteUser(userId);
-            console.log("Soft delete result:", result);
             
             if (result.success) {
               // Update local state
               setUsers(users.filter(u => u.id !== userId));
-              console.log(`User ${userId} has been marked for deletion`);
               
               // Show temporary success message
               showStatusMessage("User has been successfully deleted", "success");
-              
-              // Log information for debugging but don't show to user
-              if (result.requiresAuthDeletion && result.email) {
-                console.log(`To complete deletion process, delete user with email '${result.email}' from Firebase Authentication`);
-              }
             } else {
-              console.error(`Failed to delete user ${userId}: ${result.message}`);
               showStatusMessage(`Failed to delete user: ${result.message}`, "error");
             }
           } catch (error) {
-            console.error("Error processing user deletion:", error);
             showStatusMessage(`An error occurred: ${error.message}`, "error");
           }
         }
@@ -454,8 +540,9 @@ const AdminPortal = ({ darkMode, setDarkMode, selectedStation, setSelectedStatio
 
         <div className={`${darkMode ? 'bg-gray-800' : 'bg-white'} rounded-lg shadow`}>
           <div className={`p-4 border-b ${darkMode ? 'border-gray-700' : 'border-gray-200'}`}>
-            <div className="flex items-center space-x-4">
-              <div className="relative flex-1">
+            <div className="flex flex-col space-y-4">
+              {/* Search Bar */}
+              <div className="relative">
                 <Search className={`w-4 h-4 absolute left-3 top-3 ${darkMode ? 'text-gray-400' : 'text-gray-400'}`} />
                 <input
                   type="text"
@@ -465,14 +552,110 @@ const AdminPortal = ({ darkMode, setDarkMode, selectedStation, setSelectedStatio
                   onChange={(e) => setUserSearchTerm(e.target.value)}
                 />
               </div>
-              <button className={`flex items-center px-3 py-2 border ${darkMode ? 'border-gray-600 text-gray-300 hover:bg-gray-700' : 'border-gray-300 text-gray-700 hover:bg-gray-100'} rounded-md`}>
-                <Filter className="w-4 h-4 mr-2" />
-                Filter
-              </button>
-              <button className={`flex items-center px-3 py-2 border ${darkMode ? 'border-gray-600 text-gray-300 hover:bg-gray-700' : 'border-gray-300 text-gray-700 hover:bg-gray-100'} rounded-md`}>
-                <Download className="w-4 h-4 mr-2" />
-                Export
-              </button>
+              
+              {/* Filters and Export */}
+              <div className="flex flex-wrap items-center gap-4">
+                <div className="flex items-center space-x-2">
+                  <Filter className={`w-4 h-4 ${darkMode ? 'text-gray-400' : 'text-gray-500'}`} />
+                  <span className={`text-sm font-medium ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>Filters:</span>
+                </div>
+                
+                {/* Role Filter */}
+                <select
+                  value={userRoleFilter}
+                  onChange={(e) => setUserRoleFilter(e.target.value)}
+                  className={`px-3 py-2 border rounded-md text-sm ${
+                    darkMode 
+                      ? 'bg-gray-700 border-gray-600 text-gray-200' 
+                      : 'bg-white border-gray-300 text-gray-700'
+                  }`}
+                >
+                  <option value="all">All Roles</option>
+                  <option value="admin">Admin</option>
+                  <option value="captain">Captain</option>
+                  <option value="firefighter">Firefighter</option>
+                </select>
+                
+                {/* Status Filter */}
+                <select
+                  value={userStatusFilter}
+                  onChange={(e) => setUserStatusFilter(e.target.value)}
+                  className={`px-3 py-2 border rounded-md text-sm ${
+                    darkMode 
+                      ? 'bg-gray-700 border-gray-600 text-gray-200' 
+                      : 'bg-white border-gray-300 text-gray-700'
+                  }`}
+                >
+                  <option value="all">All Status</option>
+                  <option value="active">Active</option>
+                  <option value="inactive">Inactive</option>
+                </select>
+                
+                {/* Clear Filters Button */}
+                {(userRoleFilter !== 'all' || userStatusFilter !== 'all' || userSearchTerm !== '') && (
+                  <button
+                    onClick={() => {
+                      setUserRoleFilter('all');
+                      setUserStatusFilter('all');
+                      setUserSearchTerm('');
+                    }}
+                    className={`px-3 py-2 text-sm border rounded-md transition-colors ${
+                      darkMode 
+                        ? 'border-gray-600 text-gray-300 hover:bg-gray-700' 
+                        : 'border-gray-300 text-gray-700 hover:bg-gray-50'
+                    }`}
+                  >
+                    Clear Filters
+                  </button>
+                )}
+                
+                {/* Results Count */}
+                <span className={`text-sm ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>
+                  {filteredUsers.length} of {users.length} users
+                </span>
+                
+                {/* Export Button */}
+                <div className="ml-auto">
+                  <button 
+                    onClick={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      
+                      // Create a separate function to avoid any closure issues
+                      const performExport = () => {
+                        try {
+                          console.log('Starting export with filters:', { userRoleFilter, userStatusFilter, userSearchTerm });
+                          console.log('Filtered users count:', filteredUsers.length);
+                          
+                          const formattedData = formatUserDataForExport(filteredUsers);
+                          const filename = `users_filtered_export_${new Date().toISOString().split('T')[0]}.csv`;
+                          downloadCSV(formattedData, filename);
+                          
+                          // Use setTimeout to avoid immediate state update that might cause re-render
+                          setTimeout(() => {
+                            showStatusMessage("User list exported successfully", "success");
+                          }, 100);
+                        } catch (error) {
+                          console.error('Error exporting users:', error);
+                          setTimeout(() => {
+                            showStatusMessage("Export failed: " + error.message, "error");
+                          }, 100);
+                        }
+                      };
+                      
+                      performExport();
+                    }}
+                    className={`flex items-center px-3 py-2 border rounded-md transition-colors ${
+                      darkMode 
+                        ? 'border-gray-600 text-gray-300 hover:bg-gray-700' 
+                        : 'border-gray-300 text-gray-700 hover:bg-gray-50'
+                    }`}
+                  >
+                    <Download className="w-4 h-4 mr-2" />
+                    Export ({filteredUsers.length})
+                  </button>
+                </div>
+              </div>
             </div>
           </div>
 
@@ -601,7 +784,6 @@ const AdminPortal = ({ darkMode, setDarkMode, selectedStation, setSelectedStatio
       // Get the station for the confirmation dialog
       const stationToDelete = stations.find(s => s.id === stationId);
       if (!stationToDelete) {
-        console.error(`Station with ID ${stationId} not found in local state`);
         showStatusMessage(`Station with ID ${stationId} not found`, "error");
         return;
       }
@@ -675,7 +857,6 @@ const AdminPortal = ({ darkMode, setDarkMode, selectedStation, setSelectedStatio
               if (result.success) {
                 // Update local state
                 setStations(stations.filter(s => s.id !== stationId));
-                console.log(`Station ${stationId} deleted successfully with affected items:`, result.affected);
                 
                 // Also update the local users state if any users were affected
                 if (result.affected && result.affected.users > 0) {
@@ -708,14 +889,12 @@ const AdminPortal = ({ darkMode, setDarkMode, selectedStation, setSelectedStatio
                 // Hide processing message
                 setStatusMessage(prev => ({ ...prev, visible: false }));
                 
-                console.error(`Failed to delete station ${stationId}: ${result.message}`);
                 showStatusMessage(`Failed to delete station: ${result.message}`, "error");
               }
             } catch (error) {
               // Hide processing message
               setStatusMessage(prev => ({ ...prev, visible: false }));
               
-              console.error("Error deleting station:", error);
               showStatusMessage(`Error: ${error.message}`, "error");
             }
           }
@@ -724,7 +903,6 @@ const AdminPortal = ({ darkMode, setDarkMode, selectedStation, setSelectedStatio
         // Hide any loading message
         setStatusMessage(prev => ({ ...prev, visible: false }));
         
-        console.error("Error preparing station deletion:", error);
         showStatusMessage(`Error: ${error.message}`, "error");
         
         // Fall back to a simpler confirmation if we can't get the full impact
@@ -886,68 +1064,222 @@ const AdminPortal = ({ darkMode, setDarkMode, selectedStation, setSelectedStatio
   };
 
   // Admin Reports Component
-  const AdminReports = () => (
-    <div className="space-y-6">
-      <h2 className={`text-2xl font-bold ${darkMode ? 'text-white' : 'text-gray-900'}`}>Reports & Analytics</h2>
-      
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <div className={`${darkMode ? 'bg-gray-800' : 'bg-white'} rounded-lg shadow p-6`}>
-          <div className="flex items-center justify-between mb-4">
-            <h3 className={`text-lg font-bold ${darkMode ? 'text-white' : 'text-gray-900'}`}>GAR Assessments</h3>
-            <FileBarChart className={`w-6 h-6 ${darkMode ? 'text-blue-400' : 'text-blue-600'}`} />
+  const AdminReports = () => {
+    const [reportCounts, setReportCounts] = useState({
+      assessments: 0,
+      logs: 0,
+      loading: true
+    });
+
+    useEffect(() => {
+      const fetchReportCounts = async () => {
+        try {
+          setReportCounts(prev => ({ ...prev, loading: true }));
+          
+          // Get counts for reports
+          const [allAssessments, allLogs] = await Promise.all([
+            firestoreOperations.getAllAssessments(),
+            firestoreOperations.getAllLogs()
+          ]);
+
+          setReportCounts({
+            assessments: allAssessments.length,
+            logs: allLogs.length,
+            loading: false
+          });
+        } catch (error) {
+          console.error('Error fetching report counts:', error);
+          setReportCounts({
+            assessments: 0,
+            logs: 0,
+            loading: false
+          });
+        }
+      };
+
+      fetchReportCounts();
+    }, [firestoreOperations]);
+
+    const handleExportUsers = async () => {
+      try {
+        showStatusMessage("Exporting users...", "info");
+        const result = await firestoreOperations.exportUsers();
+        
+        if (result.success) {
+          const formattedData = formatUserDataForExport(result.data);
+          downloadCSV(formattedData, result.filename);
+          showStatusMessage("Users exported successfully", "success");
+        } else {
+          showStatusMessage(`Export failed: ${result.message}`, "error");
+        }
+      } catch (error) {
+        console.error('Error exporting users:', error);
+        showStatusMessage("Export failed: " + error.message, "error");
+      }
+    };
+
+    const handleExportStations = async () => {
+      try {
+        showStatusMessage("Exporting stations...", "info");
+        const result = await firestoreOperations.exportStations();
+        
+        if (result.success) {
+          const formattedData = formatStationDataForExport(result.data);
+          downloadCSV(formattedData, result.filename);
+          showStatusMessage("Stations exported successfully", "success");
+        } else {
+          showStatusMessage(`Export failed: ${result.message}`, "error");
+        }
+      } catch (error) {
+        console.error('Error exporting stations:', error);
+        showStatusMessage("Export failed: " + error.message, "error");
+      }
+    };
+
+    const handleExportGARHistory = async () => {
+      try {
+        showStatusMessage("Exporting GAR assessments...", "info");
+        const result = await firestoreOperations.exportGARHistory();
+        
+        if (result.success) {
+          const formattedData = formatGARDataForExport(result.data);
+          downloadCSV(formattedData, result.filename);
+          showStatusMessage("GAR history exported successfully", "success");
+        } else {
+          showStatusMessage(`Export failed: ${result.message}`, "error");
+        }
+      } catch (error) {
+        console.error('Error exporting GAR history:', error);
+        showStatusMessage("Export failed: " + error.message, "error");
+      }
+    };
+
+    const handleExportDailyLogs = async () => {
+      try {
+        showStatusMessage("Exporting daily logs...", "info");
+        const result = await firestoreOperations.exportDailyLogs();
+        
+        if (result.success) {
+          const formattedData = formatLogDataForExport(result.data);
+          downloadCSV(formattedData, result.filename);
+          showStatusMessage("Daily logs exported successfully", "success");
+        } else {
+          showStatusMessage(`Export failed: ${result.message}`, "error");
+        }
+      } catch (error) {
+        console.error('Error exporting daily logs:', error);
+        showStatusMessage("Export failed: " + error.message, "error");
+      }
+    };
+
+    const handleViewGARReports = () => {
+      // Navigate to reports page with GAR filter
+      navigate('/reports?type=assessments');
+    };
+
+    const handleViewDailyLogs = () => {
+      // Navigate to reports page with logs filter
+      navigate('/reports?type=logs');
+    };
+
+    const handleViewUserActivity = () => {
+      // Navigate to analytics section
+      setAdminActiveSection('analytics');
+    };
+
+    return (
+      <div className="space-y-6">
+        <h2 className={`text-2xl font-bold ${darkMode ? 'text-white' : 'text-gray-900'}`}>Reports & Analytics</h2>
+        
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          <div className={`${darkMode ? 'bg-gray-800' : 'bg-white'} rounded-lg shadow p-6`}>
+            <div className="flex items-center justify-between mb-4">
+              <h3 className={`text-lg font-bold ${darkMode ? 'text-white' : 'text-gray-900'}`}>GAR Assessments</h3>
+              <FileBarChart className={`w-6 h-6 ${darkMode ? 'text-blue-400' : 'text-blue-600'}`} />
+            </div>
+            <p className={`${darkMode ? 'text-gray-300' : 'text-gray-600'} mb-2`}>
+              {reportCounts.loading ? 'Loading...' : `${reportCounts.assessments} assessments in database`}
+            </p>
+            <p className={`${darkMode ? 'text-gray-400' : 'text-gray-500'} text-sm mb-4`}>View historical GAR assessment data and trends</p>
+            <button 
+              onClick={handleViewGARReports}
+              className={`w-full px-4 py-2 ${darkMode ? 'bg-blue-600 hover:bg-blue-700' : 'bg-blue-600 hover:bg-blue-700'} text-white rounded-md`}
+            >
+              View Reports
+            </button>
           </div>
-          <p className={`${darkMode ? 'text-gray-300' : 'text-gray-600'} mb-4`}>View historical GAR assessment data and trends</p>
-          <button className={`w-full px-4 py-2 ${darkMode ? 'bg-blue-600 hover:bg-blue-700' : 'bg-blue-600 hover:bg-blue-700'} text-white rounded-md`}>
-            View Reports
-          </button>
+
+          <div className={`${darkMode ? 'bg-gray-800' : 'bg-white'} rounded-lg shadow p-6`}>
+            <div className="flex items-center justify-between mb-4">
+              <h3 className={`text-lg font-bold ${darkMode ? 'text-white' : 'text-gray-900'}`}>Daily Logs</h3>
+              <FileText className={`w-6 h-6 ${darkMode ? 'text-green-400' : 'text-green-600'}`} />
+            </div>
+            <p className={`${darkMode ? 'text-gray-300' : 'text-gray-600'} mb-2`}>
+              {reportCounts.loading ? 'Loading...' : `${reportCounts.logs} logs in database`}
+            </p>
+            <p className={`${darkMode ? 'text-gray-400' : 'text-gray-500'} text-sm mb-4`}>Browse and analyze daily logs from all stations</p>
+            <button 
+              onClick={handleViewDailyLogs}
+              className={`w-full px-4 py-2 ${darkMode ? 'bg-green-600 hover:bg-green-700' : 'bg-green-600 hover:bg-green-700'} text-white rounded-md`}
+            >
+              View Logs
+            </button>
+          </div>
+
+          <div className={`${darkMode ? 'bg-gray-800' : 'bg-white'} rounded-lg shadow p-6`}>
+            <div className="flex items-center justify-between mb-4">
+              <h3 className={`text-lg font-bold ${darkMode ? 'text-white' : 'text-gray-900'}`}>User Activity</h3>
+              <Activity className={`w-6 h-6 ${darkMode ? 'text-purple-400' : 'text-purple-600'}`} />
+            </div>
+            <p className={`${darkMode ? 'text-gray-300' : 'text-gray-600'} mb-2`}>
+              {users.length} active users
+            </p>
+            <p className={`${darkMode ? 'text-gray-400' : 'text-gray-500'} text-sm mb-4`}>Track user engagement and system usage</p>
+            <button 
+              onClick={handleViewUserActivity}
+              className={`w-full px-4 py-2 ${darkMode ? 'bg-purple-600 hover:bg-purple-700' : 'bg-purple-600 hover:bg-purple-700'} text-white rounded-md`}
+            >
+              View Analytics
+            </button>
+          </div>
         </div>
 
         <div className={`${darkMode ? 'bg-gray-800' : 'bg-white'} rounded-lg shadow p-6`}>
-          <div className="flex items-center justify-between mb-4">
-            <h3 className={`text-lg font-bold ${darkMode ? 'text-white' : 'text-gray-900'}`}>Daily Logs</h3>
-            <FileText className={`w-6 h-6 ${darkMode ? 'text-green-400' : 'text-green-600'}`} />
+          <h3 className={`text-lg font-bold mb-4 ${darkMode ? 'text-white' : 'text-gray-900'}`}>Quick Exports</h3>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <button 
+              onClick={handleExportUsers}
+              className={`flex items-center justify-center px-4 py-3 border ${darkMode ? 'border-gray-700 text-gray-300 hover:bg-gray-700' : 'border-gray-300 text-gray-700 hover:bg-gray-50'} rounded-md transition-colors`}
+            >
+              <Download className="w-4 h-4 mr-2" />
+              Export User List
+            </button>
+            <button 
+              onClick={handleExportStations}
+              className={`flex items-center justify-center px-4 py-3 border ${darkMode ? 'border-gray-700 text-gray-300 hover:bg-gray-700' : 'border-gray-300 text-gray-700 hover:bg-gray-50'} rounded-md transition-colors`}
+            >
+              <Download className="w-4 h-4 mr-2" />
+              Export Station Data
+            </button>
+            <button 
+              onClick={handleExportGARHistory}
+              className={`flex items-center justify-center px-4 py-3 border ${darkMode ? 'border-gray-700 text-gray-300 hover:bg-gray-700' : 'border-gray-300 text-gray-700 hover:bg-gray-50'} rounded-md transition-colors`}
+            >
+              <Download className="w-4 h-4 mr-2" />
+              Export GAR History
+            </button>
+            <button 
+              onClick={handleExportDailyLogs}
+              className={`flex items-center justify-center px-4 py-3 border ${darkMode ? 'border-gray-700 text-gray-300 hover:bg-gray-700' : 'border-gray-300 text-gray-700 hover:bg-gray-50'} rounded-md transition-colors`}
+            >
+              <Download className="w-4 h-4 mr-2" />
+              Export Daily Logs
+            </button>
           </div>
-          <p className={`${darkMode ? 'text-gray-300' : 'text-gray-600'} mb-4`}>Browse and analyze daily logs from all stations</p>
-          <button className={`w-full px-4 py-2 ${darkMode ? 'bg-green-600 hover:bg-green-700' : 'bg-green-600 hover:bg-green-700'} text-white rounded-md`}>
-            View Logs
-          </button>
-        </div>
-
-        <div className={`${darkMode ? 'bg-gray-800' : 'bg-white'} rounded-lg shadow p-6`}>
-          <div className="flex items-center justify-between mb-4">
-            <h3 className={`text-lg font-bold ${darkMode ? 'text-white' : 'text-gray-900'}`}>User Activity</h3>
-            <Activity className={`w-6 h-6 ${darkMode ? 'text-purple-400' : 'text-purple-600'}`} />
-          </div>
-          <p className={`${darkMode ? 'text-gray-300' : 'text-gray-600'} mb-4`}>Track user engagement and system usage</p>
-          <button className={`w-full px-4 py-2 ${darkMode ? 'bg-purple-600 hover:bg-purple-700' : 'bg-purple-600 hover:bg-purple-700'} text-white rounded-md`}>
-            View Analytics
-          </button>
         </div>
       </div>
-
-      <div className={`${darkMode ? 'bg-gray-800' : 'bg-white'} rounded-lg shadow p-6`}>
-        <h3 className={`text-lg font-bold mb-4 ${darkMode ? 'text-white' : 'text-gray-900'}`}>Quick Exports</h3>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <button className={`flex items-center justify-center px-4 py-3 border ${darkMode ? 'border-gray-700 text-gray-300 hover:bg-gray-700' : 'border-gray-300 text-gray-700 hover:bg-gray-50'} rounded-md`}>
-            <Download className="w-4 h-4 mr-2" />
-            Export User List
-          </button>
-          <button className={`flex items-center justify-center px-4 py-3 border ${darkMode ? 'border-gray-700 text-gray-300 hover:bg-gray-700' : 'border-gray-300 text-gray-700 hover:bg-gray-50'} rounded-md`}>
-            <Download className="w-4 h-4 mr-2" />
-            Export Station Data
-          </button>
-          <button className={`flex items-center justify-center px-4 py-3 border ${darkMode ? 'border-gray-700 text-gray-300 hover:bg-gray-700' : 'border-gray-300 text-gray-700 hover:bg-gray-50'} rounded-md`}>
-            <Download className="w-4 h-4 mr-2" />
-            Export GAR History
-          </button>
-          <button className={`flex items-center justify-center px-4 py-3 border ${darkMode ? 'border-gray-700 text-gray-300 hover:bg-gray-700' : 'border-gray-300 text-gray-700 hover:bg-gray-50'} rounded-md`}>
-            <Download className="w-4 h-4 mr-2" />
-            Export Daily Logs
-          </button>
-        </div>
-      </div>
-    </div>
-  );
+    );
+  };
 
   // Deleted Users Management Component
   const DeletedUsersManagement = () => {
@@ -960,18 +1292,39 @@ const AdminPortal = ({ darkMode, setDarkMode, selectedStation, setSelectedStatio
     );
 
     const handleRestoreUser = async (userId) => {
-      if (window.confirm('Are you sure you want to restore this user?')) {
-        try {
-          // In a real implementation, you would:
-          // 1. Get user data from deletedUsers collection
-          // 2. Add it back to users collection
-          // 3. Delete from deletedUsers collection
-          
-          showStatusMessage("User restoration feature coming soon", "info");
-        } catch (error) {
-          console.error("Error restoring user:", error);
-        }
+      // Get the user for the confirmation dialog
+      const userToRestore = deletedUsers.find(u => u.id === userId);
+      if (!userToRestore) {
+        showStatusMessage("User not found in deleted users list", "error");
+        return;
       }
+
+      setConfirmDialog({
+        isOpen: true,
+        title: 'Confirm User Restoration',
+        message: `Are you sure you want to restore ${userToRestore.firstName} ${userToRestore.lastName}? This will move them back to the active users list.`,
+        onConfirm: async () => {
+          try {
+            showStatusMessage("Restoring user...", "info");
+            const result = await firestoreOperations.restoreUser(userId);
+            
+            if (result.success) {
+              // Update local state - remove from deleted users
+              setDeletedUsers(deletedUsers.filter(u => u.id !== userId));
+              
+              // Add to active users
+              setUsers([...users, result.userData]);
+              
+              showStatusMessage(`${userToRestore.firstName} ${userToRestore.lastName} has been restored successfully`, "success");
+            } else {
+              showStatusMessage(`Failed to restore user: ${result.message}`, "error");
+            }
+          } catch (error) {
+            console.error("Error restoring user:", error);
+            showStatusMessage(`Error restoring user: ${error.message}`, "error");
+          }
+        }
+      });
     };
 
     return (
@@ -1089,6 +1442,357 @@ const AdminPortal = ({ darkMode, setDarkMode, selectedStation, setSelectedStatio
       </div>
     );
   };
+
+  // Analytics Component
+  const AnalyticsComponent = () => {
+    const [analytics, setAnalytics] = useState(null);
+    const [systemStats, setSystemStats] = useState(null);
+    const [loading, setLoading] = useState(true);
+    const [timeframe, setTimeframe] = useState(30);
+
+    useEffect(() => {
+      const fetchAnalytics = async () => {
+        try {
+          setLoading(true);
+          const [analyticsData, statsData] = await Promise.all([
+            firestoreOperations.getUserEngagementAnalytics(timeframe),
+            firestoreOperations.getSystemUsageStats()
+          ]);
+          
+          setAnalytics(analyticsData);
+          setSystemStats(statsData);
+        } catch (error) {
+          console.error('Error fetching analytics:', error);
+        } finally {
+          setLoading(false);
+        }
+      };
+
+      fetchAnalytics();
+    }, [timeframe, firestoreOperations]);
+
+    if (loading) {
+      return (
+        <div className="flex justify-center items-center h-64">
+          <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-purple-500"></div>
+        </div>
+      );
+    }
+
+    return (
+      <div className="space-y-4 md:space-y-6">
+        <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4">
+          <div className="flex items-center">
+            <button 
+              onClick={() => setAdminActiveSection('reports')}
+              className={`mr-3 md:mr-4 p-2 rounded-full ${darkMode ? 'hover:bg-gray-700' : 'hover:bg-gray-100'}`}
+            >
+              <ArrowLeft className={`h-5 w-5 ${darkMode ? 'text-gray-400' : 'text-gray-600'}`} />
+            </button>
+            <h2 className={`text-lg md:text-2xl font-bold ${darkMode ? 'text-white' : 'text-gray-900'}`}>User Analytics & Engagement</h2>
+          </div>
+          <select
+            value={timeframe}
+            onChange={(e) => setTimeframe(Number(e.target.value))}
+            className={`px-3 py-2 border rounded-md text-sm ${
+              darkMode 
+                ? 'bg-gray-700 border-gray-600 text-gray-200' 
+                : 'bg-white border-gray-300 text-gray-700'
+            }`}
+          >
+            <option value={7}>Last 7 days</option>
+            <option value={30}>Last 30 days</option>
+            <option value={90}>Last 90 days</option>
+          </select>
+        </div>
+
+        {/* System Overview Stats */}
+        {systemStats && (
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-6">
+            <div className={`${darkMode ? 'bg-gray-800' : 'bg-white'} rounded-lg shadow p-3 md:p-6`}>
+              <div className="flex flex-col sm:flex-row sm:items-center">
+                <Users className={`w-6 h-6 md:w-8 md:h-8 ${darkMode ? 'text-blue-400' : 'text-blue-600'} mb-2 sm:mb-0`} />
+                <div className="sm:ml-4">
+                  <p className={`text-xs md:text-sm font-medium ${darkMode ? 'text-gray-300' : 'text-gray-600'}`}>Total Users</p>
+                  <p className={`text-lg md:text-2xl font-bold ${darkMode ? 'text-white' : 'text-gray-900'}`}>{systemStats.totalUsers}</p>
+                </div>
+              </div>
+            </div>
+            
+            <div className={`${darkMode ? 'bg-gray-800' : 'bg-white'} rounded-lg shadow p-3 md:p-6`}>
+              <div className="flex flex-col sm:flex-row sm:items-center">
+                <Activity className={`w-6 h-6 md:w-8 md:h-8 ${darkMode ? 'text-green-400' : 'text-green-600'} mb-2 sm:mb-0`} />
+                <div className="sm:ml-4">
+                  <p className={`text-xs md:text-sm font-medium ${darkMode ? 'text-gray-300' : 'text-gray-600'}`}>Active Today</p>
+                  <p className={`text-lg md:text-2xl font-bold ${darkMode ? 'text-white' : 'text-gray-900'}`}>{systemStats.activeUsersToday}</p>
+                </div>
+              </div>
+            </div>
+
+            <div className={`${darkMode ? 'bg-gray-800' : 'bg-white'} rounded-lg shadow p-3 md:p-6`}>
+              <div className="flex flex-col sm:flex-row sm:items-center">
+                <FileText className={`w-6 h-6 md:w-8 md:h-8 ${darkMode ? 'text-purple-400' : 'text-purple-600'} mb-2 sm:mb-0`} />
+                <div className="sm:ml-4">
+                  <p className={`text-xs md:text-sm font-medium ${darkMode ? 'text-gray-300' : 'text-gray-600'}`}>Total Logs</p>
+                  <p className={`text-lg md:text-2xl font-bold ${darkMode ? 'text-white' : 'text-gray-900'}`}>{systemStats.totalLogs}</p>
+                </div>
+              </div>
+            </div>
+
+            <div className={`${darkMode ? 'bg-gray-800' : 'bg-white'} rounded-lg shadow p-3 md:p-6`}>
+              <div className="flex flex-col sm:flex-row sm:items-center">
+                <AlertTriangle className={`w-6 h-6 md:w-8 md:h-8 ${darkMode ? 'text-amber-400' : 'text-amber-600'} mb-2 sm:mb-0`} />
+                <div className="sm:ml-4">
+                  <p className={`text-xs md:text-sm font-medium ${darkMode ? 'text-gray-300' : 'text-gray-600'}`}>Total Assessments</p>
+                  <p className={`text-lg md:text-2xl font-bold ${darkMode ? 'text-white' : 'text-gray-900'}`}>{systemStats.totalAssessments}</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Engagement Analytics */}
+        {analytics && (
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 md:gap-6">
+            {/* Activity Breakdown */}
+            <div className={`${darkMode ? 'bg-gray-800' : 'bg-white'} rounded-lg shadow p-4 md:p-6`}>
+              <h3 className={`text-base md:text-lg font-semibold mb-3 md:mb-4 ${darkMode ? 'text-white' : 'text-gray-900'}`}>Activity Breakdown</h3>
+              <div className="space-y-3">
+                {Object.keys(analytics.actionBreakdown || {}).length > 0 ? (
+                  Object.entries(analytics.actionBreakdown).map(([action, count]) => (
+                    <div key={action} className="flex justify-between items-center">
+                      <span className={`text-sm ${darkMode ? 'text-gray-300' : 'text-gray-600'}`}>
+                        {action.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase())}
+                      </span>
+                      <span className={`font-medium ${darkMode ? 'text-white' : 'text-gray-900'}`}>{count}</span>
+                    </div>
+                  ))
+                ) : (
+                  <p className={`text-sm ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>
+                    No activity data available yet. Activity will appear as users interact with the system.
+                  </p>
+                )}
+              </div>
+            </div>
+
+            {/* Top Active Users */}
+            <div className={`${darkMode ? 'bg-gray-800' : 'bg-white'} rounded-lg shadow p-4 md:p-6`}>
+              <h3 className={`text-base md:text-lg font-semibold mb-3 md:mb-4 ${darkMode ? 'text-white' : 'text-gray-900'}`}>Most Active Users</h3>
+              <div className="space-y-3">
+                {analytics.topUsers && analytics.topUsers.length > 0 ? (
+                  analytics.topUsers.slice(0, 5).map((user, index) => (
+                  <div key={user.userId} className="flex justify-between items-center">
+                    <div className="flex items-center">
+                      <span className={`text-sm font-medium ${darkMode ? 'text-gray-400' : 'text-gray-500'} mr-2`}>
+                        #{index + 1}
+                      </span>
+                      <div>
+                        <p className={`text-sm font-medium ${darkMode ? 'text-white' : 'text-gray-900'}`}>
+                          {user.userName}
+                        </p>
+                        <p className={`text-xs ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>
+                          {user.station} • {user.role}
+                        </p>
+                      </div>
+                    </div>
+                    <span className={`font-medium ${darkMode ? 'text-purple-400' : 'text-purple-600'}`}>
+                      {user.activityCount} actions
+                    </span>
+                  </div>
+                  ))
+                ) : (
+                  <p className={`text-sm ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>
+                    No user activity data available yet. Data will appear as users interact with the system.
+                  </p>
+                )}
+              </div>
+            </div>
+
+            {/* Station Activity */}
+            <div className={`${darkMode ? 'bg-gray-800' : 'bg-white'} rounded-lg shadow p-4 md:p-6`}>
+              <h3 className={`text-base md:text-lg font-semibold mb-3 md:mb-4 ${darkMode ? 'text-white' : 'text-gray-900'}`}>Activity by Station</h3>
+              <div className="space-y-4">
+                {analytics.topStations && analytics.topStations.length > 0 ? (
+                  analytics.topStations.map((station, index) => {
+                    const maxActivity = Math.max(...analytics.topStations.map(s => s.totalActivity));
+                    const activityPercentage = maxActivity > 0 ? (station.totalActivity / maxActivity) * 100 : 0;
+                    const engagementRate = station.userCount > 0 ? (station.totalActivity / station.userCount).toFixed(1) : 0;
+                    
+                    return (
+                      <div key={station.stationName} className={`p-4 rounded-lg border ${darkMode ? 'border-gray-700 bg-gray-750' : 'border-gray-200 bg-gray-50'}`}>
+                        <div className="flex justify-between items-start mb-2">
+                          <div className="flex items-center">
+                            <span className={`text-lg font-semibold mr-2 ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>
+                              #{index + 1}
+                            </span>
+                            <div>
+                              <p className={`text-sm font-medium ${darkMode ? 'text-white' : 'text-gray-900'}`}>
+                                {station.stationName}
+                              </p>
+                              <p className={`text-xs ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>
+                                {station.userCount} active users
+                              </p>
+                            </div>
+                          </div>
+                          <div className="text-right">
+                            <p className={`text-sm font-bold ${darkMode ? 'text-blue-400' : 'text-blue-600'}`}>
+                              {station.totalActivity} activities
+                            </p>
+                            <p className={`text-xs ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>
+                              {engagementRate} per user
+                            </p>
+                          </div>
+                        </div>
+                        
+                        {/* Activity Progress Bar */}
+                        <div className={`w-full bg-gray-200 rounded-full h-2 mb-3 ${darkMode ? 'bg-gray-700' : 'bg-gray-200'}`}>
+                          <div 
+                            className="bg-blue-500 h-2 rounded-full transition-all duration-300"
+                            style={{ width: `${activityPercentage}%` }}
+                          ></div>
+                        </div>
+                        
+                        {/* Activity Breakdown */}
+                        <div className="grid grid-cols-2 gap-2 text-xs">
+                          <div className={`flex justify-between ${darkMode ? 'text-gray-300' : 'text-gray-600'}`}>
+                            <span>Logins:</span>
+                            <span className="font-medium">{station.actions?.login || 0}</span>
+                          </div>
+                          <div className={`flex justify-between ${darkMode ? 'text-gray-300' : 'text-gray-600'}`}>
+                            <span>Page Views:</span>
+                            <span className="font-medium">{(station.actions?.dashboard_view || 0) + (station.actions?.reports_view || 0)}</span>
+                          </div>
+                          <div className={`flex justify-between ${darkMode ? 'text-gray-300' : 'text-gray-600'}`}>
+                            <span>Logs Created:</span>
+                            <span className="font-medium">{station.actions?.log_created || 0}</span>
+                          </div>
+                          <div className={`flex justify-between ${darkMode ? 'text-gray-300' : 'text-gray-600'}`}>
+                            <span>GAR Assessments:</span>
+                            <span className="font-medium">{station.actions?.gar_created || 0}</span>
+                          </div>
+                        </div>
+                        
+                        {/* Engagement Level Indicator */}
+                        <div className="mt-3 flex items-center justify-between">
+                          <div className="flex items-center">
+                            <div className={`w-2 h-2 rounded-full mr-2 ${
+                              engagementRate >= 10 ? 'bg-green-500' : 
+                              engagementRate >= 5 ? 'bg-yellow-500' : 
+                              'bg-red-500'
+                            }`}></div>
+                            <span className={`text-xs font-medium ${
+                              engagementRate >= 10 ? (darkMode ? 'text-green-400' : 'text-green-600') : 
+                              engagementRate >= 5 ? (darkMode ? 'text-yellow-400' : 'text-yellow-600') : 
+                              (darkMode ? 'text-red-400' : 'text-red-600')
+                            }`}>
+                              {engagementRate >= 10 ? 'High Engagement' : 
+                               engagementRate >= 5 ? 'Medium Engagement' : 
+                               'Low Engagement'}
+                            </span>
+                          </div>
+                          
+                          {/* Station Details Button */}
+                          <button 
+                            onClick={() => {
+                              // Show detailed breakdown for this station
+                              const message = `${station.stationName} Details:\n\n` +
+                                `👥 Users: ${station.userCount}\n` +
+                                `📊 Total Activity: ${station.totalActivity}\n` +
+                                `📈 Engagement Rate: ${engagementRate} activities per user\n\n` +
+                                `Activity Breakdown:\n` +
+                                `• Logins: ${station.actions?.login || 0}\n` +
+                                `• Dashboard Views: ${station.actions?.dashboard_view || 0}\n` +
+                                `• Reports Views: ${station.actions?.reports_view || 0}\n` +
+                                `• Logs Created: ${station.actions?.log_created || 0}\n` +
+                                `• GAR Assessments: ${station.actions?.gar_created || 0}`;
+                              
+                              showStatusMessage(message, "info");
+                            }}
+                            className={`text-xs px-2 py-1 rounded transition-colors ${
+                              darkMode 
+                                ? 'bg-gray-600 hover:bg-gray-500 text-gray-300' 
+                                : 'bg-gray-200 hover:bg-gray-300 text-gray-600'
+                            }`}
+                          >
+                            Details
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  })
+                ) : (
+                  <p className={`text-sm ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>
+                    No station activity data available yet. Data will appear as users from different stations interact with the system.
+                  </p>
+                )}
+              </div>
+            </div>
+
+            {/* Daily Activity Trend */}
+            <div className={`${darkMode ? 'bg-gray-800' : 'bg-white'} rounded-lg shadow p-4 md:p-6`}>
+              <h3 className={`text-base md:text-lg font-semibold mb-3 md:mb-4 ${darkMode ? 'text-white' : 'text-gray-900'}`}>Daily Activity (Last 7 Days)</h3>
+              <div className="space-y-2">
+                {Object.values(analytics.dailyActivity).map((day) => (
+                  <div key={day.date} className="flex justify-between items-center">
+                    <span className={`text-xs ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>
+                      {new Date(day.date).toLocaleDateString('en-US', { 
+                        weekday: 'short', 
+                        month: 'short', 
+                        day: 'numeric' 
+                      })}
+                    </span>
+                    <div className="flex space-x-4 text-xs">
+                      <span className={darkMode ? 'text-blue-400' : 'text-blue-600'}>
+                        {day.totalActivity} total
+                      </span>
+                      <span className={darkMode ? 'text-green-400' : 'text-green-600'}>
+                        {day.uniqueUsers} users
+                      </span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Engagement Summary */}
+        {analytics && (
+          <div className={`${darkMode ? 'bg-gray-800' : 'bg-white'} rounded-lg shadow p-4 md:p-6`}>
+            <h3 className={`text-base md:text-lg font-semibold mb-3 md:mb-4 ${darkMode ? 'text-white' : 'text-gray-900'}`}>
+              Engagement Summary ({timeframe} days)
+            </h3>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4">
+              <div className="text-center">
+                <p className={`text-lg md:text-2xl font-bold ${darkMode ? 'text-blue-400' : 'text-blue-600'}`}>
+                  {analytics.activeUsers}
+                </p>
+                <p className={`text-xs md:text-sm ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>Active Users</p>
+              </div>
+              <div className="text-center">
+                <p className={`text-lg md:text-2xl font-bold ${darkMode ? 'text-green-400' : 'text-green-600'}`}>
+                  {analytics.loginCount}
+                </p>
+                <p className={`text-xs md:text-sm ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>Logins</p>
+              </div>
+              <div className="text-center">
+                <p className={`text-lg md:text-2xl font-bold ${darkMode ? 'text-purple-400' : 'text-purple-600'}`}>
+                  {analytics.logCreations}
+                </p>
+                <p className={`text-xs md:text-sm ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>Logs Created</p>
+              </div>
+              <div className="text-center">
+                <p className={`text-lg md:text-2xl font-bold ${darkMode ? 'text-amber-400' : 'text-amber-600'}`}>
+                  {analytics.garAssessments}
+                </p>
+                <p className={`text-xs md:text-sm ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>GAR Assessments</p>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+    );
+  };
   
   // Render admin content based on active section
   const renderAdminContent = () => {
@@ -1101,6 +1805,8 @@ const AdminPortal = ({ darkMode, setDarkMode, selectedStation, setSelectedStatio
         return <StationManagement />;
       case 'reports':
         return <AdminReports />;
+      case 'analytics':
+        return <AnalyticsComponent />;
       case 'deleted-users':
         return <DeletedUsersManagement />;
       default:
@@ -1274,7 +1980,7 @@ const AdminPortal = ({ darkMode, setDarkMode, selectedStation, setSelectedStatio
       
       {showStationModal && <StationModal 
         station={selectedStationData}
-        captains={users.filter(u => u.role === 'captain')}
+        captains={users.filter(u => u.role === 'captain' || u.role === 'admin')}
         setShowModal={setShowStationModal}
         saveStation={async (stationData) => {
           try {

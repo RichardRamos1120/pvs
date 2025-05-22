@@ -1,5 +1,6 @@
 // src/components/NewActivityModal.js
-import React, { useState } from 'react';
+import React, { useState, useEffect, useContext } from 'react';
+import { FirestoreContext } from '../App';
 import {
   FileSpreadsheet,
   Truck,
@@ -22,6 +23,48 @@ const NewActivityModal = ({ show, onClose, onAddActivity, darkMode }) => {
   const [newActivityStationCoverage, setNewActivityStationCoverage] = useState("");
   const [newActivityDocumentType, setNewActivityDocumentType] = useState("");
   const [newActivityNotes, setNewActivityNotes] = useState("");
+  const [stations, setStations] = useState([]);
+  const [loadingStations, setLoadingStations] = useState(false);
+
+  const firestoreOperations = useContext(FirestoreContext);
+
+  // Fetch stations from Firebase when modal opens
+  useEffect(() => {
+    const fetchStations = async () => {
+      if (show && firestoreOperations) {
+        try {
+          setLoadingStations(true);
+          const stationsData = await firestoreOperations.getStations();
+          
+          // Format stations for the dropdown - show only station numbers
+          const formattedStations = stationsData.map(station => {
+            // Extract just the station number
+            if (station.number) {
+              return station.number.toString();
+            } else if (station.name) {
+              // Try to extract number from name (e.g., "Station 4" -> "4")
+              const numberMatch = station.name.match(/\d+/);
+              return numberMatch ? numberMatch[0] : station.name;
+            } else {
+              // Fallback to extracting number from ID
+              const numberMatch = station.id.match(/\d+/);
+              return numberMatch ? numberMatch[0] : station.id;
+            }
+          }).sort((a, b) => parseInt(a) - parseInt(b)); // Sort numerically
+          
+          setStations(formattedStations);
+        } catch (error) {
+          console.error('Error fetching stations:', error);
+          // Fallback to empty array if fetch fails
+          setStations([]);
+        } finally {
+          setLoadingStations(false);
+        }
+      }
+    };
+
+    fetchStations();
+  }, [show, firestoreOperations]);
   
   // Activity categories definition
   const activityCodes = {
@@ -53,11 +96,11 @@ const NewActivityModal = ({ show, onClose, onAddActivity, darkMode }) => {
     ],
     "OPERATIONS": [
       "CONFERENCE CALL",
-      "COVER - STATION COVERAGE OTHER",
-      "COVER ST 10",
-      "COVER ST 11",
-      "COVER ST 4",
+      "COVER SMFD STATION",
+      "COVER MARIN CITY",
+      "COVER CENTRAL MARIN", 
       "COVER THROCKMORTON",
+      "COVER TIBURON",
       "MEETING",
       "OTHER",
       "WORK ASSIGNMENTS"
@@ -125,16 +168,7 @@ const NewActivityModal = ({ show, onClose, onAddActivity, darkMode }) => {
     "Utility Vehicle"
   ];
   
-  // List of stations for coverage
-  const stationsList = [
-    "Station 1",
-    "Station 4",
-    "Station 7",
-    "Station 10",
-    "Station 11",
-    "Station 14",
-    "Station 23"
-  ];
+  // Stations are now loaded from Firebase - see useEffect above
   
   // Calculate hours between start and end times
   const calculateHours = (startTime, endTime) => {
@@ -161,6 +195,7 @@ const NewActivityModal = ({ show, onClose, onAddActivity, darkMode }) => {
     setNewActivityStationCoverage("");
     setNewActivityDocumentType("");
     setNewActivityNotes("");
+    // Note: Don't reset stations array as it should persist
   };
   
   // Handle form submission
@@ -173,6 +208,12 @@ const NewActivityModal = ({ show, onClose, onAddActivity, darkMode }) => {
     // Validate time fields
     if (!newActivityStart || !newActivityEnd) {
       alert("Start time and end time are required");
+      return;
+    }
+
+    // Validate SMFD station coverage selection
+    if (newActivityCategory === 'OPERATIONS' && newActivityType === 'COVER SMFD STATION' && !newActivityStationCoverage) {
+      alert("Please select which SMFD station you are covering");
       return;
     }
 
@@ -193,7 +234,11 @@ const NewActivityModal = ({ show, onClose, onAddActivity, darkMode }) => {
     } else if (newActivityCategory === 'TRAINING') {
       details.trainingMethod = newActivityTrainingMethod;
     } else if (newActivityCategory === 'OPERATIONS' && newActivityType.includes('COVER')) {
-      details.stationCoverage = newActivityStationCoverage;
+      if (newActivityType === 'COVER SMFD STATION') {
+        details.stationCoverage = newActivityStationCoverage;
+      } else {
+        details.coverageLocation = newActivityType.replace('COVER ', '');
+      }
       details.apparatus = newActivityApparatus;
     } else if (newActivityCategory === 'ADMIN') {
       details.documentType = newActivityDocumentType;
@@ -391,26 +436,66 @@ const NewActivityModal = ({ show, onClose, onAddActivity, darkMode }) => {
             </div>
           )}
           
-          {newActivityCategory === 'OPERATIONS' && newActivityType.includes('COVER') && (
+          {newActivityCategory === 'OPERATIONS' && newActivityType === 'COVER SMFD STATION' && (
             <div className="mb-4">
               <h3 className="text-sm font-medium mb-2 pb-1 border-b">
-                Operation Details
+                SMFD Station Coverage Details
               </h3>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-medium mb-1">
-                    Station Coverage
+                    SMFD Station Number *
                   </label>
                   <select 
                     className="w-full p-2 border rounded-lg"
                     value={newActivityStationCoverage}
                     onChange={(e) => setNewActivityStationCoverage(e.target.value)}
+                    required
+                    disabled={loadingStations}
                   >
-                    <option value="">Select Station</option>
-                    {stationsList.map((station) => (
+                    <option value="">
+                      {loadingStations ? "Loading stations..." : "Select Station Number"}
+                    </option>
+                    {stations.map((station) => (
                       <option key={station} value={station}>{station}</option>
                     ))}
                   </select>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium mb-1">
+                    Apparatus
+                  </label>
+                  <select 
+                    className="w-full p-2 border rounded-lg"
+                    value={newActivityApparatus}
+                    onChange={(e) => setNewActivityApparatus(e.target.value)}
+                  >
+                    <option value="">Select Apparatus</option>
+                    {apparatusList.map((apparatus) => (
+                      <option key={apparatus} value={apparatus}>{apparatus}</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {newActivityCategory === 'OPERATIONS' && (newActivityType === 'COVER MARIN CITY' || newActivityType === 'COVER CENTRAL MARIN' || newActivityType === 'COVER THROCKMORTON' || newActivityType === 'COVER TIBURON') && (
+            <div className="mb-4">
+              <h3 className="text-sm font-medium mb-2 pb-1 border-b">
+                Coverage Details
+              </h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium mb-1">
+                    Coverage Location
+                  </label>
+                  <input 
+                    type="text"
+                    className="w-full p-2 border rounded-lg bg-gray-100"
+                    value={newActivityType.replace('COVER ', '')}
+                    readOnly
+                  />
                 </div>
                 <div>
                   <label className="block text-sm font-medium mb-1">

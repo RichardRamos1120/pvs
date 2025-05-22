@@ -3,7 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate, useNavigate, useLocation } from 'react-router-dom';
 import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, deleteUser } from 'firebase/auth';
 import { initializeApp } from 'firebase/app';
-import { getFirestore, collection, getDocs, addDoc, updateDoc, doc, getDoc, query, where, orderBy, serverTimestamp, deleteDoc, setDoc, writeBatch } from 'firebase/firestore';
+import { getFirestore, collection, getDocs, addDoc, updateDoc, doc, getDoc, query, where, orderBy, serverTimestamp, deleteDoc, setDoc, writeBatch, limit } from 'firebase/firestore';
 import Dashboard from './components/Dashboard';
 import TodayLog from './components/TodayLog';
 import Reports from './components/Reports';
@@ -279,6 +279,17 @@ const App = () => {
         };
 
         const docRef = await addDoc(collection(db, "logs"), newLog);
+        
+        // Track log creation activity
+        const userId = auth.currentUser?.uid;
+        if (userId) {
+          await firestoreOperations.trackUserActivity(userId, 'log_created', {
+            logId: docRef.id,
+            station: logData.station,
+            status: logData.status
+          });
+        }
+        
         return {
           id: docRef.id,
           ...newLog
@@ -699,6 +710,18 @@ const App = () => {
         };
 
         const docRef = await addDoc(collection(db, "assessments"), newAssessment);
+        
+        // Track GAR assessment creation activity
+        const userId = auth.currentUser?.uid;
+        if (userId) {
+          await firestoreOperations.trackUserActivity(userId, 'gar_created', {
+            assessmentId: docRef.id,
+            station: assessmentData.station,
+            overallRisk: assessmentData.overallRisk,
+            status: assessmentData.status
+          });
+        }
+        
         return {
           id: docRef.id,
           ...newAssessment
@@ -867,6 +890,627 @@ const App = () => {
       } catch (error) {
         console.error("Error deleting assessment:", error);
         return false;
+      }
+    },
+
+    // Get recent activity for admin dashboard
+    getRecentActivity: async (maxItems = 10) => {
+      try {
+        const activities = [];
+        
+        // Get recent logs
+        console.log("Querying logs collection...");
+        const logsRef = collection(db, "logs");
+        
+        // First check if any logs exist at all
+        const allLogsSnapshot = await getDocs(logsRef);
+        console.log(`Total logs in database: ${allLogsSnapshot.docs.length}`);
+        
+        if (allLogsSnapshot.docs.length > 0) {
+          // Show sample log data
+          const sampleLog = allLogsSnapshot.docs[0].data();
+          console.log("Sample log data:", sampleLog);
+          
+          // Try ordered query
+          try {
+            const recentLogsQuery = query(logsRef, orderBy("createdAt", "desc"), limit(3));
+            const logsSnapshot = await getDocs(recentLogsQuery);
+            
+            console.log(`Found ${logsSnapshot.docs.length} recent logs with createdAt ordering`);
+            logsSnapshot.forEach(doc => {
+              const data = doc.data();
+              console.log(`Log ${doc.id}:`, data);
+              activities.push({
+                id: doc.id,
+                type: 'log',
+                message: `Daily log completed for ${data.station || 'Unknown Station'}`,
+                timestamp: data.createdAt,
+                station: data.station
+              });
+            });
+          } catch (orderError) {
+            console.warn("Failed to order logs by createdAt:", orderError);
+            // Fallback: just get the first few logs
+            allLogsSnapshot.docs.slice(0, 3).forEach(doc => {
+              const data = doc.data();
+              activities.push({
+                id: doc.id,
+                type: 'log',
+                message: `Daily log completed for ${data.station || 'Unknown Station'}`,
+                timestamp: data.createdAt || data.date || new Date(),
+                station: data.station
+              });
+            });
+          }
+        } else {
+          console.log("No logs found in database");
+        }
+
+        // Get recent assessments
+        console.log("Querying assessments collection...");
+        const assessmentsRef = collection(db, "assessments");
+        
+        // Check if any assessments exist
+        const allAssessmentsSnapshot = await getDocs(assessmentsRef);
+        console.log(`Total assessments in database: ${allAssessmentsSnapshot.docs.length}`);
+        
+        if (allAssessmentsSnapshot.docs.length > 0) {
+          // Show sample assessment data
+          const sampleAssessment = allAssessmentsSnapshot.docs[0].data();
+          console.log("Sample assessment data:", sampleAssessment);
+          
+          try {
+            const recentAssessmentsQuery = query(assessmentsRef, orderBy("createdAt", "desc"), limit(3));
+            const assessmentsSnapshot = await getDocs(recentAssessmentsQuery);
+            
+            console.log(`Found ${assessmentsSnapshot.docs.length} recent assessments with createdAt ordering`);
+            assessmentsSnapshot.forEach(doc => {
+              const data = doc.data();
+              const riskColor = data.overallRisk?.toLowerCase() || 'unknown';
+              activities.push({
+                id: doc.id,
+                type: 'assessment',
+                message: `GAR Assessment (${riskColor.toUpperCase()}) published for ${data.station || 'Unknown Station'}`,
+                timestamp: data.createdAt,
+                station: data.station,
+                risk: riskColor
+              });
+            });
+          } catch (orderError) {
+            console.warn("Failed to order assessments by createdAt:", orderError);
+            // Fallback: just get the first few assessments
+            allAssessmentsSnapshot.docs.slice(0, 3).forEach(doc => {
+              const data = doc.data();
+              const riskColor = data.overallRisk?.toLowerCase() || 'unknown';
+              activities.push({
+                id: doc.id,
+                type: 'assessment',
+                message: `GAR Assessment (${riskColor.toUpperCase()}) published for ${data.station || 'Unknown Station'}`,
+                timestamp: data.createdAt || data.date || new Date(),
+                station: data.station,
+                risk: riskColor
+              });
+            });
+          }
+        } else {
+          console.log("No assessments found in database");
+        }
+
+        // Get recent user logins (users with recent lastLogin timestamps)
+        const usersRef = collection(db, "users");
+        
+        // Try to get users ordered by lastLogin - but handle cases where field might not exist
+        try {
+          const recentUsersQuery = query(usersRef, orderBy("lastLogin", "desc"), limit(10));
+          const usersSnapshot = await getDocs(recentUsersQuery);
+          
+          console.log(`Found ${usersSnapshot.docs.length} users with login data via orderBy`);
+          usersSnapshot.forEach(doc => {
+            const data = doc.data();
+            console.log(`User ${doc.id} lastLogin:`, data.lastLogin);
+            if (data.lastLogin) {
+              // Only include logins from the last 7 days to keep it relevant
+              const loginDate = data.lastLogin.seconds ? new Date(data.lastLogin.seconds * 1000) : new Date(data.lastLogin);
+              const daysSinceLogin = (new Date() - loginDate) / (1000 * 60 * 60 * 24);
+              
+              console.log(`User ${data.firstName || data.displayName} login was ${daysSinceLogin.toFixed(1)} days ago`);
+              
+              if (daysSinceLogin <= 7) {
+                activities.push({
+                  id: doc.id,
+                  type: 'user_login',
+                  message: `User ${data.firstName || data.displayName || 'Unknown'} ${data.lastName || ''} logged in`,
+                  timestamp: data.lastLogin,
+                  userId: doc.id
+                });
+              }
+            }
+          });
+        } catch (queryError) {
+          console.warn("OrderBy lastLogin failed, trying alternative approach:", queryError);
+          
+          // Fallback: get all users and filter client-side
+          const allUsersSnapshot = await getDocs(usersRef);
+          const usersWithLogin = [];
+          
+          allUsersSnapshot.forEach(doc => {
+            const data = doc.data();
+            if (data.lastLogin) {
+              const loginDate = data.lastLogin.seconds ? new Date(data.lastLogin.seconds * 1000) : new Date(data.lastLogin);
+              const daysSinceLogin = (new Date() - loginDate) / (1000 * 60 * 60 * 24);
+              
+              if (daysSinceLogin <= 7) {
+                usersWithLogin.push({
+                  ...data,
+                  id: doc.id,
+                  loginDate: loginDate
+                });
+              }
+            }
+          });
+          
+          // Sort by login date and take the most recent
+          usersWithLogin.sort((a, b) => b.loginDate - a.loginDate);
+          usersWithLogin.slice(0, 5).forEach(user => {
+            activities.push({
+              id: user.id,
+              type: 'user_login',
+              message: `User ${user.firstName || user.displayName || 'Unknown'} ${user.lastName || ''} logged in`,
+              timestamp: user.lastLogin,
+              userId: user.id
+            });
+          });
+          
+          console.log(`Found ${usersWithLogin.length} users with recent logins via fallback method`);
+        }
+
+        // Sort all activities by timestamp (newest first)
+        activities.sort((a, b) => {
+          let aTime, bTime;
+          
+          // Handle different timestamp formats
+          if (a.timestamp?.seconds) {
+            aTime = a.timestamp.seconds;
+          } else if (a.timestamp instanceof Date) {
+            aTime = a.timestamp.getTime() / 1000;
+          } else if (typeof a.timestamp === 'string') {
+            aTime = new Date(a.timestamp).getTime() / 1000;
+          } else {
+            aTime = 0;
+          }
+          
+          if (b.timestamp?.seconds) {
+            bTime = b.timestamp.seconds;
+          } else if (b.timestamp instanceof Date) {
+            bTime = b.timestamp.getTime() / 1000;
+          } else if (typeof b.timestamp === 'string') {
+            bTime = new Date(b.timestamp).getTime() / 1000;
+          } else {
+            bTime = 0;
+          }
+          
+          return bTime - aTime;
+        });
+
+        console.log(`Returning ${activities.length} total activities`);
+        return activities.slice(0, maxItems);
+      } catch (error) {
+        console.error("Error getting recent activity:", error);
+        return [];
+      }
+    },
+
+    // Export recent activity
+    exportRecentActivity: async function(maxItems = 50) {
+      try {
+        const activities = await this.getRecentActivity(maxItems);
+        return {
+          success: true,
+          data: activities,
+          filename: `recent_activity_export_${new Date().toISOString().split('T')[0]}.csv`
+        };
+      } catch (error) {
+        console.error("Error exporting recent activity:", error);
+        return { success: false, message: error.message };
+      }
+    },
+
+    // Export data functions
+    exportUsers: async () => {
+      try {
+        const usersRef = collection(db, "users");
+        const snapshot = await getDocs(usersRef);
+        const users = snapshot.docs.map(doc => ({
+          id: doc.id,
+          ...doc.data()
+        }));
+        return {
+          success: true,
+          data: users,
+          filename: `users_export_${new Date().toISOString().split('T')[0]}.csv`
+        };
+      } catch (error) {
+        console.error("Error exporting users:", error);
+        return { success: false, message: error.message };
+      }
+    },
+
+    exportStations: async () => {
+      try {
+        const stationsRef = collection(db, "stations");
+        const snapshot = await getDocs(stationsRef);
+        const stations = snapshot.docs.map(doc => ({
+          id: doc.id,
+          ...doc.data()
+        }));
+        return {
+          success: true,
+          data: stations,
+          filename: `stations_export_${new Date().toISOString().split('T')[0]}.csv`
+        };
+      } catch (error) {
+        console.error("Error exporting stations:", error);
+        return { success: false, message: error.message };
+      }
+    },
+
+    exportGARHistory: async () => {
+      try {
+        const assessmentsRef = collection(db, "assessments");
+        const q = query(assessmentsRef, orderBy("rawDate", "desc"));
+        const snapshot = await getDocs(q);
+        const assessments = snapshot.docs.map(doc => ({
+          id: doc.id,
+          ...doc.data()
+        }));
+        return {
+          success: true,
+          data: assessments,
+          filename: `gar_history_export_${new Date().toISOString().split('T')[0]}.csv`
+        };
+      } catch (error) {
+        console.error("Error exporting GAR history:", error);
+        return { success: false, message: error.message };
+      }
+    },
+
+    exportDailyLogs: async () => {
+      try {
+        const logsRef = collection(db, "logs");
+        const q = query(logsRef, orderBy("rawDate", "desc"));
+        const snapshot = await getDocs(q);
+        const logs = snapshot.docs.map(doc => ({
+          id: doc.id,
+          ...doc.data()
+        }));
+        return {
+          success: true,
+          data: logs,
+          filename: `daily_logs_export_${new Date().toISOString().split('T')[0]}.csv`
+        };
+      } catch (error) {
+        console.error("Error exporting daily logs:", error);
+        return { success: false, message: error.message };
+      }
+    },
+
+    // Restore deleted user
+    restoreUser: async (userId) => {
+      try {
+        // Get user data from deletedUsers collection
+        const deletedUserRef = doc(db, "deletedUsers", userId);
+        const deletedUserSnap = await getDoc(deletedUserRef);
+        
+        if (!deletedUserSnap.exists()) {
+          return { success: false, message: "Deleted user not found" };
+        }
+        
+        const userData = deletedUserSnap.data();
+        const { deletedAt, originalId, ...restoredUserData } = userData;
+        
+        // Add back to users collection
+        const userRef = doc(db, "users", userId);
+        await setDoc(userRef, {
+          ...restoredUserData,
+          restoredAt: serverTimestamp(),
+          updatedAt: serverTimestamp()
+        });
+        
+        // Remove from deletedUsers collection
+        await deleteDoc(deletedUserRef);
+        
+        return { 
+          success: true, 
+          message: "User restored successfully",
+          userData: { id: userId, ...restoredUserData }
+        };
+      } catch (error) {
+        console.error("Error restoring user:", error);
+        return { success: false, message: error.message };
+      }
+    },
+
+    // User Activity Tracking Functions
+    // Track user login activity
+    trackUserLogin: async (userId, userEmail, displayName) => {
+      try {
+        const loginData = {
+          userId,
+          email: userEmail,
+          displayName,
+          loginTime: serverTimestamp(),
+          action: 'login',
+          sessionId: `session_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
+        };
+
+        // Add to user_activity collection
+        await addDoc(collection(db, "user_activity"), loginData);
+
+        // Update user's lastLogin timestamp
+        const userRef = doc(db, "users", userId);
+        await updateDoc(userRef, {
+          lastLogin: serverTimestamp(),
+          loginCount: serverTimestamp() // We'll increment this in a moment
+        });
+
+        console.log(`Login tracked for user ${displayName}`);
+        return true;
+      } catch (error) {
+        console.error("Error tracking user login:", error);
+        return false;
+      }
+    },
+
+    // Track general user activity
+    trackUserActivity: async (userId, action, details = {}) => {
+      try {
+        const activityData = {
+          userId,
+          action,
+          timestamp: serverTimestamp(),
+          details: {
+            ...details,
+            userAgent: navigator.userAgent,
+            page: window.location.pathname
+          },
+          sessionId: localStorage.getItem('currentSessionId') || 'unknown'
+        };
+
+        await addDoc(collection(db, "user_activity"), activityData);
+        return true;
+      } catch (error) {
+        console.error("Error tracking user activity:", error);
+        return false;
+      }
+    },
+
+    // Get user engagement analytics
+    getUserEngagementAnalytics: async (timeframe = 30) => {
+      try {
+        const startDate = new Date();
+        startDate.setDate(startDate.getDate() - timeframe);
+
+        // Get user activity for the timeframe
+        let activities = [];
+        try {
+          const activityRef = collection(db, "user_activity");
+          
+          // Try the optimized query first
+          try {
+            const q = query(
+              activityRef,
+              where("timestamp", ">=", startDate),
+              orderBy("timestamp", "desc")
+            );
+            const snapshot = await getDocs(q);
+            activities = snapshot.docs.map(doc => ({
+              id: doc.id,
+              ...doc.data()
+            }));
+          } catch (indexError) {
+            console.log("Composite index not available, falling back to simple query");
+            // Fallback: get all activities and filter client-side
+            const allSnapshot = await getDocs(activityRef);
+            activities = allSnapshot.docs
+              .map(doc => ({
+                id: doc.id,
+                ...doc.data()
+              }))
+              .filter(activity => {
+                const activityDate = activity.timestamp?.toDate?.() || new Date(activity.timestamp);
+                return activityDate >= startDate;
+              })
+              .sort((a, b) => {
+                const aTime = a.timestamp?.toDate?.() || new Date(a.timestamp);
+                const bTime = b.timestamp?.toDate?.() || new Date(b.timestamp);
+                return bTime - aTime;
+              });
+          }
+        } catch (collectionError) {
+          console.log("User activity collection doesn't exist yet, returning empty analytics");
+          activities = [];
+        }
+
+        // Get all users for analysis
+        const usersRef = collection(db, "users");
+        const usersSnapshot = await getDocs(usersRef);
+        const users = usersSnapshot.docs.map(doc => ({
+          id: doc.id,
+          ...doc.data()
+        }));
+
+        // Analyze the data
+        const analytics = {
+          totalUsers: users.length,
+          activeUsers: new Set(activities.map(a => a.userId)).size,
+          totalActivities: activities.length,
+          loginCount: activities.filter(a => a.action === 'login').length,
+          logCreations: activities.filter(a => a.action === 'log_created').length,
+          garAssessments: activities.filter(a => a.action === 'gar_created').length,
+          dashboardViews: activities.filter(a => a.action === 'dashboard_view').length,
+          reportsViews: activities.filter(a => a.action === 'reports_view').length,
+          
+          // User engagement by action type
+          actionBreakdown: {},
+          
+          // Most active users
+          userActivity: {},
+          
+          // Activity by station
+          stationActivity: {},
+          
+          // Daily activity trend
+          dailyActivity: {}
+        };
+
+        // Calculate action breakdown
+        activities.forEach(activity => {
+          analytics.actionBreakdown[activity.action] = 
+            (analytics.actionBreakdown[activity.action] || 0) + 1;
+        });
+
+        // Calculate user activity
+        activities.forEach(activity => {
+          if (!analytics.userActivity[activity.userId]) {
+            const user = users.find(u => u.id === activity.userId);
+            analytics.userActivity[activity.userId] = {
+              userId: activity.userId,
+              userName: user?.displayName || user?.firstName || 'Unknown User',
+              email: user?.email || '',
+              station: user?.station || '',
+              role: user?.role || '',
+              activityCount: 0,
+              lastActive: null,
+              actions: {}
+            };
+          }
+          
+          analytics.userActivity[activity.userId].activityCount++;
+          analytics.userActivity[activity.userId].actions[activity.action] = 
+            (analytics.userActivity[activity.userId].actions[activity.action] || 0) + 1;
+            
+          // Update last active time
+          const activityTime = activity.timestamp?.toDate?.() || new Date(activity.timestamp);
+          if (!analytics.userActivity[activity.userId].lastActive || 
+              activityTime > analytics.userActivity[activity.userId].lastActive) {
+            analytics.userActivity[activity.userId].lastActive = activityTime;
+          }
+        });
+
+        // Calculate station activity
+        Object.values(analytics.userActivity).forEach(userActivity => {
+          if (userActivity.station) {
+            if (!analytics.stationActivity[userActivity.station]) {
+              analytics.stationActivity[userActivity.station] = {
+                stationName: userActivity.station,
+                userCount: 0,
+                totalActivity: 0,
+                actions: {}
+              };
+            }
+            
+            analytics.stationActivity[userActivity.station].userCount++;
+            analytics.stationActivity[userActivity.station].totalActivity += userActivity.activityCount;
+            
+            Object.entries(userActivity.actions).forEach(([action, count]) => {
+              analytics.stationActivity[userActivity.station].actions[action] = 
+                (analytics.stationActivity[userActivity.station].actions[action] || 0) + count;
+            });
+          }
+        });
+
+        // Calculate daily activity trend (last 7 days)
+        for (let i = 6; i >= 0; i--) {
+          const date = new Date();
+          date.setDate(date.getDate() - i);
+          const dateStr = date.toISOString().split('T')[0];
+          
+          const dayActivities = activities.filter(activity => {
+            const activityDate = activity.timestamp?.toDate?.() || new Date(activity.timestamp);
+            return activityDate.toISOString().split('T')[0] === dateStr;
+          });
+          
+          analytics.dailyActivity[dateStr] = {
+            date: dateStr,
+            totalActivity: dayActivities.length,
+            uniqueUsers: new Set(dayActivities.map(a => a.userId)).size,
+            logins: dayActivities.filter(a => a.action === 'login').length,
+            logCreations: dayActivities.filter(a => a.action === 'log_created').length,
+            garAssessments: dayActivities.filter(a => a.action === 'gar_created').length
+          };
+        }
+
+        // Convert userActivity object to sorted array
+        analytics.topUsers = Object.values(analytics.userActivity)
+          .sort((a, b) => b.activityCount - a.activityCount)
+          .slice(0, 10);
+
+        // Convert stationActivity object to sorted array
+        analytics.topStations = Object.values(analytics.stationActivity)
+          .sort((a, b) => b.totalActivity - a.totalActivity);
+
+        return analytics;
+      } catch (error) {
+        console.error("Error getting user engagement analytics:", error);
+        return null;
+      }
+    },
+
+    // Get system usage statistics
+    getSystemUsageStats: async () => {
+      try {
+        const stats = {
+          totalUsers: 0,
+          totalLogs: 0,
+          totalAssessments: 0,
+          totalStations: 0,
+          activeUsersToday: 0,
+          logsCreatedToday: 0,
+          assessmentsToday: 0
+        };
+
+        // Get total counts
+        const [usersSnapshot, logsSnapshot, assessmentsSnapshot, stationsSnapshot] = await Promise.all([
+          getDocs(collection(db, "users")),
+          getDocs(collection(db, "logs")),
+          getDocs(collection(db, "assessments")),
+          getDocs(collection(db, "stations"))
+        ]);
+
+        stats.totalUsers = usersSnapshot.size;
+        stats.totalLogs = logsSnapshot.size;
+        stats.totalAssessments = assessmentsSnapshot.size;
+        stats.totalStations = stationsSnapshot.size;
+
+        // Get today's activity
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        
+        try {
+          const activityRef = collection(db, "user_activity");
+          const todayQuery = query(
+            activityRef,
+            where("timestamp", ">=", today)
+          );
+          
+          const todaySnapshot = await getDocs(todayQuery);
+          const todayActivities = todaySnapshot.docs.map(doc => doc.data());
+
+          stats.activeUsersToday = new Set(todayActivities.map(a => a.userId)).size;
+          stats.logsCreatedToday = todayActivities.filter(a => a.action === 'log_created').length;
+          stats.assessmentsToday = todayActivities.filter(a => a.action === 'gar_created').length;
+        } catch (error) {
+          console.log("Error fetching today's activity, using defaults:", error);
+          // Default values if activity collection doesn't exist
+          stats.activeUsersToday = 0;
+          stats.logsCreatedToday = 0;
+          stats.assessmentsToday = 0;
+        }
+
+        return stats;
+      } catch (error) {
+        console.error("Error getting system usage stats:", error);
+        return null;
       }
     }
   };

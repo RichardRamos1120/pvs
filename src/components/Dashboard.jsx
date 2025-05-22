@@ -92,6 +92,12 @@ const Dashboard = () => {
                 const profile = await firestoreOperations.getUserProfile(user.uid);
                 setUserProfile(profile);
 
+                // Track dashboard view
+                await firestoreOperations.trackUserActivity(user.uid, 'dashboard_view', {
+                    station: selectedStation,
+                    timestamp: new Date().toISOString()
+                });
+
                 // FIXED: Only set station from profile if user hasn't manually selected one
                 // Check for localStorage first, and only use profile station as a fallback
                 const savedStation = localStorage.getItem('selectedStation');

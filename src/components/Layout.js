@@ -345,7 +345,7 @@ const Layout = ({ children, darkMode, setDarkMode, selectedStation, setSelectedS
                   : `${darkMode ? 'text-gray-300 hover:bg-gray-700' : 'text-gray-600 hover:bg-gray-100'}`
               }`}
             >
-              Past Reports
+              Past Logs
             </Link>
             <a
               href="/gar-assessment"

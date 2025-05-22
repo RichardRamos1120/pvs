@@ -2,6 +2,7 @@
 import React, { useState, useContext } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { getAuth, signInWithEmailAndPassword, GoogleAuthProvider, signInWithPopup } from 'firebase/auth';
+import { serverTimestamp } from 'firebase/firestore';
 import { Clipboard } from 'lucide-react';
 import { FirestoreContext } from '../App';
 
@@ -35,6 +36,27 @@ const Login = () => {
     
     try {
       const userCredential = await signInWithEmailAndPassword(auth, email, password);
+      
+      // Update lastLogin timestamp and track activity
+      try {
+        console.log('Updating lastLogin for user:', userCredential.user.uid);
+        await firestoreOperations.setUserProfile(userCredential.user.uid, {
+          lastLogin: serverTimestamp(),
+          updatedAt: serverTimestamp()
+        });
+        
+        // Track user login activity
+        await firestoreOperations.trackUserLogin(
+          userCredential.user.uid,
+          userCredential.user.email,
+          userCredential.user.displayName || 'User'
+        );
+        
+        console.log('Successfully updated lastLogin timestamp and tracked activity');
+      } catch (profileError) {
+        console.error('Failed to update login timestamp:', profileError);
+      }
+      
       // Successfully logged in
       console.log('Logged in:', userCredential.user);
       navigate(from, { replace: true });
@@ -104,13 +126,28 @@ const Login = () => {
           email: user.email,
           station: 'Station 1', // Default station
           role: 'firefighter', // Default role
-          createdAt: new Date(),
+          createdAt: serverTimestamp(),
+          lastLogin: serverTimestamp(),
           authProvider: 'google'
         });
         console.log('Created new user profile for Google user:', user.email);
       } else {
+        // Update lastLogin for existing users
+        console.log('Updating lastLogin for existing Google user:', user.uid);
+        await firestoreOperations.setUserProfile(user.uid, {
+          lastLogin: serverTimestamp(),
+          updatedAt: serverTimestamp()
+        });
+        console.log('Successfully updated lastLogin for Google user');
         console.log('Google user already has a profile:', existingProfile);
       }
+      
+      // Track user login activity for Google users
+      await firestoreOperations.trackUserLogin(
+        user.uid,
+        user.email,
+        user.displayName || 'User'
+      );
       
       // Successfully logged in
       console.log('Logged in with Google:', user);
