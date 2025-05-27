@@ -100,6 +100,30 @@ const Reports = () => {
         const profile = await firestoreOperations.getUserProfile(user.uid);
         setUserProfile(profile);
 
+        // Fetch stations from database
+        try {
+          const stationsData = await firestoreOperations.getStations();
+          if (stationsData && stationsData.length > 0) {
+            const formattedStations = stationsData.map(station => 
+              `Station ${station.number || station.id.replace('station_', '').replace('s', '')}`
+            ).sort((a, b) => {
+              const numA = parseInt(a.replace('Station ', ''));
+              const numB = parseInt(b.replace('Station ', ''));
+              return numA - numB;
+            });
+            
+            // Set stations list with 'all' as first option for admins
+            if (profile && profile.role === 'admin') {
+              setStationsList(['all', ...formattedStations]);
+            } else {
+              setStationsList(formattedStations);
+            }
+          }
+        } catch (error) {
+          console.error('Error fetching stations:', error);
+          // Keep default stations list if fetch fails
+        }
+
         // Track reports page view
         await firestoreOperations.trackUserActivity(user.uid, 'reports_view', {
           station: selectedStation,
@@ -372,17 +396,8 @@ const Reports = () => {
     return reportsByStation;
   };
   
-  // List of available stations
-  const stationsList = [
-    'all',
-    'Station 1', 
-    'Station 4', 
-    'Station 7', 
-    'Station 10', 
-    'Station 11', 
-    'Station 14', 
-    'Station 23'
-  ];
+  // Dynamic station list
+  const [stationsList, setStationsList] = useState(['all']);
   
   // Loading state
   if (loading) {
@@ -643,7 +658,7 @@ const Reports = () => {
                             </td>
                             <td className="px-6 py-4 whitespace-nowrap">
                               <div className="text-sm text-gray-600 dark:text-gray-400">
-                                {log.shift} Shift • {log.captain}
+                                {log.shift} Shift {log.createdByName ? `• ${log.createdByName}` : log.captain ? `• ${log.captain}` : ''}
                               </div>
                             </td>
                             <td className="px-6 py-4 whitespace-nowrap">
@@ -739,7 +754,7 @@ const Reports = () => {
                           <div>
                             <h4 className="font-medium text-gray-900 dark:text-white">{log.date}</h4>
                             <div className="text-sm text-gray-500 dark:text-gray-400">
-                              {log.captain} • {log.shift} Shift
+                              {log.createdByName || log.captain || 'Unknown'} • {log.shift} Shift
                             </div>
                           </div>
                         </div>

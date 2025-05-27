@@ -11,7 +11,7 @@ import {
   Mic
 } from 'lucide-react';
 
-const NewActivityModal = ({ show, onClose, onAddActivity, darkMode }) => {
+const NewActivityModal = ({ show, onClose, onAddActivity, darkMode, currentStation }) => {
   const [newActivityCategory, setNewActivityCategory] = useState("");
   const [newActivityType, setNewActivityType] = useState("");
   const [newActivityStart, setNewActivityStart] = useState("");
@@ -23,6 +23,7 @@ const NewActivityModal = ({ show, onClose, onAddActivity, darkMode }) => {
   const [newActivityStationCoverage, setNewActivityStationCoverage] = useState("");
   const [newActivityDocumentType, setNewActivityDocumentType] = useState("");
   const [newActivityNotes, setNewActivityNotes] = useState("");
+  const [newActivityStation, setNewActivityStation] = useState(currentStation || "");
   const [stations, setStations] = useState([]);
   const [loadingStations, setLoadingStations] = useState(false);
 
@@ -195,6 +196,7 @@ const NewActivityModal = ({ show, onClose, onAddActivity, darkMode }) => {
     setNewActivityStationCoverage("");
     setNewActivityDocumentType("");
     setNewActivityNotes("");
+    setNewActivityStation(currentStation || "");
     // Note: Don't reset stations array as it should persist
   };
   
@@ -250,7 +252,8 @@ const NewActivityModal = ({ show, onClose, onAddActivity, darkMode }) => {
       description: newActivityType,
       hours: hours.toFixed(1),
       details,
-      notes: newActivityNotes
+      notes: newActivityNotes,
+      station: newActivityStation
     };
     
     // Call the parent component function to add this activity
@@ -356,6 +359,24 @@ const NewActivityModal = ({ show, onClose, onAddActivity, darkMode }) => {
                 required
               />
             </div>
+          </div>
+          
+          {/* Station selection */}
+          <div className="mb-4">
+            <label className="block text-sm font-medium mb-1">
+              Station
+            </label>
+            <select 
+              className="w-full p-2 border rounded-lg"
+              value={newActivityStation}
+              onChange={(e) => setNewActivityStation(e.target.value)}
+            >
+              <option value="">Select Station</option>
+              <option value={currentStation}>{currentStation} (Current)</option>
+              {stations.filter(s => s !== currentStation?.replace('Station ', '')).map((station) => (
+                <option key={station} value={`Station ${station}`}>Station {station}</option>
+              ))}
+            </select>
           </div>
           
           {/* Category-specific details */}

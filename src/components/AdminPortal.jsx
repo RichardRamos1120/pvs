@@ -204,14 +204,6 @@ const AdminPortal = ({ darkMode, setDarkMode, selectedStation, setSelectedStatio
     return new Date(dateString).toLocaleString();
   };
 
-  const getApparatusStatusColor = (status) => {
-    switch (status) {
-      case 'operational': return `${darkMode ? 'bg-green-900 text-green-300' : 'bg-green-100 text-green-800'}`;
-      case 'maintenance': return `${darkMode ? 'bg-amber-900 text-amber-300' : 'bg-amber-100 text-amber-800'}`;
-      case 'out-of-service': return `${darkMode ? 'bg-red-900 text-red-300' : 'bg-red-100 text-red-800'}`;
-      default: return `${darkMode ? 'bg-gray-700 text-gray-300' : 'bg-gray-100 text-gray-800'}`;
-    }
-  };
 
   const getRoleColor = (role) => {
     switch (role) {
@@ -1025,19 +1017,6 @@ const AdminPortal = ({ darkMode, setDarkMode, selectedStation, setSelectedStatio
                     </div>
                   </div>
 
-                  <div>
-                    <p className={`text-sm font-medium mb-2 ${darkMode ? 'text-gray-200' : 'text-gray-700'}`}>Apparatus Status</p>
-                    <div className="space-y-1">
-                      {station.apparatus.map(item => (
-                        <div key={item.id} className="flex justify-between items-center">
-                          <span className={`text-sm ${darkMode ? 'text-gray-300' : 'text-gray-600'}`}>{item.name}</span>
-                          <span className={`text-xs px-2 py-1 rounded-full ${getApparatusStatusColor(item.status)}`}>
-                            {item.status}
-                          </span>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
                 </div>
               ))}
             </div>

@@ -9,6 +9,7 @@ const UserModal = ({ user, stations, setShowModal, saveUser, darkMode }) => {
       lastName: '',
       email: '',
       role: 'firefighter',
+      rank: 'Firefighter',
       stationId: '',
       status: 'active',
       permissions: []
@@ -122,30 +123,49 @@ const UserModal = ({ user, stations, setShowModal, saveUser, darkMode }) => {
                 onChange={handleChange}
               >
                 <option value="firefighter">Firefighter</option>
-                <option value="captain">Captain</option>
                 <option value="admin">Admin</option>
               </select>
             </div>
             <div>
-              <label className={`block text-sm font-medium ${darkMode ? 'text-gray-300' : 'text-gray-700'} mb-1`}>Station</label>
+              <label className={`block text-sm font-medium ${darkMode ? 'text-gray-300' : 'text-gray-700'} mb-1`}>Rank</label>
               <select
-                name="stationId"
+                name="rank"
                 className={`w-full p-2 border rounded-md ${
                   darkMode 
                     ? 'bg-gray-700 border-gray-600 text-white' 
                     : 'bg-white border-gray-300 text-gray-900'
                 }`}
-                value={formData.stationId}
+                value={formData.rank}
                 onChange={handleChange}
               >
-                <option value="">Select Station</option>
-                {stations.map(station => (
-                  <option key={station.id} value={station.id}>
-                    Station {station.number}
-                  </option>
-                ))}
+                <option value="Firefighter">Firefighter</option>
+                <option value="Captain">Captain</option>
+                <option value="Deputy Chief">Deputy Chief</option>
+                <option value="Battalion Chief">Battalion Chief</option>
+                <option value="Chief">Chief</option>
               </select>
             </div>
+          </div>
+          
+          <div>
+            <label className={`block text-sm font-medium ${darkMode ? 'text-gray-300' : 'text-gray-700'} mb-1`}>Station</label>
+            <select
+              name="stationId"
+              className={`w-full p-2 border rounded-md ${
+                darkMode 
+                  ? 'bg-gray-700 border-gray-600 text-white' 
+                  : 'bg-white border-gray-300 text-gray-900'
+              }`}
+              value={formData.stationId}
+              onChange={handleChange}
+            >
+              <option value="">Select Station</option>
+              {stations.map(station => (
+                <option key={station.id} value={station.id}>
+                  Station {station.number}
+                </option>
+              ))}
+            </select>
           </div>
 
           <div>

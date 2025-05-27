@@ -232,7 +232,7 @@ const ReportDetail = () => {
 
       // Staff Information Section
       y = addSectionTitle('STAFF INFORMATION', y + 5);
-      y = addField('Captain:', log.captain, y);
+      y = addField('Created by:', log.createdByName || log.captain || 'Unknown', y);
 
       // Crew members
       if (log.crew && log.crew.length > 0) {
@@ -369,6 +369,14 @@ const ReportDetail = () => {
             pdf.text(`Notes: ${activity.notes}`, 30, y + 5);
             y += 16;
           }
+          
+          // Added by information
+          if (activity.addedByName) {
+            pdf.setFont('helvetica', 'italic');
+            pdf.setFontSize(8);
+            pdf.text(`Added by ${activity.addedByName}`, 25, y);
+            y += 5;
+          }
 
           y += 5;
 
@@ -390,7 +398,7 @@ const ReportDetail = () => {
           y = 20;
         }
 
-        y = addSectionTitle("CAPTAIN'S NOTES", y + 5);
+        y = addSectionTitle("NOTES", y + 5);
 
         // Add notes with a background box
         pdf.setFillColor(255, 252, 230); // Light yellow background
@@ -411,7 +419,7 @@ const ReportDetail = () => {
         }
 
         y = addSectionTitle("VERIFICATION", y + 5);
-        y = addField('Completed by:', log.captain || log.completedBy || 'Unknown', y);
+        y = addField('Completed by:', log.completedBy || log.createdByName || log.captain || 'Unknown', y);
         y = addField('Date:', log.completedAt ? new Date(log.completedAt).toLocaleString() : 'Not recorded', y);
 
         // Simple verification stamp
@@ -712,6 +720,16 @@ const ReportDetail = () => {
                             <span className="text-gray-500 dark:text-gray-400">Notes:</span> {activity.notes}
                           </div>
                         )}
+                        
+                        {/* Display who added this activity */}
+                        {activity.addedByName && (
+                          <div className="mt-2 text-xs text-gray-500 dark:text-gray-400 italic">
+                            Added by {activity.addedByName}
+                            {activity.station && activity.station !== log.station && (
+                              <span className="ml-2">• For {activity.station}</span>
+                            )}
+                          </div>
+                        )}
                       </div>
                     </div>
                   </div>
@@ -730,14 +748,14 @@ const ReportDetail = () => {
           {/* Captain's Notes - Now on the left */}
           {log.notes ? (
             <div className="bg-white dark:bg-gray-800 shadow rounded-lg p-6">
-              <h3 className="text-lg font-semibold border-b pb-2 mb-4">Captain's Notes</h3>
+              <h3 className="text-lg font-semibold border-b pb-2 mb-4">Notes</h3>
               <div className="p-4 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-100 dark:border-yellow-900/30 rounded-lg">
                 <p>{log.notes}</p>
               </div>
             </div>
           ) : (
             <div className="bg-white dark:bg-gray-800 shadow rounded-lg p-6">
-              <h3 className="text-lg font-semibold border-b pb-2 mb-4">Captain's Notes</h3>
+              <h3 className="text-lg font-semibold border-b pb-2 mb-4">Notes</h3>
               <div className="p-4 bg-gray-50 dark:bg-gray-750 border border-gray-200 dark:border-gray-700 rounded-lg text-gray-500 dark:text-gray-400 italic">
                 <p>No additional notes for this log.</p>
               </div>

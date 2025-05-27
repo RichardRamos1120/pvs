@@ -134,7 +134,7 @@ const TodayLog = () => {
   };
 
   // Check if user has permission to edit logs
-  const hasEditPermission = userRole === 'admin' || userRole === 'captain';
+  const hasEditPermission = userRole === 'admin' || userRole === 'firefighter';
 
   // Function to create a new log for today
   const createNewLog = async () => {
@@ -159,14 +159,15 @@ const TodayLog = () => {
       const newLog = {
         date: formattedToday,
         rawDate: today.toISOString(),
-        captain: auth.currentUser?.displayName || "Captain",
         station: selectedStation,
         shift: "B",
         crew: [],
         activities: [],
         totalHours: "0.0",
         status: 'draft',
-        notes: ""
+        notes: "",
+        createdBy: auth.currentUser?.uid || null,
+        createdByName: auth.currentUser?.displayName || "Unknown"
       };
 
       console.log("Creating new log with data:", newLog);
@@ -215,12 +216,9 @@ const TodayLog = () => {
             setUserRole(userData.role);
 
             // Determine permissions based on role
-            if (userData.role === 'captain' || userData.role === 'admin') {
+            if (userData.role === 'admin' || userData.role === 'firefighter') {
               console.log("User has edit permission with role:", userData.role);
               setReadOnlyMode(false);
-            } else if (userData.role === 'firefighter') {
-              console.log("User has view-only permission with role:", userData.role);
-              setReadOnlyMode(true);
             } else {
               console.log("User has unknown role:", userData.role);
               setReadOnlyMode(true);
@@ -546,9 +544,17 @@ const TodayLog = () => {
     try {
       console.log("Adding new activity:", activity);
 
+      // Add user information to the activity
+      const activityWithUser = {
+        ...activity,
+        addedBy: auth.currentUser?.uid || null,
+        addedByName: auth.currentUser?.displayName || "Unknown",
+        addedAt: new Date().toISOString()
+      };
+
       // Make a copy of existing activities or initialize if null/undefined
       const existingActivities = todayLog.activities || [];
-      const updatedActivities = [...existingActivities, activity];
+      const updatedActivities = [...existingActivities, activityWithUser];
 
       // Sort by start time
       updatedActivities.sort((a, b) => {
@@ -1035,6 +1041,16 @@ const TodayLog = () => {
                               <span className="text-gray-500 dark:text-gray-400">Notes:</span> {activity.notes}
                             </div>
                           )}
+                          
+                          {/* Display who added this activity */}
+                          {activity.addedByName && (
+                            <div className="mt-2 text-xs text-gray-500 dark:text-gray-400 italic">
+                              Added by {activity.addedByName}
+                              {activity.station && activity.station !== todayLog.station && (
+                                <span className="ml-2">• For {activity.station}</span>
+                              )}
+                            </div>
+                          )}
                         </div>
                       </div>
                     </div>
@@ -1152,6 +1168,7 @@ const TodayLog = () => {
           onClose={() => setShowNewActivityForm(false)}
           onAddActivity={addNewActivity}
           darkMode={darkMode}
+          currentStation={selectedStation}
         />
 
         {/* Crew Selection Modal */}

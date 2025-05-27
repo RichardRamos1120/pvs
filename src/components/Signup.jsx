@@ -11,7 +11,8 @@ const Signup = () => {
   const [confirmPassword, setConfirmPassword] = useState('');
   const [displayName, setDisplayName] = useState('');
   const [station, setStation] = useState('Station 23');
-  const [role, setRole] = useState('firefighter'); // firefighter, captain, admin
+  const [role, setRole] = useState('firefighter'); // firefighter, admin
+  const [rank, setRank] = useState('Firefighter'); // Chief, Battalion Chief, Deputy Chief, Captain, Firefighter
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   
@@ -71,6 +72,7 @@ const Signup = () => {
         email,
         station,
         role,
+        rank,
         createdAt: new Date()
       });
       
@@ -194,6 +196,23 @@ const Signup = () => {
               </select>
             </div>
             <div>
+              <label htmlFor="rank" className="sr-only">Rank</label>
+              <select
+                id="rank"
+                name="rank"
+                required
+                className="appearance-none rounded-none relative block w-full px-3 py-2 border border-gray-300 dark:border-gray-700 dark:bg-gray-700 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 text-gray-900 focus:outline-none focus:ring-blue-500 focus:border-blue-500 focus:z-10 sm:text-sm"
+                value={rank}
+                onChange={(e) => setRank(e.target.value)}
+              >
+                <option value="Firefighter">Firefighter</option>
+                <option value="Captain">Captain</option>
+                <option value="Deputy Chief">Deputy Chief</option>
+                <option value="Battalion Chief">Battalion Chief</option>
+                <option value="Chief">Chief</option>
+              </select>
+            </div>
+            <div>
               <label htmlFor="role" className="sr-only">Role</label>
               <select
                 id="role"
@@ -204,7 +223,6 @@ const Signup = () => {
                 onChange={(e) => setRole(e.target.value)}
               >
                 <option value="firefighter">Firefighter</option>
-                <option value="captain">Captain</option>
                 <option value="admin">Administrator</option>
               </select>
             </div>

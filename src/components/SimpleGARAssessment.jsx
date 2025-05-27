@@ -130,8 +130,11 @@ const GARAssessment = () => {
     rawDate: new Date().toISOString(),
     time: new Date().toTimeString().substring(0, 5),
     type: "",
+    assessmentType: "department", // New field: "department" or "mission"
     station: "",
     status: "draft",
+    createdBy: auth.currentUser?.uid || null,
+    createdByName: auth.currentUser?.displayName || "Unknown",
     weather: {
       temperature: "",
       temperatureUnit: "°F",
@@ -729,7 +732,7 @@ const GARAssessment = () => {
 
         // Check user role for permissions
         if (profile?.role) {
-          if (profile.role === 'captain' || profile.role === 'admin') {
+          if (profile.role === 'admin' || profile.role === 'firefighter') {
             setReadOnlyMode(false);
           } else {
             setReadOnlyMode(true);
@@ -1847,27 +1850,35 @@ const GARAssessment = () => {
           <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Assessment Type</label>
           <select
             className={`w-full p-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white ${readOnlyMode ? 'cursor-not-allowed opacity-90' : ''}`}
-            ref={typeRef}
             onChange={(e) => {
-              // Update data on change for the type
-              const newType = e.target.value;
-              assessmentData.type = newType;
+              // Update assessment type
+              const newAssessmentType = e.target.value;
+              setAssessmentData(prev => ({
+                ...prev,
+                assessmentType: newAssessmentType
+              }));
 
               // Update station value based on assessment type
-              if (newType === "Department-wide") {
+              if (newAssessmentType === "department") {
                 // For Department-wide, always set to All Stations
-                assessmentData.station = "All Stations";
+                setAssessmentData(prev => ({
+                  ...prev,
+                  station: "All Stations"
+                }));
 
                 // Update the select element to show All Stations and disable it
                 if (stationRef.current) {
                   stationRef.current.value = "All Stations";
                   stationRef.current.disabled = true;
                 }
-              } else if (newType === "Station-specific") {
+              } else if (newAssessmentType === "mission") {
                 // If previously All Stations, initialize with selected station
                 if (assessmentData.station === "All Stations") {
                   const stationValue = selectedStation || "";
-                  assessmentData.station = stationValue;
+                  setAssessmentData(prev => ({
+                    ...prev,
+                    station: stationValue
+                  }));
 
                   // Initialize with current station
                   if (stationRef.current) {
@@ -1879,20 +1890,16 @@ const GARAssessment = () => {
                 if (stationRef.current) {
                   stationRef.current.disabled = false;
                 }
-              } else {
-                // For no selection, disable station
-                if (stationRef.current) {
-                  stationRef.current.disabled = true;
-                }
               }
 
               setHasChanges(true);
             }}
+            value={assessmentData.assessmentType}
             disabled={readOnlyMode}
           >
             <option value="">Select assessment type</option>
-            <option value="Department-wide">Department-wide</option>
-            <option value="Station-specific">Mission-specific</option>
+            <option value="department">Department-wide</option>
+            <option value="mission">Mission-specific</option>
           </select>
         </div>
         <div>
@@ -1917,7 +1924,7 @@ const GARAssessment = () => {
               assessmentData.station = selectedStationValue;
               setHasChanges(true);
             }}
-            disabled={readOnlyMode || !typeRef.current || typeRef.current.value !== "Station-specific"}
+            disabled={readOnlyMode || assessmentData.assessmentType !== "mission"}
           >
             <option value="">Select station</option>
             <option value="All Stations">All Stations</option>
@@ -2773,9 +2780,11 @@ const GARAssessment = () => {
                       </div>
                       <div>
                         <div className="flex items-center">
-                          <h3 className="font-medium text-gray-900 dark:text-white">{assessment.type || "Unknown Type"}</h3>
+                          <h3 className="font-medium text-gray-900 dark:text-white">
+                            {assessment.assessmentType === "department" ? "Department-wide" : assessment.assessmentType === "mission" ? "Mission-specific" : assessment.type || "Unknown Type"}
+                          </h3>
                           <span className="ml-2 px-2 py-0.5 bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-300 rounded text-xs">
-                            {assessment.type === "Department-wide" ? "All Stations" : assessment.station || "All Stations"}
+                            {assessment.assessmentType === "department" || assessment.type === "Department-wide" ? "All Stations" : assessment.station || "All Stations"}
                           </span>
                           {assessment.status && (
                             <span className={`ml-2 px-2 py-0.5 rounded text-xs ${
@@ -2791,7 +2800,7 @@ const GARAssessment = () => {
                           {assessment.date || "No date"} • Score: {assessmentScore} ({assessmentRisk.level})
                         </p>
                         <div className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                          {assessment.captain && <span>By: {assessment.captain}</span>}
+                          {(assessment.createdByName || assessment.captain) && <span>By: {assessment.createdByName || assessment.captain}</span>}
                           {assessment.weather?.precipitation && (
                             <span className="ml-2">{assessment.weather.precipitation}</span>
                           )}
