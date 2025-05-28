@@ -14,6 +14,7 @@ import {
 const NewActivityModal = ({ show, onClose, onAddActivity, darkMode, currentStation }) => {
   const [newActivityCategory, setNewActivityCategory] = useState("");
   const [newActivityType, setNewActivityType] = useState("");
+  const [newActivityStartTime, setNewActivityStartTime] = useState("");
   const [newActivityDuration, setNewActivityDuration] = useState("");
   const [newActivityApparatus, setNewActivityApparatus] = useState("");
   const [newActivityMaintenanceType, setNewActivityMaintenanceType] = useState("");
@@ -190,12 +191,25 @@ const NewActivityModal = ({ show, onClose, onAddActivity, darkMode, currentStati
     { value: "8", label: "8 hours" }
   ];
 
-  // No need to calculate end time since we're only using duration
+  // Calculate end time based on start time + duration
+  const calculateEndTime = (startTime, durationHours) => {
+    if (!startTime || !durationHours) return "";
+    
+    const [hours, minutes] = startTime.split(':').map(Number);
+    const startDate = new Date();
+    startDate.setHours(hours, minutes, 0, 0);
+    
+    const durationMinutes = parseFloat(durationHours) * 60;
+    const endDate = new Date(startDate.getTime() + durationMinutes * 60000);
+    
+    return endDate.toTimeString().slice(0, 5); // Format as HH:MM
+  };
   
   // Reset form fields
   const resetForm = () => {
     setNewActivityCategory("");
     setNewActivityType("");
+    setNewActivityStartTime("");
     setNewActivityDuration("");
     setNewActivityApparatus("");
     setNewActivityMaintenanceType("");
@@ -215,6 +229,12 @@ const NewActivityModal = ({ show, onClose, onAddActivity, darkMode, currentStati
       return;
     }
 
+    // Validate start time field
+    if (!newActivityStartTime) {
+      alert("Start time is required");
+      return;
+    }
+
     // Validate duration field
     if (!newActivityDuration) {
       alert("Duration is required");
@@ -229,10 +249,15 @@ const NewActivityModal = ({ show, onClose, onAddActivity, darkMode, currentStati
 
     // Get duration hours
     const hours = parseFloat(newActivityDuration);
+    
+    // Calculate end time
+    const endTime = calculateEndTime(newActivityStartTime, newActivityDuration);
 
     // Create activity details based on category
     let details = {
-      duration: newActivityDuration
+      duration: newActivityDuration,
+      startTime: newActivityStartTime,
+      endTime: endTime
     };
 
     // Add category-specific details
@@ -338,13 +363,29 @@ const NewActivityModal = ({ show, onClose, onAddActivity, darkMode, currentStati
             )}
           </div>
           
-          {/* Duration input */}
-          <div className="mb-4">
-            <label className="block text-sm font-medium mb-1">
-              Duration*
-            </label>
+          {/* Start time and Duration inputs */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+            {/* Start time input */}
+            <div>
+              <label className="block text-sm font-medium mb-1">
+                Start Time*
+              </label>
+              <input
+                type="time"
+                className={`w-full p-2 border rounded-lg ${darkMode ? 'bg-gray-700 border-gray-600 text-white' : 'bg-white border-gray-300 text-gray-900'}`}
+                value={newActivityStartTime}
+                onChange={(e) => setNewActivityStartTime(e.target.value)}
+                required
+              />
+            </div>
+            
+            {/* Duration input */}
+            <div>
+              <label className="block text-sm font-medium mb-1">
+                Duration*
+              </label>
             <select
-              className={`w-full p-2 border rounded-lg ${darkMode ? 'bg-gray-700 text-white' : 'bg-white text-gray-900'}`}
+              className={`w-full p-2 border rounded-lg ${darkMode ? 'bg-gray-700 border-gray-600 text-white' : 'bg-white border-gray-300 text-gray-900'}`}
               value={newActivityDuration}
               onChange={(e) => setNewActivityDuration(e.target.value)}
               required
@@ -356,7 +397,18 @@ const NewActivityModal = ({ show, onClose, onAddActivity, darkMode, currentStati
                 </option>
               ))}
             </select>
+            </div>
           </div>
+          
+          {/* Show calculated end time */}
+          {newActivityStartTime && newActivityDuration && (
+            <div className="mb-4 p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
+              <div className="text-sm text-blue-700 dark:text-blue-300">
+                <strong>End Time:</strong> {calculateEndTime(newActivityStartTime, newActivityDuration)} 
+                <span className="ml-2 text-xs">({newActivityStartTime} + {durationOptions.find(d => d.value === newActivityDuration)?.label})</span>
+              </div>
+            </div>
+          )}
           
           {/* Station selection */}
           <div className="mb-4">
@@ -595,7 +647,7 @@ const NewActivityModal = ({ show, onClose, onAddActivity, darkMode, currentStati
             <button 
               onClick={handleSubmit}
               className="px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
-              disabled={!newActivityCategory || !newActivityType || !newActivityDuration}
+              disabled={!newActivityCategory || !newActivityType || !newActivityStartTime || !newActivityDuration}
             >
               Add Activity
             </button>

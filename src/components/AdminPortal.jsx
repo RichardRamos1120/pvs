@@ -47,7 +47,8 @@ const AdminPortal = ({ darkMode, setDarkMode, selectedStation, setSelectedStatio
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [users, setUsers] = useState([]);
-  const [stations, setStations] = useState([]);
+  const [stations, setStations] = useState([]); // Paginated stations for display
+  const [allStations, setAllStations] = useState([]); // All stations for dropdowns
   const [statusMessage, setStatusMessage] = useState({ text: '', type: '', visible: false });
   const [confirmDialog, setConfirmDialog] = useState({ 
     isOpen: false, 
@@ -147,6 +148,29 @@ const AdminPortal = ({ darkMode, setDarkMode, selectedStation, setSelectedStatio
 
     fetchData();
   }, [auth, firestoreOperations, navigate, currentUserPage, userRoleFilter]);
+
+  // Fetch ALL stations for dropdowns (not paginated)
+  useEffect(() => {
+    const fetchAllStations = async () => {
+      try {
+        const stationsData = await firestoreOperations.getStations();
+        const formattedAllStations = stationsData.map(station => ({
+          id: station.id,
+          number: station.number || station.id.replace('s', ''),
+          name: station.name || `Station ${station.number || ''}`,
+          address: station.address || '',
+          phone: station.phone || ''
+        }));
+        console.log(`[DEBUG] Loaded ${formattedAllStations.length} stations for dropdowns:`, formattedAllStations);
+        setAllStations(formattedAllStations);
+      } catch (error) {
+        console.error("Error fetching all stations:", error);
+        setAllStations([]);
+      }
+    };
+
+    fetchAllStations();
+  }, [firestoreOperations]);
 
   // Separate useEffect for station pagination
   useEffect(() => {
@@ -1939,7 +1963,7 @@ const AdminPortal = ({ darkMode, setDarkMode, selectedStation, setSelectedStatio
       {/* Modals */}
       {showUserModal && <UserModal 
         user={selectedUser} 
-        stations={stations}
+        stations={allStations}
         setShowModal={setShowUserModal}
         saveUser={async (userData) => {
           try {
