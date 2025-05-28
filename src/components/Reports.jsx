@@ -47,6 +47,12 @@ const Reports = () => {
   });
   
   const [pastLogs, setPastLogs] = useState([]);
+  
+  // Helper function to check if user can manage logs (create/delete)
+  const canManageLogs = (userProfile) => {
+      return userProfile?.role === 'admin' || 
+             ['Captain', 'Deputy Chief', 'Battalion Chief', 'Chief'].includes(userProfile?.rank);
+  };
   const [activeTab, setActiveTab] = useState('all'); // 'all', 'draft', 'complete'
   // Initialize stationFilter - default to 'all' for admin users or to selectedStation for others
   const [stationFilter, setStationFilter] = useState('all'); // Start with 'all', we'll update after checking user role
@@ -282,9 +288,9 @@ const Reports = () => {
   const deleteLog = async () => {
     if (!logToDelete) return;
 
-    // Security check - only allow admins and captains to delete logs
-    if (userProfile?.role !== 'admin' && userProfile?.role !== 'captain') {
-      setError('Permission denied. Only captains and administrators can delete logs.');
+    // Security check - only allow admins and users with Captain rank or higher to delete logs
+    if (!canManageLogs(userProfile)) {
+      setError('Permission denied. Only Captains and above can delete logs.');
       setDeleteConfirmOpen(false);
       setLogToDelete(null);
       return;
@@ -465,7 +471,7 @@ const Reports = () => {
             
             <div className="flex flex-col sm:flex-row space-y-2 sm:space-y-0 sm:space-x-2">
               {/* Only show buttons for captains/admins if stations exist */}
-              {(userProfile?.role === 'captain' || userProfile?.role === 'admin') && 
+              {canManageLogs(userProfile) && 
                !(selectedStation === 'No Stations Available' || selectedStation === 'Error Loading Stations') && (
                 <>
                   <button 
@@ -494,7 +500,7 @@ const Reports = () => {
               )}
               
               {/* Show a warning when no stations exist */}
-              {(userProfile?.role === 'captain' || userProfile?.role === 'admin') && 
+              {canManageLogs(userProfile) && 
                (selectedStation === 'No Stations Available' || selectedStation === 'Error Loading Stations') && (
                 <div className="inline-flex items-center px-4 py-2 border border-yellow-300 dark:border-yellow-600 text-sm font-medium rounded-md text-yellow-800 dark:text-yellow-200 bg-yellow-50 dark:bg-yellow-900/20">
                   <AlertTriangle className="h-4 w-4 mr-1 text-yellow-500 dark:text-yellow-400" />
@@ -732,7 +738,7 @@ const Reports = () => {
                                 <div className="flex items-center space-x-3 ml-4">
                                   {log.status === 'draft' ? (
                                     <>
-                                      {(userProfile?.role === 'admin' || userProfile?.role === 'captain') && (
+                                      {canManageLogs(userProfile) && (
                                         <button
                                           onClick={() => {
                                             // First update localStorage directly to ensure station is set before navigation
@@ -753,7 +759,7 @@ const Reports = () => {
                                           Edit
                                         </button>
                                       )}
-                                      {(userProfile?.role === 'admin' || userProfile?.role === 'captain') && (
+                                      {canManageLogs(userProfile) && (
                                         <button
                                           onClick={() => confirmDeleteLog(log)}
                                           className="text-red-600 hover:text-red-900 dark:text-red-400 dark:hover:text-red-200 inline-flex items-center"
@@ -829,7 +835,7 @@ const Reports = () => {
                         <div className="mt-2 flex justify-end space-x-3">
                           {log.status === 'draft' ? (
                             <>
-                              {(userProfile?.role === 'admin' || userProfile?.role === 'captain') && (
+                              {canManageLogs(userProfile) && (
                                 <button
                                   onClick={() => {
                                     // First update localStorage directly to ensure station is set before navigation
@@ -850,7 +856,7 @@ const Reports = () => {
                                   Edit
                                 </button>
                               )}
-                              {(userProfile?.role === 'admin' || userProfile?.role === 'captain') && (
+                              {canManageLogs(userProfile) && (
                                 <button
                                   onClick={() => confirmDeleteLog(log)}
                                   className="text-red-600 hover:text-red-900 dark:text-red-400 dark:hover:text-red-200 text-sm flex items-center"

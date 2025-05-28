@@ -243,8 +243,6 @@ const AdminPortal = ({ darkMode, setDarkMode, selectedStation, setSelectedStatio
     switch (role) {
       case 'admin': 
         return darkMode ? 'bg-red-900 text-red-300' : 'bg-red-100 text-red-800';
-      case 'captain': 
-        return darkMode ? 'bg-blue-900 text-blue-300' : 'bg-blue-100 text-blue-800';
       case 'firefighter': 
         return darkMode ? 'bg-green-900 text-green-300' : 'bg-green-100 text-green-800';
       default: 
@@ -586,7 +584,6 @@ const AdminPortal = ({ darkMode, setDarkMode, selectedStation, setSelectedStatio
                 >
                   <option value="all">All Roles</option>
                   <option value="admin">Admin</option>
-                  <option value="captain">Captain</option>
                   <option value="firefighter">Firefighter</option>
                 </select>
                 
@@ -1974,7 +1971,7 @@ const AdminPortal = ({ darkMode, setDarkMode, selectedStation, setSelectedStatio
       
       {showStationModal && <StationModal 
         station={selectedStationData}
-        captains={users.filter(u => u.role === 'captain' || u.role === 'admin')}
+        captains={users.filter(u => u.role === 'admin' || ['Captain', 'Deputy Chief', 'Battalion Chief', 'Chief'].includes(u.rank))}
         setShowModal={setShowStationModal}
         saveStation={async (stationData) => {
           try {

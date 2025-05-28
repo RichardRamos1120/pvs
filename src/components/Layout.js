@@ -38,23 +38,8 @@ const Layout = ({ children, darkMode, setDarkMode, selectedStation, setSelectedS
         if (!user) return;
         
         // Get user profile for admin check
-        console.log('[DEBUG] Current user UID:', user.uid);
-        console.log('[DEBUG] Current user email:', user.email);
         const userProfile = await firestoreOperations.getUserProfile(user.uid);
-        console.log('[DEBUG] User profile found:', userProfile);
-        
-        // Also check if there's another document with this email
-        try {
-          const db = getFirestore();
-          const usersRef = collection(db, "users");
-          const q = query(usersRef, where("email", "==", user.email));
-          const querySnapshot = await getDocs(q);
-          console.log('[DEBUG] All documents with this email:', querySnapshot.docs.map(doc => ({id: doc.id, data: doc.data()})));
-        } catch (error) {
-          console.log('[DEBUG] Error searching by email:', error);
-        }
-        
-        setIsAdmin(userProfile?.role === 'admin' || userProfile?.role === 'captain');
+        setIsAdmin(userProfile?.role === 'admin');
         
         // Fetch stations from Firestore
         const stationsData = await firestoreOperations.getStations();

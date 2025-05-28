@@ -457,7 +457,7 @@ const TodayLog = () => {
 
           if (!hasEditPermission) {
             console.log("User doesn't have permission to create a log");
-            setError("No activity log exists for today. Please contact a captain or administrator to create a new log.");
+            setError("No activity log exists for today. Please contact a Captain or administrator to create a new log.");
           }
         }
       } catch (error) {

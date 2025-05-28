@@ -123,7 +123,6 @@ const UserModal = ({ user, stations, setShowModal, saveUser, darkMode }) => {
                 onChange={handleChange}
               >
                 <option value="firefighter">Firefighter</option>
-                <option value="captain">Captain</option>
                 <option value="admin">Admin</option>
               </select>
             </div>

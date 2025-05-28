@@ -47,6 +47,12 @@ const Dashboard = () => {
     });
 
     const [pastLogs, setPastLogs] = useState([]);
+    
+    // Helper function to check if user can manage logs (create/delete)
+    const canManageLogs = (userProfile) => {
+        return userProfile?.role === 'admin' || 
+               ['Captain', 'Deputy Chief', 'Battalion Chief', 'Chief'].includes(userProfile?.rank);
+    };
     const [userProfile, setUserProfile] = useState(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
@@ -224,9 +230,9 @@ const Dashboard = () => {
     const deleteLog = async () => {
         if (!logToDelete) return;
 
-        // Security check - only allow admins and captains to delete logs
-        if (userProfile?.role !== 'admin' && userProfile?.role !== 'captain') {
-            setError('Permission denied. Only captains and administrators can delete logs.');
+        // Security check - only allow admins and users with Captain rank or higher to delete logs
+        if (!canManageLogs(userProfile)) {
+            setError('Permission denied. Only Captains and above can delete logs.');
             setDeleteConfirmOpen(false);
             setLogToDelete(null);
             return;
@@ -366,7 +372,7 @@ const Dashboard = () => {
                         </div>
                         <div className="mt-4 md:mt-0 flex flex-wrap gap-2">
                             {/* Only show "Start New Log" button for admins and captains if no active log exists and stations exist */}
-                            {!hasActiveLog && (userProfile?.role === 'admin' || userProfile?.role === 'captain') && 
+                            {!hasActiveLog && canManageLogs(userProfile) && 
                              !(selectedStation === 'No Stations Available' || selectedStation === 'Error Loading Stations') && (
                                 <button
                                     onClick={createNewLog}
@@ -498,7 +504,7 @@ const Dashboard = () => {
                                                 </span>
                                                 {log.status === 'draft' ? (
                                                     <div className="flex space-x-3">
-                                                        {(userProfile?.role === 'admin' || userProfile?.role === 'captain') && (
+                                                        {canManageLogs(userProfile) && (
                                                             <button
                                                                 onClick={() => confirmDeleteLog(log)}
                                                                 className="text-red-600 dark:text-red-400 hover:text-red-800 dark:hover:text-red-300 text-sm flex items-center px-2 py-1"
@@ -564,7 +570,7 @@ const Dashboard = () => {
                                             <div className="mt-2 flex justify-end space-x-3">
                                                 {log.status === 'draft' ? (
                                                     <>
-                                                        {(userProfile?.role === 'admin' || userProfile?.role === 'captain') && (
+                                                        {canManageLogs(userProfile) && (
                                                             <button
                                                                 onClick={() => confirmDeleteLog(log)}
                                                                 className="text-red-600 hover:text-red-900 dark:text-red-400 dark:hover:text-red-200 text-sm flex items-center"
@@ -689,7 +695,7 @@ const Dashboard = () => {
                     <h3 className="text-lg font-semibold mb-4">Quick Links</h3>
                     <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
                         {/* Only show "New Log" button for admins and captains when no active log exists and stations exist */}
-                        {!hasActiveLog && (userProfile?.role === 'admin' || userProfile?.role === 'captain') && 
+                        {!hasActiveLog && canManageLogs(userProfile) && 
                          !(selectedStation === 'No Stations Available' || selectedStation === 'Error Loading Stations') && (
                             <button
                                 onClick={createNewLog}
@@ -701,7 +707,7 @@ const Dashboard = () => {
                         )}
                         
                         {/* Show a disabled button when no stations exist */}
-                        {!hasActiveLog && (userProfile?.role === 'admin' || userProfile?.role === 'captain') && 
+                        {!hasActiveLog && canManageLogs(userProfile) && 
                          (selectedStation === 'No Stations Available' || selectedStation === 'Error Loading Stations') && (
                             <div className="flex flex-col items-center justify-center p-4 bg-gray-100 dark:bg-gray-800 rounded-lg text-gray-400 dark:text-gray-500 cursor-not-allowed">
                                 <PlusCircle className="h-8 w-8 mb-2" />
