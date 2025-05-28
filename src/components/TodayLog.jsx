@@ -162,6 +162,7 @@ const TodayLog = () => {
         station: selectedStation,
         shift: "B",
         crew: [],
+        crewIds: [],
         activities: [],
         totalHours: "0.0",
         status: 'draft',
@@ -259,8 +260,8 @@ const TodayLog = () => {
     if (todayLog) {
       setLocalNotes(todayLog.notes || '');
       setUnsavedChanges(false);
-      // Initialize selected crew from todayLog
-      setSelectedCrew(todayLog.crew || []);
+      // Initialize selected crew from todayLog - convert names to IDs if needed
+      setSelectedCrew(todayLog.crewIds || []);
     }
   }, [todayLog]);
 
@@ -273,6 +274,23 @@ const TodayLog = () => {
           const firefighters = await firestoreOperations.getUsersByRole('firefighter');
           setAvailableFirefighters(firefighters);
           setFilteredFirefighters(firefighters);
+          
+          // If we have existing crew but no crewIds (backwards compatibility),
+          // try to convert crew names to IDs
+          if (todayLog && todayLog.crew && todayLog.crew.length > 0 && (!todayLog.crewIds || todayLog.crewIds.length === 0)) {
+            const matchedIds = [];
+            todayLog.crew.forEach(crewName => {
+              const firefighter = firefighters.find(f => 
+                (f.displayName && f.displayName === crewName) ||
+                (f.firstName && f.lastName && `${f.firstName} ${f.lastName}` === crewName) ||
+                (f.firstName && f.firstName === crewName)
+              );
+              if (firefighter) {
+                matchedIds.push(firefighter.id);
+              }
+            });
+            setSelectedCrew(matchedIds);
+          }
         } catch (error) {
           console.error("Error fetching firefighters:", error);
         }
@@ -280,7 +298,7 @@ const TodayLog = () => {
 
       fetchFirefighters();
     }
-  }, [showCrewModal, firestoreOperations]);
+  }, [showCrewModal, firestoreOperations, todayLog]);
 
   // Filter firefighters based on search term and station filter
   useEffect(() => {
@@ -296,10 +314,15 @@ const TodayLog = () => {
     // Apply search term filter
     if (searchTerm.trim()) {
       const search = searchTerm.toLowerCase();
-      filtered = filtered.filter(f =>
-        f.displayName?.toLowerCase().includes(search) ||
-        f.email?.toLowerCase().includes(search)
-      );
+      filtered = filtered.filter(f => {
+        const displayName = f.displayName || f.firstName || 'Unknown User';
+        const fullName = f.firstName && f.lastName ? `${f.firstName} ${f.lastName}` : displayName;
+        return displayName.toLowerCase().includes(search) ||
+               fullName.toLowerCase().includes(search) ||
+               f.email?.toLowerCase().includes(search) ||
+               f.firstName?.toLowerCase().includes(search) ||
+               f.lastName?.toLowerCase().includes(search);
+      });
     }
 
     setFilteredFirefighters(filtered);
@@ -652,7 +675,7 @@ const TodayLog = () => {
   };
 
   // Update crew members
-  const updateCrew = async (crew) => {
+  const updateCrew = async (crewIds) => {
     // Check permission before allowing edit
     if (readOnlyMode) {
       setError("You don't have permission to update crew");
@@ -663,9 +686,20 @@ const TodayLog = () => {
 
     try {
       console.log("Updating crew members");
+      
+      // Convert crew IDs to names for display
+      const crewNames = crewIds.map(id => {
+        const firefighter = availableFirefighters.find(f => f.id === id);
+        return firefighter ? 
+          (firefighter.displayName || firefighter.firstName || 'Unknown User') + 
+          (firefighter.lastName ? ` ${firefighter.lastName}` : '') 
+          : 'Unknown User';
+      });
+
       const updatedLog = {
         ...todayLog,
-        crew
+        crew: crewNames, // For display purposes
+        crewIds: crewIds // For selection tracking
       };
 
       // Update in Firestore
@@ -1273,18 +1307,18 @@ const TodayLog = () => {
                         <div
                           key={firefighter.id}
                           className={`flex items-center p-3 border-b border-gray-200 dark:border-gray-700 last:border-0 hover:bg-gray-50 dark:hover:bg-gray-750 ${
-                            selectedCrew.includes(firefighter.displayName) ? 'bg-blue-50 dark:bg-blue-900/20' : ''
+                            selectedCrew.includes(firefighter.id) ? 'bg-blue-50 dark:bg-blue-900/20' : ''
                           }`}
                         >
                           <input
                             type="checkbox"
                             id={`firefighter-${firefighter.id}`}
-                            checked={selectedCrew.includes(firefighter.displayName)}
+                            checked={selectedCrew.includes(firefighter.id)}
                             onChange={(e) => {
                               if (e.target.checked) {
-                                setSelectedCrew([...selectedCrew, firefighter.displayName]);
+                                setSelectedCrew([...selectedCrew, firefighter.id]);
                               } else {
-                                setSelectedCrew(selectedCrew.filter(name => name !== firefighter.displayName));
+                                setSelectedCrew(selectedCrew.filter(id => id !== firefighter.id));
                               }
                             }}
                             className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
@@ -1295,10 +1329,18 @@ const TodayLog = () => {
                           >
                             <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center">
                               <div>
-                                {firefighter.displayName}
+                                <div className="font-medium">
+                                  {firefighter.displayName || firefighter.firstName || 'Unknown User'}
+                                  {firefighter.lastName && ` ${firefighter.lastName}`}
+                                </div>
                                 <p className="text-sm text-gray-500 dark:text-gray-400">
-                                  {firefighter.email}
+                                  {firefighter.email || 'No email'}
                                 </p>
+                                {firefighter.rank && (
+                                  <p className="text-xs text-gray-600 dark:text-gray-400">
+                                    {firefighter.rank}
+                                  </p>
+                                )}
                               </div>
                               {firefighter.station && (
                                 <span className="text-xs text-gray-500 dark:text-gray-400 bg-gray-100 dark:bg-gray-700 px-2 py-1 rounded mt-1 sm:mt-0">

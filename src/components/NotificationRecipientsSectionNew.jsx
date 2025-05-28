@@ -16,6 +16,8 @@ const NotificationRecipientsSection = ({
   const [searchTerm, setSearchTerm] = useState('');
   const [stationFilter, setStationFilter] = useState('all');
   const [rankFilter, setRankFilter] = useState('all');
+  const [availableStations, setAvailableStations] = useState([]);
+  const [firestoreStations, setFirestoreStations] = useState([]);
   const searchInputRef = useRef(null);
   const [isLoadingUsers, setIsLoadingUsers] = useState(false);
   const [errorLoading, setErrorLoading] = useState(false);
@@ -43,6 +45,39 @@ const NotificationRecipientsSection = ({
     console.log(`Removed ${userList.length - cleanUsers.length} dummy users, kept ${cleanUsers.length} real users`);
     return cleanUsers;
   };
+
+  // Fetch ALL stations from Firestore for the filter dropdown
+  useEffect(() => {
+    const fetchAllStationsFromFirestore = async () => {
+      try {
+        console.log("Fetching ALL stations from Firestore for filter dropdown...");
+        const db = getFirestore();
+        const stationsRef = collection(db, "stations");
+        const stationsSnapshot = await getDocs(stationsRef);
+        
+        if (!stationsSnapshot.empty) {
+          const allStations = stationsSnapshot.docs.map(doc => {
+            const data = doc.data();
+            return `Station ${data.number || doc.id.replace('s', '')}`;
+          }).sort();
+          
+          console.log("Loaded ALL stations from Firestore for filter:", allStations);
+          setFirestoreStations(allStations);
+          setAvailableStations(allStations);
+        } else {
+          console.log("No stations found in Firestore");
+          setAvailableStations([]);
+        }
+      } catch (error) {
+        console.error("Error fetching stations from Firestore:", error);
+        // If Firestore fails, set empty array
+        setAvailableStations([]);
+      }
+    };
+
+    // Always fetch stations from Firestore, regardless of users
+    fetchAllStationsFromFirestore();
+  }, []); // Remove allUsers dependency - we want ALL stations, not just user stations
 
   // Debug logging for users list and auto-fetch on initial load
   useEffect(() => {
@@ -84,8 +119,8 @@ const NotificationRecipientsSection = ({
 
   // Use fallback values to prevent errors - start with completely empty selections
   const notificationRecipients = assessmentData.notificationRecipients || {
-    groups: [], // No default groups
-    users: []
+    groups: [], // No default groups - completely empty
+    users: []   // No default users - completely empty
   };
 
   // Function to check if a user is selected - handle both id and userId fields
@@ -225,11 +260,19 @@ const NotificationRecipientsSection = ({
       );
     }
 
-    // Apply rank filter - check both role and rank fields with case-insensitive comparison
+    // Apply rank filter - check both role and rank fields
     if (rankFilter !== 'all') {
       filtered = filtered.filter(user => {
-        const userRole = (user.role || user.rank || '').toLowerCase();
-        return userRole === rankFilter.toLowerCase();
+        // For role-based filtering (admin, captain, firefighter)
+        if (['admin', 'captain', 'firefighter'].includes(rankFilter.toLowerCase())) {
+          const userRole = (user.role || '').toLowerCase();
+          return userRole === rankFilter.toLowerCase();
+        }
+        // For rank-based filtering (Firefighter, Captain, Deputy Chief, etc.)
+        else {
+          const userRank = user.rank || '';
+          return userRank === rankFilter;
+        }
       });
     }
 
@@ -470,14 +513,9 @@ const NotificationRecipientsSection = ({
             onChange={(e) => setStationFilter(e.target.value)}
           >
             <option value="all">All Stations</option>
-            <option value="Station 1">Station 1</option>
-            <option value="Station 4">Station 4</option>
-            <option value="Station 7">Station 7</option>
-            <option value="Station 10">Station 10</option>
-            <option value="Station 11">Station 11</option>
-            <option value="Station 14">Station 14</option>
-            <option value="Station 23">Station 23</option>
-            <option value="Headquarters">Headquarters</option>
+            {availableStations.map(station => (
+              <option key={station} value={station}>{station}</option>
+            ))}
           </select>
         </div>
 
@@ -488,21 +526,30 @@ const NotificationRecipientsSection = ({
             value={rankFilter}
             onChange={(e) => setRankFilter(e.target.value)}
           >
-            <option value="all">All Ranks</option>
-            <option value="admin">Admin</option>
-            <option value="captain">Captain</option>
-            <option value="firefighter">Firefighter</option>
+            <option value="all">All Personnel</option>
+            <optgroup label="By Role">
+              <option value="admin">Admin</option>
+              <option value="captain">Captain</option>
+              <option value="firefighter">Firefighter</option>
+            </optgroup>
+            <optgroup label="By Rank">
+              <option value="Firefighter">Firefighter</option>
+              <option value="Captain">Captain</option>
+              <option value="Deputy Chief">Deputy Chief</option>
+              <option value="Battalion Chief">Battalion Chief</option>
+              <option value="Chief">Chief</option>
+            </optgroup>
           </select>
         </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Available Recipients */}
         <div>
-          <h4 className="text-base font-medium text-gray-800 dark:text-gray-200 mb-2">Available Recipients</h4>
+          <h4 className="text-base font-medium text-gray-800 dark:text-gray-200 mb-3">Available Recipients</h4>
           
-          <div className="border border-gray-200 dark:border-gray-700 rounded-md overflow-hidden">
-            <div className="max-h-96 overflow-y-auto">
+          <div className="border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden">
+            <div className="max-h-80 overflow-y-auto">
               {isLoadingUsers ? (
                 <div className="p-8 text-center text-gray-500 dark:text-gray-400">
                   <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-blue-500 mx-auto mb-2"></div>
@@ -515,8 +562,8 @@ const NotificationRecipientsSection = ({
                     <h5 className="font-medium text-gray-700 dark:text-gray-300 text-sm">Department Groups</h5>
                   </div>
                   
-                  {/* Render groups */}
-                  {notificationRecipients?.groups?.map((group, idx) => (
+                  {/* Render groups - only if groups exist */}
+                  {(notificationRecipients?.groups && notificationRecipients.groups.length > 0) && notificationRecipients.groups.map((group, idx) => (
                     <div
                       key={`group-list-${group.id}-${idx}`}
                       className={`p-3 flex items-center hover:bg-gray-50 dark:hover:bg-gray-750 cursor-pointer ${
@@ -539,7 +586,11 @@ const NotificationRecipientsSection = ({
                         <div className="font-medium">{group.name}</div>
                       </div>
                     </div>
-                  ))}
+                  )) || (
+                    <div className="p-4 text-center text-gray-500 dark:text-gray-400 text-sm">
+                      No groups available
+                    </div>
+                  )}
                   
                   {/* Individual Personnel */}
                   <div className="bg-gray-50 dark:bg-gray-750 p-2">
@@ -567,10 +618,11 @@ const NotificationRecipientsSection = ({
                           className="h-5 w-5 text-blue-600 focus:ring-blue-500 border-gray-300 rounded cursor-pointer"
                         />
                         <div className="ml-3 flex-1">
-                          <div className="font-medium">{user.displayName || user.name}</div>
-                          <div className="text-sm text-gray-500 dark:text-gray-400">
+                          <div className="font-medium text-sm">{user.displayName || user.name}</div>
+                          <div className="text-xs text-gray-500 dark:text-gray-400">
                             {user.email}
                             {user.station && <span> • {user.station}</span>}
+                            {user.rank && <span> • {user.rank}</span>}
                           </div>
                         </div>
                       </div>
@@ -615,13 +667,13 @@ const NotificationRecipientsSection = ({
         
         {/* Selected Recipients */}
         <div>
-          <h4 className="text-base font-medium text-gray-800 dark:text-gray-200 mb-2">Selected Recipients</h4>
-          <div className="border border-gray-200 dark:border-gray-700 rounded-md p-4 bg-white dark:bg-gray-800 h-full min-h-[200px]">
-            {(notificationRecipients?.groups?.some(g => g.selected) || 
+          <h4 className="text-base font-medium text-gray-800 dark:text-gray-200 mb-3">Selected Recipients</h4>
+          <div className="border border-gray-200 dark:border-gray-700 rounded-lg p-4 bg-gray-50 dark:bg-gray-750 h-full min-h-[200px]">
+            {((notificationRecipients?.groups && notificationRecipients.groups.length > 0 && notificationRecipients.groups.some(g => g.selected)) || 
               (notificationRecipients?.users && notificationRecipients.users.length > 0)) ? (
               <div className="space-y-4">
                 {/* Selected groups */}
-                {notificationRecipients?.groups?.filter(group => group.selected)?.length > 0 && (
+                {(notificationRecipients?.groups && notificationRecipients.groups.length > 0 && notificationRecipients.groups.filter(group => group.selected)?.length > 0) && (
                   <div>
                     <h5 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Groups</h5>
                     <div className="flex flex-wrap gap-2">
@@ -680,8 +732,14 @@ const NotificationRecipientsSection = ({
                 )}
               </div>
             ) : (
-              <div className="h-full flex items-center justify-center text-gray-500 dark:text-gray-400 italic">
-                No recipients selected
+              <div className="h-full flex flex-col items-center justify-center text-gray-500 dark:text-gray-400">
+                <div className="text-center">
+                  <svg className="w-12 h-12 mx-auto mb-3 opacity-50" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197m13.5-9a2.25 2.25 0 11-4.5 0 2.25 2.25 0 014.5 0z" />
+                  </svg>
+                  <p className="text-sm font-medium">No recipients selected</p>
+                  <p className="text-xs mt-1">Select users or groups from the left</p>
+                </div>
               </div>
             )}
           </div>

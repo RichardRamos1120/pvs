@@ -6,6 +6,7 @@ import { FirestoreContext } from '../App';
 import Layout from './Layout';
 import UserModal from './modals/UserModal';
 import StationModal from './modals/StationModal';
+import Pagination from './Pagination';
 import { 
   downloadCSV, 
   formatUserDataForExport, 
@@ -47,7 +48,6 @@ const AdminPortal = ({ darkMode, setDarkMode, selectedStation, setSelectedStatio
   const [error, setError] = useState('');
   const [users, setUsers] = useState([]);
   const [stations, setStations] = useState([]);
-  const [deletedUsers, setDeletedUsers] = useState([]);
   const [statusMessage, setStatusMessage] = useState({ text: '', type: '', visible: false });
   const [confirmDialog, setConfirmDialog] = useState({ 
     isOpen: false, 
@@ -56,10 +56,19 @@ const AdminPortal = ({ darkMode, setDarkMode, selectedStation, setSelectedStatio
     onConfirm: null 
   });
 
-  // Move user filter states to parent level to prevent resets
-  const [userSearchTerm, setUserSearchTerm] = useState('');
+  // Move user filter states to parent level to prevent resets  
   const [userRoleFilter, setUserRoleFilter] = useState('all');
   const [userStatusFilter, setUserStatusFilter] = useState('all');
+  
+  // Pagination state for users
+  const [currentUserPage, setCurrentUserPage] = useState(1);
+  const [totalUsers, setTotalUsers] = useState(0);
+  const [usersPerPage] = useState(5); // Show 5 users per page
+
+  // Pagination state for stations
+  const [currentStationPage, setCurrentStationPage] = useState(1);
+  const [totalStations, setTotalStations] = useState(0);
+  const [stationsPerPage] = useState(5); // Show 5 stations per page
 
   const navigate = useNavigate();
   const auth = getAuth();
@@ -85,14 +94,20 @@ const AdminPortal = ({ darkMode, setDarkMode, selectedStation, setSelectedStatio
           return;
         }
 
-        // Fetch all users from Firestore
+        // Fetch paginated users from Firestore
         try {
-          // Get all users from the 'users' collection
-          const usersCollection = await firestoreOperations.getAllUsers();
+          console.log(`Fetching paginated users - Page: ${currentUserPage}, Role: ${userRoleFilter}`);
           
-          if (usersCollection && usersCollection.length > 0) {
+          const paginatedResult = await firestoreOperations.getPaginatedUsers(
+            currentUserPage,
+            usersPerPage,
+            userRoleFilter === 'all' ? null : userRoleFilter,
+            null // No station filter for now
+          );
+          
+          if (paginatedResult.users && paginatedResult.users.length > 0) {
             // Format data to match our component's expected structure
-            const formattedUsers = usersCollection.map(user => ({
+            const formattedUsers = paginatedResult.users.map(user => ({
               id: user.id || user.userId,
               firstName: user.firstName || user.displayName?.split(' ')[0] || '',
               lastName: user.lastName || user.displayName?.split(' ').slice(1).join(' ') || '',
@@ -106,9 +121,11 @@ const AdminPortal = ({ darkMode, setDarkMode, selectedStation, setSelectedStatio
             }));
             
             setUsers(formattedUsers);
+            setTotalUsers(paginatedResult.totalUsers || 0);
           } else {
-            // No default user - empty array means no users
+            // No users found
             setUsers([]);
+            setTotalUsers(0);
           }
         } catch (error) {
           console.error("Error fetching users:", error);
@@ -116,52 +133,9 @@ const AdminPortal = ({ darkMode, setDarkMode, selectedStation, setSelectedStatio
           
           // No fallback data, just empty array
           setUsers([]);
+          setTotalUsers(0);
         }
 
-        // Fetch all stations
-        try {
-          const stationsData = await firestoreOperations.getStations();
-          
-          if (stationsData && stationsData.length > 0) {
-            // Format stations data
-            const formattedStations = stationsData.map(station => ({
-              id: station.id,
-              number: station.number || station.id.replace('s', ''),
-              name: station.name || `Station ${station.number || ''}`,
-              address: station.address || '',
-              phone: station.phone || '',
-              captainId: station.captainId || null,
-              crewIds: station.crewIds || [],
-              apparatus: station.apparatus || [],
-              createdAt: station.createdAt || new Date().toISOString()
-            }));
-            
-            setStations(formattedStations);
-          } else {
-            // No fallback - an empty array indicates no stations
-            setStations([]);
-          }
-        } catch (error) {
-          console.error("Error fetching stations:", error);
-          setError("Failed to load stations.");
-          
-          // No fallback - just set empty array
-          setStations([]);
-        }
-        
-        // Fetch deleted users
-        try {
-          const deletedUsersData = await firestoreOperations.getDeletedUsers();
-          
-          if (deletedUsersData && deletedUsersData.length > 0) {
-            setDeletedUsers(deletedUsersData);
-          } else {
-            setDeletedUsers([]);
-          }
-        } catch (error) {
-          console.error("Error fetching deleted users:", error);
-          setDeletedUsers([]);
-        }
 
       } catch (error) {
         console.error('Error fetching data:', error);
@@ -172,7 +146,67 @@ const AdminPortal = ({ darkMode, setDarkMode, selectedStation, setSelectedStatio
     };
 
     fetchData();
-  }, [auth, firestoreOperations, navigate]);
+  }, [auth, firestoreOperations, navigate, currentUserPage, userRoleFilter]);
+
+  // Separate useEffect for station pagination
+  useEffect(() => {
+    const fetchStations = async () => {
+      try {
+        console.log(`Fetching paginated stations - Page: ${currentStationPage}`);
+        
+        const paginatedResult = await firestoreOperations.getPaginatedStations(
+          currentStationPage,
+          stationsPerPage
+        );
+        
+        if (paginatedResult.stations && paginatedResult.stations.length > 0) {
+          // Format stations data
+          const formattedStations = paginatedResult.stations.map(station => ({
+            id: station.id,
+            number: station.number || station.id.replace('s', ''),
+            name: station.name || `Station ${station.number || ''}`,
+            address: station.address || '',
+            phone: station.phone || '',
+            captainId: station.captainId || null,
+            crewIds: station.crewIds || [],
+            apparatus: station.apparatus || [],
+            createdAt: station.createdAt || new Date().toISOString()
+          }));
+          
+          setStations(formattedStations);
+          setTotalStations(paginatedResult.totalStations || 0);
+        } else {
+          // No stations found
+          setStations([]);
+          setTotalStations(0);
+        }
+      } catch (error) {
+        console.error("Error fetching stations:", error);
+        setStations([]);
+        setTotalStations(0);
+      }
+    };
+
+    if (!loading) {
+      fetchStations();
+    }
+  }, [firestoreOperations, currentStationPage, stationsPerPage, loading]);
+
+  // Handle user page change
+  const handleUserPageChange = (page) => {
+    setCurrentUserPage(page);
+  };
+
+  // Handle station page change
+  const handleStationPageChange = (page) => {
+    setCurrentStationPage(page);
+  };
+
+  // Handle user role filter change
+  const handleUserRoleFilterChange = (role) => {
+    setUserRoleFilter(role);
+    setCurrentUserPage(1); // Reset to first page when filter changes
+  };
 
   // Helper functions
   const getStationName = (stationId) => {
@@ -274,18 +308,6 @@ const AdminPortal = ({ darkMode, setDarkMode, selectedStation, setSelectedStatio
         >
           <FileBarChart className="w-4 h-4 mr-1 md:mr-2" />
           <span>Reports</span>
-        </button>
-        <button
-          onClick={() => setAdminActiveSection('deleted-users')}
-          className={`px-3 md:px-6 py-3 flex items-center whitespace-nowrap text-sm md:text-base ${
-            adminActiveSection === 'deleted-users' 
-              ? `${darkMode ? 'bg-gray-700 text-red-400 font-medium border-b-2 border-red-500' : 'bg-red-50 text-red-600 font-medium border-b-2 border-red-600'}` 
-              : `${darkMode ? 'text-gray-300 hover:bg-gray-700' : 'text-gray-600 hover:bg-gray-100'}`
-          }`}
-        >
-          <Trash className="w-4 h-4 mr-1 md:mr-2" />
-          <span className="hidden sm:inline">Deleted Users</span>
-          <span className="sm:hidden">Deleted</span>
         </button>
       </div>
     </div>
@@ -455,22 +477,22 @@ const AdminPortal = ({ darkMode, setDarkMode, selectedStation, setSelectedStatio
 
   // User Management Component
   const UserManagement = () => {
-    // Filter users based on search term and filters (using parent state)
+    const [userSearchTerm, setUserSearchTerm] = useState('');
+    
+    // With server-side pagination, we use the users directly from the paginated results
+    // Role filtering is handled on the server, but we can still do client-side search and status filtering
     const filteredUsers = users.filter(user => {
-      // Text search filter
+      // Text search filter (client-side for now)
       const matchesSearch = userSearchTerm === '' || 
         user.firstName.toLowerCase().includes(userSearchTerm.toLowerCase()) ||
         user.lastName.toLowerCase().includes(userSearchTerm.toLowerCase()) ||
         user.email.toLowerCase().includes(userSearchTerm.toLowerCase()) ||
         user.role.toLowerCase().includes(userSearchTerm.toLowerCase());
       
-      // Role filter
-      const matchesRole = userRoleFilter === 'all' || user.role === userRoleFilter;
-      
-      // Status filter
+      // Status filter (client-side for now) 
       const matchesStatus = userStatusFilter === 'all' || user.status === userStatusFilter;
       
-      return matchesSearch && matchesRole && matchesStatus;
+      return matchesSearch && matchesStatus;
     });
     
     const handleCreateUser = () => {
@@ -555,7 +577,7 @@ const AdminPortal = ({ darkMode, setDarkMode, selectedStation, setSelectedStatio
                 {/* Role Filter */}
                 <select
                   value={userRoleFilter}
-                  onChange={(e) => setUserRoleFilter(e.target.value)}
+                  onChange={(e) => handleUserRoleFilterChange(e.target.value)}
                   className={`px-3 py-2 border rounded-md text-sm ${
                     darkMode 
                       ? 'bg-gray-700 border-gray-600 text-gray-200' 
@@ -603,32 +625,30 @@ const AdminPortal = ({ darkMode, setDarkMode, selectedStation, setSelectedStatio
                 
                 {/* Results Count */}
                 <span className={`text-sm ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>
-                  {filteredUsers.length} of {users.length} users
+                  Showing {users.length} of {totalUsers} users
                 </span>
                 
-                {/* Export Button */}
-                <div className="ml-auto">
+                {/* Export Buttons */}
+                <div className="ml-auto flex space-x-2">
+                  {/* Export Current Page */}
                   <button 
                     onClick={(e) => {
                       e.preventDefault();
                       e.stopPropagation();
                       
-                      // Create a separate function to avoid any closure issues
                       const performExport = () => {
                         try {
-                          console.log('Starting export with filters:', { userRoleFilter, userStatusFilter, userSearchTerm });
-                          console.log('Filtered users count:', filteredUsers.length);
+                          console.log('Starting current page export:', filteredUsers.length);
                           
                           const formattedData = formatUserDataForExport(filteredUsers);
-                          const filename = `users_filtered_export_${new Date().toISOString().split('T')[0]}.csv`;
+                          const filename = `users_page_${currentUserPage}_export_${new Date().toISOString().split('T')[0]}.csv`;
                           downloadCSV(formattedData, filename);
                           
-                          // Use setTimeout to avoid immediate state update that might cause re-render
                           setTimeout(() => {
-                            showStatusMessage("User list exported successfully", "success");
+                            showStatusMessage("Current page exported successfully", "success");
                           }, 100);
                         } catch (error) {
-                          console.error('Error exporting users:', error);
+                          console.error('Error exporting current page:', error);
                           setTimeout(() => {
                             showStatusMessage("Export failed: " + error.message, "error");
                           }, 100);
@@ -644,7 +664,67 @@ const AdminPortal = ({ darkMode, setDarkMode, selectedStation, setSelectedStatio
                     }`}
                   >
                     <Download className="w-4 h-4 mr-2" />
-                    Export ({filteredUsers.length})
+                    Export Page ({users.length})
+                  </button>
+
+                  {/* Export All */}
+                  <button 
+                    onClick={async (e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      
+                      const performExportAll = async () => {
+                        try {
+                          console.log('Starting export all users');
+                          setStatusMessage({ text: "Fetching all users for export...", type: "info", visible: true });
+                          
+                          // Fetch all users for export
+                          const allUsersData = await firestoreOperations.getAllUsers();
+                          
+                          if (allUsersData && allUsersData.length > 0) {
+                            const formattedUsers = allUsersData.map(user => ({
+                              id: user.id || user.userId,
+                              firstName: user.firstName || user.displayName?.split(' ')[0] || '',
+                              lastName: user.lastName || user.displayName?.split(' ').slice(1).join(' ') || '',
+                              email: user.email || '',
+                              role: user.role || 'firefighter',
+                              stationId: user.stationId || user.station || '',
+                              status: user.status || 'active',
+                              lastLogin: user.lastLogin || user.lastSignInTime || new Date().toISOString(),
+                              createdAt: user.createdAt || user.creationTime || new Date().toISOString(),
+                              permissions: user.permissions || []
+                            }));
+                            
+                            const formattedData = formatUserDataForExport(formattedUsers);
+                            const filename = `users_all_export_${new Date().toISOString().split('T')[0]}.csv`;
+                            downloadCSV(formattedData, filename);
+                            
+                            setTimeout(() => {
+                              showStatusMessage(`All ${formattedUsers.length} users exported successfully`, "success");
+                            }, 100);
+                          } else {
+                            setTimeout(() => {
+                              showStatusMessage("No users found to export", "error");
+                            }, 100);
+                          }
+                        } catch (error) {
+                          console.error('Error exporting all users:', error);
+                          setTimeout(() => {
+                            showStatusMessage("Export all failed: " + error.message, "error");
+                          }, 100);
+                        }
+                      };
+                      
+                      await performExportAll();
+                    }}
+                    className={`flex items-center px-3 py-2 border rounded-md transition-colors ${
+                      darkMode 
+                        ? 'border-blue-600 text-blue-300 hover:bg-blue-700 border-2' 
+                        : 'border-blue-500 text-blue-600 hover:bg-blue-50 border-2'
+                    }`}
+                  >
+                    <Download className="w-4 h-4 mr-2" />
+                    Export All ({totalUsers})
                   </button>
                 </div>
               </div>
@@ -746,6 +826,19 @@ const AdminPortal = ({ darkMode, setDarkMode, selectedStation, setSelectedStatio
               </div>
             )}
           </div>
+          
+          {/* Pagination for Users */}
+          {totalUsers > 0 && (
+            <Pagination
+              currentPage={currentUserPage}
+              totalPages={Math.ceil(totalUsers / usersPerPage)}
+              totalItems={totalUsers}
+              itemsPerPage={usersPerPage}
+              onPageChange={handleUserPageChange}
+              darkMode={darkMode}
+              showItemCount={true}
+            />
+          )}
         </div>
       </div>
     );
@@ -847,12 +940,8 @@ const AdminPortal = ({ darkMode, setDarkMode, selectedStation, setSelectedStatio
               const result = await firestoreOperations.deleteStation(stationId);
               
               if (result.success) {
-                // Update local state
-                setStations(stations.filter(s => s.id !== stationId));
-                
-                // Also update the local users state if any users were affected
+                // Update affected users in the local state if any users were affected
                 if (result.affected && result.affected.users > 0) {
-                  // Update affected users in the local state by clearing their station
                   setUsers(users.map(user => {
                     if (user.stationId === stationId || user.station === stationName) {
                       return {
@@ -867,6 +956,46 @@ const AdminPortal = ({ darkMode, setDarkMode, selectedStation, setSelectedStatio
                 
                 // Hide processing message
                 setStatusMessage(prev => ({ ...prev, visible: false }));
+                
+                // Refresh station data for current page
+                const refreshStations = async () => {
+                  try {
+                    const newTotalStations = totalStations - 1;
+                    let pageToFetch = currentStationPage;
+                    
+                    // If we deleted the last item on the current page and it's not page 1, go to previous page
+                    if (stations.length === 1 && currentStationPage > 1) {
+                      pageToFetch = currentStationPage - 1;
+                      setCurrentStationPage(pageToFetch);
+                    }
+                    
+                    const paginatedResult = await firestoreOperations.getPaginatedStations(
+                      pageToFetch,
+                      stationsPerPage
+                    );
+                    
+                    if (paginatedResult.stations) {
+                      const formattedStations = paginatedResult.stations.map(station => ({
+                        id: station.id,
+                        number: station.number || station.id.replace('s', ''),
+                        name: station.name || `Station ${station.number || ''}`,
+                        address: station.address || '',
+                        phone: station.phone || '',
+                        captainId: station.captainId || null,
+                        crewIds: station.crewIds || [],
+                        apparatus: station.apparatus || [],
+                        createdAt: station.createdAt || new Date().toISOString()
+                      }));
+                      
+                      setStations(formattedStations);
+                      setTotalStations(paginatedResult.totalStations || 0);
+                    }
+                  } catch (error) {
+                    console.error("Error refreshing stations:", error);
+                  }
+                };
+                
+                await refreshStations();
                 
                 // Show detailed success message
                 let successMsg = `${stationName} deleted successfully.`;
@@ -913,10 +1042,7 @@ const AdminPortal = ({ darkMode, setDarkMode, selectedStation, setSelectedStatio
               setStatusMessage(prev => ({ ...prev, visible: false }));
               
               if (result.success) {
-                // Update local state
-                setStations(stations.filter(s => s.id !== stationId));
-                
-                // Also update any affected users in the local state
+                // Update any affected users in the local state
                 setUsers(users.map(user => {
                   if (user.stationId === stationId || user.station === stationToDelete.name) {
                     return {
@@ -928,6 +1054,44 @@ const AdminPortal = ({ darkMode, setDarkMode, selectedStation, setSelectedStatio
                   return user;
                 }));
                 
+                // Refresh station data for current page
+                const refreshStations = async () => {
+                  try {
+                    let pageToFetch = currentStationPage;
+                    
+                    // If we deleted the last item on the current page and it's not page 1, go to previous page
+                    if (stations.length === 1 && currentStationPage > 1) {
+                      pageToFetch = currentStationPage - 1;
+                      setCurrentStationPage(pageToFetch);
+                    }
+                    
+                    const paginatedResult = await firestoreOperations.getPaginatedStations(
+                      pageToFetch,
+                      stationsPerPage
+                    );
+                    
+                    if (paginatedResult.stations) {
+                      const formattedStations = paginatedResult.stations.map(station => ({
+                        id: station.id,
+                        number: station.number || station.id.replace('s', ''),
+                        name: station.name || `Station ${station.number || ''}`,
+                        address: station.address || '',
+                        phone: station.phone || '',
+                        captainId: station.captainId || null,
+                        crewIds: station.crewIds || [],
+                        apparatus: station.apparatus || [],
+                        createdAt: station.createdAt || new Date().toISOString()
+                      }));
+                      
+                      setStations(formattedStations);
+                      setTotalStations(paginatedResult.totalStations || 0);
+                    }
+                  } catch (error) {
+                    console.error("Error refreshing stations:", error);
+                  }
+                };
+                
+                await refreshStations();
                 showStatusMessage(`${stationToDelete.name} deleted successfully`, "success");
               } else {
                 showStatusMessage(`Failed to delete station: ${result.message}`, "error");
@@ -1035,6 +1199,21 @@ const AdminPortal = ({ darkMode, setDarkMode, selectedStation, setSelectedStatio
                 <Building className="w-4 h-4 mr-2" />
                 Add Your First Station
               </button>
+            </div>
+          )}
+
+          {/* Pagination */}
+          {totalStations > stationsPerPage && (
+            <div className="py-6">
+              <Pagination
+                currentPage={currentStationPage}
+                totalPages={Math.ceil(totalStations / stationsPerPage)}
+                totalItems={totalStations}
+                itemsPerPage={stationsPerPage}
+                onPageChange={handleStationPageChange}
+                darkMode={darkMode}
+                showItemCount={true}
+              />
             </div>
           )}
         </div>
@@ -1255,168 +1434,6 @@ const AdminPortal = ({ darkMode, setDarkMode, selectedStation, setSelectedStatio
               Export Daily Logs
             </button>
           </div>
-        </div>
-      </div>
-    );
-  };
-
-  // Deleted Users Management Component
-  const DeletedUsersManagement = () => {
-    const [deletedSearchTerm, setDeletedSearchTerm] = useState('');
-    
-    const filteredDeletedUsers = deletedUsers.filter(user =>
-      (user.firstName && user.firstName.toLowerCase().includes(deletedSearchTerm.toLowerCase())) ||
-      (user.lastName && user.lastName.toLowerCase().includes(deletedSearchTerm.toLowerCase())) ||
-      (user.email && user.email.toLowerCase().includes(deletedSearchTerm.toLowerCase()))
-    );
-
-    const handleRestoreUser = async (userId) => {
-      // Get the user for the confirmation dialog
-      const userToRestore = deletedUsers.find(u => u.id === userId);
-      if (!userToRestore) {
-        showStatusMessage("User not found in deleted users list", "error");
-        return;
-      }
-
-      setConfirmDialog({
-        isOpen: true,
-        title: 'Confirm User Restoration',
-        message: `Are you sure you want to restore ${userToRestore.firstName} ${userToRestore.lastName}? This will move them back to the active users list.`,
-        onConfirm: async () => {
-          try {
-            showStatusMessage("Restoring user...", "info");
-            const result = await firestoreOperations.restoreUser(userId);
-            
-            if (result.success) {
-              // Update local state - remove from deleted users
-              setDeletedUsers(deletedUsers.filter(u => u.id !== userId));
-              
-              // Add to active users
-              setUsers([...users, result.userData]);
-              
-              showStatusMessage(`${userToRestore.firstName} ${userToRestore.lastName} has been restored successfully`, "success");
-            } else {
-              showStatusMessage(`Failed to restore user: ${result.message}`, "error");
-            }
-          } catch (error) {
-            console.error("Error restoring user:", error);
-            showStatusMessage(`Error restoring user: ${error.message}`, "error");
-          }
-        }
-      });
-    };
-
-    return (
-      <div className="space-y-6">
-        <div className="flex justify-between items-center">
-          <h2 className={`text-2xl font-bold ${darkMode ? 'text-white' : 'text-gray-900'}`}>Deleted Users</h2>
-          <div className="flex items-center">
-            <button
-              onClick={() => window.open('https://console.firebase.google.com/project/_/authentication/users', '_blank')}
-              className={`px-4 py-2 ${darkMode ? 'bg-indigo-600 hover:bg-indigo-700' : 'bg-indigo-600 hover:bg-indigo-700'} text-white rounded-md`}
-            >
-              Open Firebase Auth Console
-            </button>
-          </div>
-        </div>
-        
-        <div className={`${darkMode ? 'bg-gray-800' : 'bg-white'} rounded-lg shadow p-4`}>
-          <div className="flex items-center space-x-4 mb-4">
-            <div className="relative flex-1">
-              <Search className={`w-4 h-4 absolute left-3 top-3 ${darkMode ? 'text-gray-400' : 'text-gray-400'}`} />
-              <input
-                type="text"
-                placeholder="Search deleted users..."
-                className={`w-full pl-10 pr-4 py-2 border ${darkMode ? 'bg-gray-700 border-gray-600 text-gray-200 placeholder-gray-400' : 'bg-white border-gray-300 text-gray-700 placeholder-gray-400'} rounded-md`}
-                value={deletedSearchTerm}
-                onChange={(e) => setDeletedSearchTerm(e.target.value)}
-              />
-            </div>
-          </div>
-          
-          <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead className={darkMode ? 'bg-gray-700' : 'bg-gray-50'}>
-                <tr>
-                  <th className={`px-6 py-3 text-left text-xs font-medium ${darkMode ? 'text-gray-300' : 'text-gray-500'} uppercase tracking-wider`}>
-                    User
-                  </th>
-                  <th className={`px-6 py-3 text-left text-xs font-medium ${darkMode ? 'text-gray-300' : 'text-gray-500'} uppercase tracking-wider`}>
-                    Email
-                  </th>
-                  <th className={`px-6 py-3 text-left text-xs font-medium ${darkMode ? 'text-gray-300' : 'text-gray-500'} uppercase tracking-wider`}>
-                    Role
-                  </th>
-                  <th className={`px-6 py-3 text-left text-xs font-medium ${darkMode ? 'text-gray-300' : 'text-gray-500'} uppercase tracking-wider`}>
-                    Deleted At
-                  </th>
-                  <th className={`px-6 py-3 text-left text-xs font-medium ${darkMode ? 'text-gray-300' : 'text-gray-500'} uppercase tracking-wider`}>
-                    Actions
-                  </th>
-                </tr>
-              </thead>
-              <tbody className={`${darkMode ? 'bg-gray-800' : 'bg-white'} divide-y ${darkMode ? 'divide-gray-700' : 'divide-gray-200'}`}>
-                {filteredDeletedUsers.length > 0 ? (
-                  filteredDeletedUsers.map((user) => (
-                    <tr key={user.id} className={darkMode ? 'hover:bg-gray-700' : 'hover:bg-gray-50'}>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="flex items-center">
-                          <div className={`${darkMode ? 'bg-red-900' : 'bg-red-100'} rounded-full p-2 mr-3`}>
-                            <User className={`w-4 h-4 ${darkMode ? 'text-red-300' : 'text-red-600'}`} />
-                          </div>
-                          <div>
-                            <div className={`text-sm font-medium ${darkMode ? 'text-white' : 'text-gray-900'}`}>
-                              {user.firstName || 'Unknown'} {user.lastName || ''}
-                            </div>
-                          </div>
-                        </div>
-                      </td>
-                      <td className={`px-6 py-4 whitespace-nowrap text-sm ${darkMode ? 'text-gray-300' : 'text-gray-900'}`}>
-                        {user.email || 'No email'}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
-                          user.role === 'admin' 
-                            ? (darkMode ? 'bg-red-900 text-red-300' : 'bg-red-100 text-red-800')
-                            : user.role === 'captain'
-                            ? (darkMode ? 'bg-blue-900 text-blue-300' : 'bg-blue-100 text-blue-800')
-                            : (darkMode ? 'bg-green-900 text-green-300' : 'bg-green-100 text-green-800')
-                        }`}>
-                          {user.role || 'Unknown'}
-                        </span>
-                      </td>
-                      <td className={`px-6 py-4 whitespace-nowrap text-sm ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>
-                        {user.deletedAtFormatted || 'Unknown'}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium flex space-x-2">
-                        <button
-                          onClick={() => handleRestoreUser(user.id)}
-                          className={darkMode ? 'text-green-400 hover:text-green-300' : 'text-green-600 hover:text-green-900'}
-                          title="Restore User"
-                        >
-                          <Eye className="w-4 h-4" />
-                        </button>
-                        <button
-                          onClick={() => window.open('https://console.firebase.google.com/project/_/authentication/users', '_blank')}
-                          className={darkMode ? 'text-blue-400 hover:text-blue-300' : 'text-blue-600 hover:text-blue-900'}
-                          title="Open Firebase Auth Console"
-                        >
-                          <Activity className="w-4 h-4" />
-                        </button>
-                      </td>
-                    </tr>
-                  ))
-                ) : (
-                  <tr>
-                    <td colSpan="5" className={`px-6 py-4 text-center ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>
-                      No deleted users found.
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
-          </div>
-          
         </div>
       </div>
     );
@@ -1786,8 +1803,6 @@ const AdminPortal = ({ darkMode, setDarkMode, selectedStation, setSelectedStatio
         return <AdminReports />;
       case 'analytics':
         return <AnalyticsComponent />;
-      case 'deleted-users':
-        return <DeletedUsersManagement />;
       default:
         return <AdminOverview />;
     }
@@ -1973,16 +1988,47 @@ const AdminPortal = ({ darkMode, setDarkMode, selectedStation, setSelectedStatio
             
             if (savedStation) {
               if (selectedStationData) {
-                // Update existing station in the local state
-                setStations(stations.map(s => s.id === selectedStationData.id ? savedStation : s));
                 console.log(`Station ${selectedStationData.id} updated successfully`);
                 showStatusMessage(`Station ${savedStation.name} updated successfully`, "success");
               } else {
-                // Add new station to the local state
-                setStations([...stations, savedStation]);
                 console.log(`New station created with ID: ${savedStation.id}`);
                 showStatusMessage(`Station ${savedStation.name} created successfully`, "success");
+                // For new stations, go to the last page to see the new station
+                const newTotalStations = totalStations + 1;
+                const lastPage = Math.ceil(newTotalStations / stationsPerPage);
+                setCurrentStationPage(lastPage);
               }
+              
+              // Refresh station data for current page
+              const refreshStations = async () => {
+                try {
+                  const paginatedResult = await firestoreOperations.getPaginatedStations(
+                    currentStationPage,
+                    stationsPerPage
+                  );
+                  
+                  if (paginatedResult.stations) {
+                    const formattedStations = paginatedResult.stations.map(station => ({
+                      id: station.id,
+                      number: station.number || station.id.replace('s', ''),
+                      name: station.name || `Station ${station.number || ''}`,
+                      address: station.address || '',
+                      phone: station.phone || '',
+                      captainId: station.captainId || null,
+                      crewIds: station.crewIds || [],
+                      apparatus: station.apparatus || [],
+                      createdAt: station.createdAt || new Date().toISOString()
+                    }));
+                    
+                    setStations(formattedStations);
+                    setTotalStations(paginatedResult.totalStations || 0);
+                  }
+                } catch (error) {
+                  console.error("Error refreshing stations:", error);
+                }
+              };
+              
+              await refreshStations();
               setShowStationModal(false);
             } else {
               console.error("Failed to save station");

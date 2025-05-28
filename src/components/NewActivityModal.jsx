@@ -14,8 +14,7 @@ import {
 const NewActivityModal = ({ show, onClose, onAddActivity, darkMode, currentStation }) => {
   const [newActivityCategory, setNewActivityCategory] = useState("");
   const [newActivityType, setNewActivityType] = useState("");
-  const [newActivityStart, setNewActivityStart] = useState("");
-  const [newActivityEnd, setNewActivityEnd] = useState("");
+  const [newActivityDuration, setNewActivityDuration] = useState("");
   const [newActivityApparatus, setNewActivityApparatus] = useState("");
   const [newActivityMaintenanceType, setNewActivityMaintenanceType] = useState("");
   const [newActivityPassFail, setNewActivityPassFail] = useState("");
@@ -171,24 +170,33 @@ const NewActivityModal = ({ show, onClose, onAddActivity, darkMode, currentStati
   
   // Stations are now loaded from Firebase - see useEffect above
   
-  // Calculate hours between start and end times
-  const calculateHours = (startTime, endTime) => {
-    if (!startTime) return 1.0; // Default to 1 hour if no start time
-    if (!endTime) return 1.0; // Default to 1 hour if no end time
-    
-    const start = new Date(`2000-01-01T${startTime}`);
-    const end = new Date(`2000-01-01T${endTime}`);
-    let hours = (end - start) / (1000 * 60 * 60);
-    if (hours < 0) hours = 24 + hours; // Span over midnight
-    return parseFloat(hours.toFixed(1));
-  };
+  // Duration options (30 minutes to 8 hours)
+  const durationOptions = [
+    { value: "0.5", label: "30 minutes" },
+    { value: "1", label: "1 hour" },
+    { value: "1.5", label: "1.5 hours" },
+    { value: "2", label: "2 hours" },
+    { value: "2.5", label: "2.5 hours" },
+    { value: "3", label: "3 hours" },
+    { value: "3.5", label: "3.5 hours" },
+    { value: "4", label: "4 hours" },
+    { value: "4.5", label: "4.5 hours" },
+    { value: "5", label: "5 hours" },
+    { value: "5.5", label: "5.5 hours" },
+    { value: "6", label: "6 hours" },
+    { value: "6.5", label: "6.5 hours" },
+    { value: "7", label: "7 hours" },
+    { value: "7.5", label: "7.5 hours" },
+    { value: "8", label: "8 hours" }
+  ];
+
+  // No need to calculate end time since we're only using duration
   
   // Reset form fields
   const resetForm = () => {
     setNewActivityCategory("");
     setNewActivityType("");
-    setNewActivityStart("");
-    setNewActivityEnd("");
+    setNewActivityDuration("");
     setNewActivityApparatus("");
     setNewActivityMaintenanceType("");
     setNewActivityPassFail("");
@@ -207,9 +215,9 @@ const NewActivityModal = ({ show, onClose, onAddActivity, darkMode, currentStati
       return;
     }
 
-    // Validate time fields
-    if (!newActivityStart || !newActivityEnd) {
-      alert("Start time and end time are required");
+    // Validate duration field
+    if (!newActivityDuration) {
+      alert("Duration is required");
       return;
     }
 
@@ -219,13 +227,12 @@ const NewActivityModal = ({ show, onClose, onAddActivity, darkMode, currentStati
       return;
     }
 
-    // Calculate hours
-    const hours = calculateHours(newActivityStart, newActivityEnd);
+    // Get duration hours
+    const hours = parseFloat(newActivityDuration);
 
     // Create activity details based on category
     let details = {
-      startTime: newActivityStart,
-      endTime: newActivityEnd
+      duration: newActivityDuration
     };
 
     // Add category-specific details
@@ -331,34 +338,24 @@ const NewActivityModal = ({ show, onClose, onAddActivity, darkMode, currentStati
             )}
           </div>
           
-          {/* Time inputs */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-            <div>
-              <label className="block text-sm font-medium mb-1">
-                Start Time*
-              </label>
-              <input
-                type="time"
-                className={`w-full p-2 border rounded-lg ${darkMode ? 'bg-gray-700 text-white' : 'bg-white text-gray-900'}`}
-                style={{ colorScheme: darkMode ? 'dark' : 'light' }}
-                value={newActivityStart}
-                onChange={(e) => setNewActivityStart(e.target.value)}
-                required
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium mb-1">
-                End Time*
-              </label>
-              <input
-                type="time"
-                className={`w-full p-2 border rounded-lg ${darkMode ? 'bg-gray-700 text-white' : 'bg-white text-gray-900'}`}
-                style={{ colorScheme: darkMode ? 'dark' : 'light' }}
-                value={newActivityEnd}
-                onChange={(e) => setNewActivityEnd(e.target.value)}
-                required
-              />
-            </div>
+          {/* Duration input */}
+          <div className="mb-4">
+            <label className="block text-sm font-medium mb-1">
+              Duration*
+            </label>
+            <select
+              className={`w-full p-2 border rounded-lg ${darkMode ? 'bg-gray-700 text-white' : 'bg-white text-gray-900'}`}
+              value={newActivityDuration}
+              onChange={(e) => setNewActivityDuration(e.target.value)}
+              required
+            >
+              <option value="">Select Duration</option>
+              {durationOptions.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
           </div>
           
           {/* Station selection */}
@@ -598,7 +595,7 @@ const NewActivityModal = ({ show, onClose, onAddActivity, darkMode, currentStati
             <button 
               onClick={handleSubmit}
               className="px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
-              disabled={!newActivityCategory || !newActivityType}
+              disabled={!newActivityCategory || !newActivityType || !newActivityDuration}
             >
               Add Activity
             </button>

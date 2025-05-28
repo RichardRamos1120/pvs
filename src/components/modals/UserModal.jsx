@@ -123,6 +123,7 @@ const UserModal = ({ user, stations, setShowModal, saveUser, darkMode }) => {
                 onChange={handleChange}
               >
                 <option value="firefighter">Firefighter</option>
+                <option value="captain">Captain</option>
                 <option value="admin">Admin</option>
               </select>
             </div>
@@ -185,32 +186,6 @@ const UserModal = ({ user, stations, setShowModal, saveUser, darkMode }) => {
             </select>
           </div>
 
-          <div>
-            <label className={`block text-sm font-medium ${darkMode ? 'text-gray-300' : 'text-gray-700'} mb-2`}>Permissions</label>
-            <div className="space-y-3">
-              {permissions.map(permission => (
-                <div key={permission.id} className="flex items-center">
-                  <input
-                    type="checkbox"
-                    id={`permission-${permission.id}`}
-                    checked={formData.permissions.includes(permission.id)}
-                    onChange={() => handlePermissionChange(permission.id)}
-                    className={`h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded mr-3 ${
-                      darkMode 
-                        ? 'bg-gray-700 border-gray-600 focus:ring-offset-gray-800' 
-                        : 'bg-white border-gray-300 focus:ring-offset-white'
-                    }`}
-                  />
-                  <label 
-                    htmlFor={`permission-${permission.id}`}
-                    className={`text-sm cursor-pointer select-none ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}
-                  >
-                    {permission.label}
-                  </label>
-                </div>
-              ))}
-            </div>
-          </div>
         </div>
 
         <div className="flex justify-end space-x-3 mt-6">

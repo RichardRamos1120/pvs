@@ -3,7 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate, useNavigate, useLocation } from 'react-router-dom';
 import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, deleteUser } from 'firebase/auth';
 import { initializeApp } from 'firebase/app';
-import { getFirestore, collection, getDocs, addDoc, updateDoc, doc, getDoc, query, where, orderBy, serverTimestamp, deleteDoc, setDoc, writeBatch, limit } from 'firebase/firestore';
+import { getFirestore, collection, getDocs, addDoc, updateDoc, doc, getDoc, query, where, orderBy, serverTimestamp, deleteDoc, setDoc, writeBatch, limit, startAfter, getCountFromServer } from 'firebase/firestore';
 import Dashboard from './components/Dashboard';
 import TodayLog from './components/TodayLog';
 import Reports from './components/Reports';
@@ -106,7 +106,20 @@ const App = () => {
         if (userSnap.exists()) {
           return userSnap.data();
         } else {
-          console.log("No user profile found");
+          console.log("No user profile found with UID, trying email lookup");
+          // Fallback: try to find user by email
+          const auth = getAuth();
+          const currentUser = auth.currentUser;
+          if (currentUser?.email) {
+            const usersRef = collection(db, "users");
+            const q = query(usersRef, where("email", "==", currentUser.email));
+            const querySnapshot = await getDocs(q);
+            
+            if (!querySnapshot.empty) {
+              console.log("Found user profile by email");
+              return querySnapshot.docs[0].data();
+            }
+          }
           return null;
         }
       } catch (error) {
@@ -245,6 +258,248 @@ const App = () => {
       } catch (error) {
         console.error("Error getting all logs:", error);
         return [];
+      }
+    },
+
+    // Get paginated logs
+    getPaginatedLogs: async (page = 1, logsPerPage = 10, stationFilter = null, statusFilter = null) => {
+      try {
+        const logsRef = collection(db, "logs");
+        let baseQuery = logsRef;
+
+        // Build query conditions
+        const conditions = [orderBy("rawDate", "desc")];
+        
+        if (stationFilter && stationFilter !== 'all') {
+          conditions.unshift(where("station", "==", stationFilter));
+        }
+        
+        if (statusFilter && statusFilter !== 'all') {
+          conditions.unshift(where("status", "==", statusFilter));
+        }
+
+        // Get total count for pagination
+        const countQuery = query(baseQuery, ...conditions.filter(c => c.type !== 'orderBy'));
+        const countSnapshot = await getCountFromServer(countQuery);
+        const totalLogs = countSnapshot.data().count;
+
+        // Get paginated data
+        const offset = (page - 1) * logsPerPage;
+        const paginatedQuery = query(baseQuery, ...conditions, limit(logsPerPage));
+
+        // If not first page, we need to use startAfter
+        let finalQuery = paginatedQuery;
+        if (offset > 0) {
+          // Get the last document of the previous page to use as startAfter
+          const prevPageQuery = query(baseQuery, ...conditions, limit(offset));
+          const prevPageSnapshot = await getDocs(prevPageQuery);
+          const lastDoc = prevPageSnapshot.docs[prevPageSnapshot.docs.length - 1];
+          
+          if (lastDoc) {
+            finalQuery = query(baseQuery, ...conditions, startAfter(lastDoc), limit(logsPerPage));
+          }
+        }
+
+        const snapshot = await getDocs(finalQuery);
+        const logsList = snapshot.docs.map(doc => ({
+          id: doc.id,
+          ...doc.data()
+        }));
+
+        return {
+          logs: logsList,
+          totalLogs,
+          totalPages: Math.ceil(totalLogs / logsPerPage),
+          currentPage: page,
+          hasNextPage: offset + logsPerPage < totalLogs,
+          hasPrevPage: page > 1
+        };
+      } catch (error) {
+        console.error("Error getting paginated logs:", error);
+        return {
+          logs: [],
+          totalLogs: 0,
+          totalPages: 0,
+          currentPage: 1,
+          hasNextPage: false,
+          hasPrevPage: false
+        };
+      }
+    },
+
+    // Get paginated users  
+    getPaginatedUsers: async (page = 1, usersPerPage = 20, roleFilter = null, stationFilter = null) => {
+      try {
+        const usersRef = collection(db, "users");
+        let baseQuery = usersRef;
+
+        // Build query conditions
+        const conditions = [orderBy("createdAt", "desc")];
+        
+        if (roleFilter && roleFilter !== 'all') {
+          conditions.unshift(where("role", "==", roleFilter));
+        }
+        
+        if (stationFilter && stationFilter !== 'all') {
+          conditions.unshift(where("station", "==", stationFilter));
+        }
+
+        // Get total count
+        const countQuery = query(baseQuery, ...conditions.filter(c => c.type !== 'orderBy'));
+        const countSnapshot = await getCountFromServer(countQuery);
+        const totalUsers = countSnapshot.data().count;
+
+        // Get paginated data
+        const offset = (page - 1) * usersPerPage;
+        const paginatedQuery = query(baseQuery, ...conditions, limit(usersPerPage));
+
+        let finalQuery = paginatedQuery;
+        if (offset > 0) {
+          const prevPageQuery = query(baseQuery, ...conditions, limit(offset));
+          const prevPageSnapshot = await getDocs(prevPageQuery);
+          const lastDoc = prevPageSnapshot.docs[prevPageSnapshot.docs.length - 1];
+          
+          if (lastDoc) {
+            finalQuery = query(baseQuery, ...conditions, startAfter(lastDoc), limit(usersPerPage));
+          }
+        }
+
+        const snapshot = await getDocs(finalQuery);
+        const usersList = snapshot.docs.map(doc => ({
+          id: doc.id,
+          ...doc.data()
+        }));
+
+        return {
+          users: usersList,
+          totalUsers,
+          totalPages: Math.ceil(totalUsers / usersPerPage),
+          currentPage: page,
+          hasNextPage: offset + usersPerPage < totalUsers,
+          hasPrevPage: page > 1
+        };
+      } catch (error) {
+        console.error("Error getting paginated users:", error);
+        return {
+          users: [],
+          totalUsers: 0,
+          totalPages: 0,
+          currentPage: 1,
+          hasNextPage: false,
+          hasPrevPage: false
+        };
+      }
+    },
+
+    getPaginatedStations: async (page = 1, stationsPerPage = 5) => {
+      try {
+        const stationsRef = collection(db, "stations");
+        
+        // Build query conditions
+        const conditions = [orderBy("number", "asc")];
+
+        // Get total count
+        const countQuery = query(stationsRef);
+        const countSnapshot = await getCountFromServer(countQuery);
+        const totalStations = countSnapshot.data().count;
+
+        // Get paginated data
+        const offset = (page - 1) * stationsPerPage;
+        const paginatedQuery = query(stationsRef, ...conditions, limit(stationsPerPage));
+
+        let finalQuery = paginatedQuery;
+        if (offset > 0) {
+          const prevPageQuery = query(stationsRef, ...conditions, limit(offset));
+          const prevPageSnapshot = await getDocs(prevPageQuery);
+          const lastDoc = prevPageSnapshot.docs[prevPageSnapshot.docs.length - 1];
+          
+          if (lastDoc) {
+            finalQuery = query(stationsRef, ...conditions, startAfter(lastDoc), limit(stationsPerPage));
+          }
+        }
+
+        const snapshot = await getDocs(finalQuery);
+        const stationsList = snapshot.docs.map(doc => ({
+          id: doc.id,
+          ...doc.data()
+        }));
+
+        return {
+          stations: stationsList,
+          totalStations,
+          totalPages: Math.ceil(totalStations / stationsPerPage),
+          currentPage: page,
+          hasNextPage: offset + stationsPerPage < totalStations,
+          hasPrevPage: page > 1
+        };
+      } catch (error) {
+        console.error("Error getting paginated stations:", error);
+        return {
+          stations: [],
+          totalStations: 0,
+          totalPages: 0,
+          currentPage: 1,
+          hasNextPage: false,
+          hasPrevPage: false
+        };
+      }
+    },
+
+    getPaginatedAssessments: async (page = 1, assessmentsPerPage = 5, stationFilter = null) => {
+      try {
+        const assessmentsRef = collection(db, "assessments");
+        
+        // Build query conditions
+        const conditions = [orderBy("rawDate", "desc")];
+        
+        if (stationFilter && stationFilter !== 'all') {
+          conditions.unshift(where("station", "==", stationFilter));
+        }
+
+        // Get total count
+        const countQuery = query(assessmentsRef, ...conditions.filter(c => c.type !== 'orderBy'));
+        const countSnapshot = await getCountFromServer(countQuery);
+        const totalAssessments = countSnapshot.data().count;
+
+        // Get paginated data
+        const offset = (page - 1) * assessmentsPerPage;
+        const paginatedQuery = query(assessmentsRef, ...conditions, limit(assessmentsPerPage));
+
+        let finalQuery = paginatedQuery;
+        if (offset > 0) {
+          const prevPageQuery = query(assessmentsRef, ...conditions, limit(offset));
+          const prevPageSnapshot = await getDocs(prevPageQuery);
+          const lastDoc = prevPageSnapshot.docs[prevPageSnapshot.docs.length - 1];
+          
+          if (lastDoc) {
+            finalQuery = query(assessmentsRef, ...conditions, startAfter(lastDoc), limit(assessmentsPerPage));
+          }
+        }
+
+        const snapshot = await getDocs(finalQuery);
+        const assessmentsList = snapshot.docs.map(doc => ({
+          id: doc.id,
+          ...doc.data()
+        }));
+
+        return {
+          assessments: assessmentsList,
+          totalAssessments,
+          totalPages: Math.ceil(totalAssessments / assessmentsPerPage),
+          currentPage: page,
+          hasNextPage: offset + assessmentsPerPage < totalAssessments,
+          hasPrevPage: page > 1
+        };
+      } catch (error) {
+        console.error("Error getting paginated assessments:", error);
+        return {
+          assessments: [],
+          totalAssessments: 0,
+          totalPages: 0,
+          currentPage: 1,
+          hasNextPage: false,
+          hasPrevPage: false
+        };
       }
     },
 

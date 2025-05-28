@@ -8,6 +8,7 @@ import { v4 as uuidv4 } from 'uuid';
 import RiskFactorOptimized from './RiskFactorOptimized';
 import ReadOnlyAssessmentView from './ReadOnlyAssessmentView';
 import NotificationRecipientsSection from './NotificationRecipientsSectionNew';
+import Pagination from './Pagination';
 
 // Main component
 const GARAssessment = () => {
@@ -106,6 +107,11 @@ const GARAssessment = () => {
   const [pastAssessments, setPastAssessments] = useState([]);
   const [filteredAssessments, setFilteredAssessments] = useState([]);
   const [searchTerm, setSearchTerm] = useState('');
+  
+  // Pagination state for assessments
+  const [currentAssessmentPage, setCurrentAssessmentPage] = useState(1);
+  const [totalAssessments, setTotalAssessments] = useState(0);
+  const [assessmentsPerPage] = useState(5); // Show 5 assessments per page
   const [error, setError] = useState('');
   const [userProfile, setUserProfile] = useState(null);
   const [readOnlyMode, setReadOnlyMode] = useState(false);
@@ -165,11 +171,7 @@ const GARAssessment = () => {
       complexity: ""
     },
     notificationRecipients: {
-      groups: [
-        { id: "firefighters", name: "All Firefighters", count: 231, selected: true },
-        { id: "officers", name: "All Officers", count: 27, selected: true },
-        { id: "chiefs", name: "Chief Staff", count: 5, selected: true }
-      ],
+      groups: [], // No default groups at all
       users: []
     }
   });
@@ -421,27 +423,30 @@ const GARAssessment = () => {
     }
   };
   
-  // Fetch assessments from Firebase
+  // Fetch assessments from Firebase with pagination
   const fetchAssessments = async (station) => {
     try {
       setLoading(true);
       setError(''); // Clear any previous errors
 
-      console.log("Fetching assessments for station:", station);
-      // For GAR Assessment page, we want to see all assessments
-      const assessments = await firestoreOperations.getAllAssessments();
-      console.log("Fetched assessments:", assessments);
+      console.log(`Fetching paginated assessments - Page: ${currentAssessmentPage}, Station: ${station}`);
+      
+      const paginatedResult = await firestoreOperations.getPaginatedAssessments(
+        currentAssessmentPage,
+        assessmentsPerPage,
+        station === 'All Stations' ? null : station
+      );
+      
+      if (paginatedResult.assessments && paginatedResult.assessments.length >= 0) {
+        // Check each assessment has an ID
+        paginatedResult.assessments.forEach((assessment, index) => {
+          if (!assessment.id) {
+            console.error(`Assessment at index ${index} is missing an ID:`, assessment);
+          }
+        });
 
-      // Check each assessment has an ID
-      assessments.forEach((assessment, index) => {
-        if (!assessment.id) {
-          console.error(`Assessment at index ${index} is missing an ID:`, assessment);
-        }
-      });
-
-      // Check for any draft assessments and update state
-      if (Array.isArray(assessments)) {
-        const draftFound = assessments.find(a => a.status === 'draft');
+        // Check for any draft assessments and update state
+        const draftFound = paginatedResult.assessments.find(a => a.status === 'draft');
         if (draftFound) {
           console.log("Found a draft assessment:", draftFound);
           setDraftAssessment(draftFound);
@@ -449,26 +454,31 @@ const GARAssessment = () => {
           setDraftAssessment(null);
         }
 
-        setPastAssessments(assessments);
-        setFilteredAssessments(assessments);
+        setPastAssessments(paginatedResult.assessments);
+        setTotalAssessments(paginatedResult.totalAssessments || 0);
       } else {
-        console.warn("Received non-array assessments data:", assessments);
+        console.warn("No assessments found");
         setPastAssessments([]);
-        setFilteredAssessments([]);
+        setTotalAssessments(0);
         setDraftAssessment(null);
       }
     } catch (error) {
       console.error("Error fetching assessments:", error);
       setError("Failed to load assessment data. Please try again.");
       setPastAssessments([]); // Reset to empty array on error
-      setFilteredAssessments([]);
+      setTotalAssessments(0);
       setDraftAssessment(null);
     } finally {
       setLoading(false);
     }
   };
 
-  // Filter assessments based on search term
+  // Handle assessment page change
+  const handleAssessmentPageChange = (page) => {
+    setCurrentAssessmentPage(page);
+  };
+
+  // Update filtered assessments when search term or past assessments change
   useEffect(() => {
     if (!searchTerm.trim()) {
       setFilteredAssessments(pastAssessments);
@@ -490,6 +500,13 @@ const GARAssessment = () => {
 
     setFilteredAssessments(filtered);
   }, [searchTerm, pastAssessments]);
+
+  // Fetch assessments when page changes
+  useEffect(() => {
+    if (!loading && selectedStation) {
+      fetchAssessments(selectedStation);
+    }
+  }, [currentAssessmentPage]);
   
   // Fetch all real users for notification recipients from Firestore
   const fetchUsers = async () => {
@@ -1320,11 +1337,7 @@ const GARAssessment = () => {
         prev = {
           ...prev,
           notificationRecipients: {
-            groups: [
-              { id: "firefighters", name: "All Firefighters", count: 231, selected: true },
-              { id: "officers", name: "All Officers", count: 27, selected: true },
-              { id: "chiefs", name: "Chief Staff", count: 5, selected: true }
-            ],
+            groups: [],
             users: []
           }
         };
@@ -1356,11 +1369,7 @@ const GARAssessment = () => {
         prev = {
           ...prev,
           notificationRecipients: {
-            groups: [
-              { id: "firefighters", name: "All Firefighters", count: 231, selected: true },
-              { id: "officers", name: "All Officers", count: 27, selected: true },
-              { id: "chiefs", name: "Chief Staff", count: 5, selected: true }
-            ],
+            groups: [],
             users: []
           }
         };
@@ -1560,11 +1569,7 @@ const GARAssessment = () => {
               setAssessmentData(prev => ({
                 ...prev,
                 notificationRecipients: {
-                  groups: [
-                    { id: "firefighters", name: "All Firefighters", count: 231, selected: true },
-                    { id: "officers", name: "All Officers", count: 27, selected: true },
-                    { id: "chiefs", name: "Chief Staff", count: 5, selected: true }
-                  ],
+                  groups: [],
                   users: []
                 }
               }));
@@ -2367,11 +2372,7 @@ const GARAssessment = () => {
         setAssessmentData(prev => ({
           ...prev,
           notificationRecipients: {
-            groups: [
-              { id: "firefighters", name: "All Firefighters", count: 231, selected: true },
-              { id: "officers", name: "All Officers", count: 27, selected: true },
-              { id: "chiefs", name: "Chief Staff", count: 5, selected: true }
-            ],
+            groups: [],
             users: []
           }
         }));
@@ -2863,6 +2864,21 @@ const GARAssessment = () => {
                   <p className="text-sm mt-1">Create your first risk assessment to get started</p>
                 </>
               )}
+            </div>
+          )}
+
+          {/* Pagination */}
+          {totalAssessments > assessmentsPerPage && (
+            <div className="py-6">
+              <Pagination
+                currentPage={currentAssessmentPage}
+                totalPages={Math.ceil(totalAssessments / assessmentsPerPage)}
+                totalItems={totalAssessments}
+                itemsPerPage={assessmentsPerPage}
+                onPageChange={handleAssessmentPageChange}
+                darkMode={darkMode}
+                showItemCount={true}
+              />
             </div>
           )}
         </div>

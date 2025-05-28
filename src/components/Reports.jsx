@@ -4,6 +4,8 @@ import { useNavigate } from 'react-router-dom';
 import { getAuth } from 'firebase/auth';
 import { FirestoreContext } from '../App';
 import Layout from './Layout';
+import Pagination from './Pagination';
+import { downloadCSV, formatLogDataForExport } from '../utils/csvExport';
 import {
   Calendar,
   Search,
@@ -17,7 +19,8 @@ import {
   Edit3,
   Trash2,
   AlertCircle,
-  AlertTriangle
+  AlertTriangle,
+  Download
 } from 'lucide-react';
 
 const Reports = () => {
@@ -54,6 +57,12 @@ const Reports = () => {
   const [userProfile, setUserProfile] = useState(null);
   const [logToDelete, setLogToDelete] = useState(null);
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
+  const [stationsList, setStationsList] = useState(['Station 1']);
+  
+  // Pagination state
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalLogs, setTotalLogs] = useState(0);
+  const [logsPerPage] = useState(5); // Show 5 logs per page
 
   const navigate = useNavigate();
   const auth = getAuth();
@@ -149,26 +158,21 @@ const Reports = () => {
           setStationFilter(stationToUse);
         }
 
-        // Fetch logs
-        let logs;
-        if (profile && profile.role === 'admin') {
-          // If station filter is 'all' and user is admin, get all logs
-          if (stationFilter === 'all') {
-            console.log("Fetching ALL logs for admin user");
-            logs = await firestoreOperations.getAllLogs();
-          } else {
-            // Otherwise filter by the current station
-            console.log(`Fetching logs for admin user filtered by station: ${stationFilter}`);
-            logs = await firestoreOperations.getLogs(stationFilter);
-          }
-        } else {
-          // Regular users see only their station logs
-          const stationToUse = savedStation || profile.station || selectedStation;
-          console.log(`Fetching logs for regular user with station: ${stationToUse}`);
-          logs = await firestoreOperations.getLogs(stationToUse);
-        }
-
-        setPastLogs(logs || []);
+        // Fetch paginated logs
+        const stationToFilter = profile && profile.role === 'admin' && stationFilter === 'all' ? null : stationFilter;
+        const statusToFilter = activeTab === 'all' ? null : activeTab;
+        
+        console.log(`Fetching paginated logs - Page: ${currentPage}, Station: ${stationToFilter}, Status: ${statusToFilter}`);
+        
+        const paginatedResult = await firestoreOperations.getPaginatedLogs(
+          currentPage, 
+          logsPerPage, 
+          stationToFilter, 
+          statusToFilter
+        );
+        
+        setPastLogs(paginatedResult.logs || []);
+        setTotalLogs(paginatedResult.totalLogs || 0);
       } catch (error) {
         console.error('Error fetching data:', error);
         setError('Failed to load reports. Please try again.');
@@ -178,47 +182,29 @@ const Reports = () => {
     };
 
     fetchData();
-  }, [auth, firestoreOperations, stationFilter, selectedStation]);
+  }, [auth, firestoreOperations, stationFilter, selectedStation, currentPage, activeTab]);
   
   // Handle station filter change
-  const handleStationFilterChange = async (stationName) => {
+  const handleStationFilterChange = (stationName) => {
     console.log(`Changing station filter to: ${stationName}`);
     setStationFilter(stationName);
+    setCurrentPage(1); // Reset to first page when filter changes
 
     // Also update the global selectedStation if not "all"
     if (stationName !== 'all') {
       handleStationChange(stationName);
     }
+  };
 
-    try {
-      setLoading(true);
-      let logs;
+  // Handle tab change
+  const handleTabChange = (tab) => {
+    setActiveTab(tab);
+    setCurrentPage(1); // Reset to first page when tab changes
+  };
 
-      if (stationName === 'all') {
-        if (userProfile && userProfile.role === 'admin') {
-          // Admin viewing all logs
-          console.log("Fetching ALL logs for admin user");
-          logs = await firestoreOperations.getAllLogs();
-        } else {
-          // Non-admin users shouldn't see "all" option, but if they try, default to their station
-          console.log("Non-admin trying to access all logs, defaulting to their station");
-          const stationToUse = localStorage.getItem('selectedStation') || userProfile?.station || selectedStation;
-          setStationFilter(stationToUse); // Update UI to show correct station
-          logs = await firestoreOperations.getLogs(stationToUse);
-        }
-      } else {
-        // Specific station filter
-        console.log(`Fetching logs for station: ${stationName}`);
-        logs = await firestoreOperations.getLogs(stationName);
-      }
-
-      setPastLogs(logs || []);
-    } catch (error) {
-      console.error('Error fetching logs:', error);
-      setError('Failed to load logs. Please try again.');
-    } finally {
-      setLoading(false);
-    }
+  // Handle page change
+  const handlePageChange = (page) => {
+    setCurrentPage(page);
   };
   
   // Create new log or navigate to existing today's log
@@ -396,9 +382,6 @@ const Reports = () => {
     return reportsByStation;
   };
   
-  // Dynamic station list
-  const [stationsList, setStationsList] = useState(['all']);
-  
   // Loading state
   if (loading) {
     return (
@@ -573,12 +556,74 @@ const Reports = () => {
                 <option value="month">This Month</option>
                 <option value="custom">Custom Range</option>
               </select>
+              
+              {/* Export Buttons */}
+              <div className="flex space-x-2">
+                {/* Export Current Page */}
+                <button
+                  onClick={() => {
+                    try {
+                      const formattedData = formatLogDataForExport(pastLogs);
+                      const filename = `logs_page_${currentPage}_export_${new Date().toISOString().split('T')[0]}.csv`;
+                      downloadCSV(formattedData, filename);
+                    } catch (error) {
+                      console.error('Error exporting current page:', error);
+                      alert('Export failed: ' + error.message);
+                    }
+                  }}
+                  className={`flex items-center px-3 py-2 border rounded-md transition-colors text-sm ${
+                    darkMode 
+                      ? 'border-gray-600 text-gray-300 hover:bg-gray-700' 
+                      : 'border-gray-300 text-gray-700 hover:bg-gray-50'
+                  }`}
+                >
+                  <Download className="w-4 h-4 mr-2" />
+                  Export Page ({pastLogs.length})
+                </button>
+
+                {/* Export All */}
+                <button
+                  onClick={async () => {
+                    try {
+                      console.log('Starting export all logs');
+                      
+                      // Fetch all logs for export
+                      let allLogs;
+                      if (userProfile && userProfile.role === 'admin') {
+                        allLogs = await firestoreOperations.getAllLogs();
+                      } else {
+                        const userStation = localStorage.getItem('selectedStation') || userProfile?.station || selectedStation;
+                        allLogs = await firestoreOperations.getLogs(userStation);
+                      }
+                      
+                      if (allLogs && allLogs.length > 0) {
+                        const formattedData = formatLogDataForExport(allLogs);
+                        const filename = `logs_all_export_${new Date().toISOString().split('T')[0]}.csv`;
+                        downloadCSV(formattedData, filename);
+                      } else {
+                        alert('No logs found to export');
+                      }
+                    } catch (error) {
+                      console.error('Error exporting all logs:', error);
+                      alert('Export all failed: ' + error.message);
+                    }
+                  }}
+                  className={`flex items-center px-3 py-2 border rounded-md transition-colors text-sm ${
+                    darkMode 
+                      ? 'border-blue-600 text-blue-300 hover:bg-blue-700 border-2' 
+                      : 'border-blue-500 text-blue-600 hover:bg-blue-50 border-2'
+                  }`}
+                >
+                  <Download className="w-4 h-4 mr-2" />
+                  Export All ({totalLogs})
+                </button>
+              </div>
             </div>
           </div>
           
           <div className="mt-4 flex border-b border-gray-200 dark:border-gray-700">
             <button
-              onClick={() => setActiveTab('all')}
+              onClick={() => handleTabChange('all')}
               className={`px-4 py-2 text-sm font-medium ${
                 activeTab === 'all' 
                   ? 'border-b-2 border-blue-500 text-blue-600 dark:text-blue-400' 
@@ -588,7 +633,7 @@ const Reports = () => {
               All
             </button>
             <button
-              onClick={() => setActiveTab('complete')}
+              onClick={() => handleTabChange('complete')}
               className={`px-4 py-2 text-sm font-medium ${
                 activeTab === 'complete' 
                   ? 'border-b-2 border-green-500 text-green-600 dark:text-green-400' 
@@ -598,7 +643,7 @@ const Reports = () => {
               Complete
             </button>
             <button
-              onClick={() => setActiveTab('draft')}
+              onClick={() => handleTabChange('draft')}
               className={`px-4 py-2 text-sm font-medium ${
                 activeTab === 'draft' 
                   ? 'border-b-2 border-yellow-500 text-yellow-600 dark:text-yellow-400' 
@@ -843,6 +888,19 @@ const Reports = () => {
               </div>
             )}
           </div>
+          
+          {/* Pagination */}
+          {totalLogs > 0 && (
+            <Pagination
+              currentPage={currentPage}
+              totalPages={Math.ceil(totalLogs / logsPerPage)}
+              totalItems={totalLogs}
+              itemsPerPage={logsPerPage}
+              onPageChange={handlePageChange}
+              darkMode={darkMode}
+              showItemCount={true}
+            />
+          )}
         </div>
       </div>
     </Layout>
