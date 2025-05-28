@@ -38,7 +38,17 @@ import {
 } from 'lucide-react';
 
 const AdminPortal = ({ darkMode, setDarkMode, selectedStation, setSelectedStation }) => {
-  const [adminActiveSection, setAdminActiveSection] = useState('overview');
+  // Initialize adminActiveSection from localStorage with default to 'overview'
+  const [adminActiveSection, setAdminActiveSection] = useState(() => {
+    return localStorage.getItem('adminActiveSection') || 'overview';
+  });
+  
+  // Helper function to update admin section and persist to localStorage
+  const updateAdminSection = (section) => {
+    setAdminActiveSection(section);
+    localStorage.setItem('adminActiveSection', section);
+  };
+  
   const [showUserModal, setShowUserModal] = useState(false);
   const [showStationModal, setShowStationModal] = useState(false);
   const [selectedUser, setSelectedUser] = useState(null);
@@ -60,6 +70,7 @@ const AdminPortal = ({ darkMode, setDarkMode, selectedStation, setSelectedStatio
   // Move user filter states to parent level to prevent resets  
   const [userRoleFilter, setUserRoleFilter] = useState('all');
   const [userStatusFilter, setUserStatusFilter] = useState('all');
+  const [userRankFilter, setUserRankFilter] = useState('all');
   
   // Pagination state for users
   const [currentUserPage, setCurrentUserPage] = useState(1);
@@ -75,8 +86,9 @@ const AdminPortal = ({ darkMode, setDarkMode, selectedStation, setSelectedStatio
   const auth = getAuth();
   const firestoreOperations = useContext(FirestoreContext);
 
+  // Initial authentication and setup effect
   useEffect(() => {
-    const fetchData = async () => {
+    const initializeComponent = async () => {
       try {
         setLoading(true);
         const user = auth.currentUser;
@@ -95,80 +107,138 @@ const AdminPortal = ({ darkMode, setDarkMode, selectedStation, setSelectedStatio
           return;
         }
 
-        // Fetch paginated users from Firestore
+        // Fix any users missing required fields for filtering
         try {
-          console.log(`Fetching paginated users - Page: ${currentUserPage}, Role: ${userRoleFilter}`);
-          
-          const paginatedResult = await firestoreOperations.getPaginatedUsers(
-            currentUserPage,
-            usersPerPage,
-            userRoleFilter === 'all' ? null : userRoleFilter,
-            null // No station filter for now
-          );
-          
-          if (paginatedResult.users && paginatedResult.users.length > 0) {
-            // Format data to match our component's expected structure
-            const formattedUsers = paginatedResult.users.map(user => ({
-              id: user.id || user.userId,
-              firstName: user.firstName || user.displayName?.split(' ')[0] || '',
-              lastName: user.lastName || user.displayName?.split(' ').slice(1).join(' ') || '',
-              email: user.email || '',
-              role: user.role || 'firefighter',
-              stationId: user.stationId || user.station || '',
-              status: user.status || 'active',
-              lastLogin: user.lastLogin || user.lastSignInTime || new Date().toISOString(),
-              createdAt: user.createdAt || user.creationTime || new Date().toISOString(),
-              permissions: user.permissions || []
-            }));
-            
-            setUsers(formattedUsers);
-            setTotalUsers(paginatedResult.totalUsers || 0);
-          } else {
-            // No users found
-            setUsers([]);
-            setTotalUsers(0);
+          const fixResult = await firestoreOperations.fixUserFieldsForFiltering();
+          if (fixResult.success && fixResult.fixedCount > 0) {
+            console.log(`Fixed ${fixResult.fixedCount} users with missing fields`);
           }
         } catch (error) {
-          console.error("Error fetching users:", error);
-          setError("Failed to load users.");
-          
-          // No fallback data, just empty array
-          setUsers([]);
-          setTotalUsers(0);
+          console.error('Error fixing user fields:', error);
         }
 
-
+        setLoading(false);
       } catch (error) {
-        console.error('Error fetching data:', error);
+        console.error('Error initializing component:', error);
         setError(error.message);
-      } finally {
         setLoading(false);
       }
     };
 
-    fetchData();
-  }, [auth, firestoreOperations, navigate, currentUserPage, userRoleFilter]);
+    initializeComponent();
+  }, [auth, firestoreOperations, navigate]);
 
-  // Fetch ALL stations for dropdowns (not paginated)
+  // Debug function to check actual user data structure
+  const debugUserData = async () => {
+    try {
+      const allUsers = await firestoreOperations.getAllUsers();
+      console.log('=== DEBUG: ALL USERS DATA ===');
+      console.log('Total users found:', allUsers.length);
+      allUsers.forEach((user, index) => {
+        console.log(`User ${index + 1}:`, {
+          id: user.id,
+          role: user.role,
+          status: user.status,
+          rank: user.rank,
+          firstName: user.firstName,
+          email: user.email
+        });
+      });
+      console.log('=== END DEBUG ===');
+    } catch (error) {
+      console.error('Debug error:', error);
+    }
+  };
+
+  // Separate effect for fetching users when filters or pagination change
   useEffect(() => {
-    const fetchAllStations = async () => {
+    const fetchUsers = async () => {
+      if (!auth.currentUser) return;
+
       try {
-        const stationsData = await firestoreOperations.getStations();
-        const formattedAllStations = stationsData.map(station => ({
-          id: station.id,
-          number: station.number || station.id.replace('s', ''),
-          name: station.name || `Station ${station.number || ''}`,
-          address: station.address || '',
-          phone: station.phone || ''
-        }));
-        console.log(`[DEBUG] Loaded ${formattedAllStations.length} stations for dropdowns:`, formattedAllStations);
-        setAllStations(formattedAllStations);
+        // Call debug function to see actual data
+        await debugUserData();
+        
+        console.log('Fetching users with filters:', {
+          page: currentUserPage,
+          role: userRoleFilter,
+          status: userStatusFilter,
+          rank: userRankFilter
+        });
+
+        const paginatedResult = await firestoreOperations.getPaginatedUsers(
+          currentUserPage,
+          usersPerPage,
+          userRoleFilter === 'all' ? null : userRoleFilter,
+          null, // No station filter for now
+          userStatusFilter === 'all' ? null : userStatusFilter,
+          userRankFilter === 'all' ? null : userRankFilter
+        );
+        
+        console.log('Received users result:', paginatedResult);
+        
+        // Show notification if using client-side filtering
+        if (paginatedResult.clientSideFiltered) {
+          showStatusMessage("Using client-side filtering (Firestore indexes pending)", "info");
+        }
+        
+        if (paginatedResult.users) {
+          // Format data to match our component's expected structure
+          const formattedUsers = paginatedResult.users.map(user => ({
+            id: user.id || user.userId,
+            firstName: user.firstName || user.displayName?.split(' ')[0] || '',
+            lastName: user.lastName || user.displayName?.split(' ').slice(1).join(' ') || '',
+            email: user.email || '',
+            role: user.role || 'firefighter',
+            rank: user.rank || 'Firefighter',
+            stationId: user.stationId || user.station || '',
+            status: user.status || 'active',
+            lastLogin: user.lastLogin || user.lastSignInTime || new Date().toISOString(),
+            createdAt: user.createdAt || user.creationTime || new Date().toISOString(),
+            permissions: user.permissions || []
+          }));
+          
+          console.log('Setting formatted users:', formattedUsers.length);
+          setUsers(formattedUsers);
+          setTotalUsers(paginatedResult.totalUsers || 0);
+        } else {
+          // No users found
+          setUsers([]);
+          setTotalUsers(0);
+        }
       } catch (error) {
-        console.error("Error fetching all stations:", error);
-        setAllStations([]);
+        console.error("Error fetching users:", error);
+        setError("Failed to load users.");
+        
+        // No fallback data, just empty array
+        setUsers([]);
+        setTotalUsers(0);
       }
     };
 
+    fetchUsers();
+  }, [auth, firestoreOperations, currentUserPage, userRoleFilter, userStatusFilter, userRankFilter, usersPerPage]);
+
+  // Function to fetch ALL stations for dropdowns (reusable)
+  const fetchAllStations = async () => {
+    try {
+      const stationsData = await firestoreOperations.getStations();
+      const formattedAllStations = stationsData.map(station => ({
+        id: station.id,
+        number: station.number || station.id.replace('s', ''),
+        name: station.name || `Station ${station.number || ''}`,
+        address: station.address || '',
+        phone: station.phone || ''
+      }));
+      setAllStations(formattedAllStations);
+    } catch (error) {
+      console.error("Error fetching all stations:", error);
+      setAllStations([]);
+    }
+  };
+
+  // Fetch ALL stations for dropdowns (not paginated)
+  useEffect(() => {
     fetchAllStations();
   }, [firestoreOperations]);
 
@@ -228,7 +298,20 @@ const AdminPortal = ({ darkMode, setDarkMode, selectedStation, setSelectedStatio
 
   // Handle user role filter change
   const handleUserRoleFilterChange = (role) => {
+    console.log('Role filter changed to:', role);
     setUserRoleFilter(role);
+    setCurrentUserPage(1); // Reset to first page when filter changes
+  };
+
+  const handleUserStatusFilterChange = (status) => {
+    console.log('Status filter changed to:', status);
+    setUserStatusFilter(status);
+    setCurrentUserPage(1); // Reset to first page when filter changes
+  };
+
+  const handleUserRankFilterChange = (rank) => {
+    console.log('Rank filter changed to:', rank);
+    setUserRankFilter(rank);
     setCurrentUserPage(1); // Reset to first page when filter changes
   };
 
@@ -287,7 +370,7 @@ const AdminPortal = ({ darkMode, setDarkMode, selectedStation, setSelectedStatio
     <div className={`${darkMode ? 'bg-gray-800' : 'bg-white'} border-b ${darkMode ? 'border-gray-700' : 'border-gray-200'} mb-4 md:mb-6`}>
       <div className="flex overflow-x-auto scrollbar-hide">
         <button
-          onClick={() => setAdminActiveSection('overview')}
+          onClick={() => updateAdminSection('overview')}
           className={`px-3 md:px-6 py-3 flex items-center whitespace-nowrap text-sm md:text-base ${
             adminActiveSection === 'overview' 
               ? `${darkMode ? 'bg-gray-700 text-blue-400 font-medium border-b-2 border-blue-500' : 'bg-blue-50 text-blue-600 font-medium border-b-2 border-blue-600'}` 
@@ -299,7 +382,7 @@ const AdminPortal = ({ darkMode, setDarkMode, selectedStation, setSelectedStatio
           <span className="sm:hidden">Overview</span>
         </button>
         <button
-          onClick={() => setAdminActiveSection('users')}
+          onClick={() => updateAdminSection('users')}
           className={`px-3 md:px-6 py-3 flex items-center whitespace-nowrap text-sm md:text-base ${
             adminActiveSection === 'users' 
               ? `${darkMode ? 'bg-gray-700 text-blue-400 font-medium border-b-2 border-blue-500' : 'bg-blue-50 text-blue-600 font-medium border-b-2 border-blue-600'}` 
@@ -310,7 +393,7 @@ const AdminPortal = ({ darkMode, setDarkMode, selectedStation, setSelectedStatio
           <span>Users</span>
         </button>
         <button
-          onClick={() => setAdminActiveSection('stations')}
+          onClick={() => updateAdminSection('stations')}
           className={`px-3 md:px-6 py-3 flex items-center whitespace-nowrap text-sm md:text-base ${
             adminActiveSection === 'stations' 
               ? `${darkMode ? 'bg-gray-700 text-blue-400 font-medium border-b-2 border-blue-500' : 'bg-blue-50 text-blue-600 font-medium border-b-2 border-blue-600'}` 
@@ -321,7 +404,7 @@ const AdminPortal = ({ darkMode, setDarkMode, selectedStation, setSelectedStatio
           <span>Stations</span>
         </button>
         <button
-          onClick={() => setAdminActiveSection('reports')}
+          onClick={() => updateAdminSection('reports')}
           className={`px-3 md:px-6 py-3 flex items-center whitespace-nowrap text-sm md:text-base ${
             adminActiveSection === 'reports' || adminActiveSection === 'analytics'
               ? `${darkMode ? 'bg-gray-700 text-blue-400 font-medium border-b-2 border-blue-500' : 'bg-blue-50 text-blue-600 font-medium border-b-2 border-blue-600'}` 
@@ -502,19 +585,16 @@ const AdminPortal = ({ darkMode, setDarkMode, selectedStation, setSelectedStatio
     const [userSearchTerm, setUserSearchTerm] = useState('');
     
     // With server-side pagination, we use the users directly from the paginated results
-    // Role filtering is handled on the server, but we can still do client-side search and status filtering
+    // Server-side filtering is handled by the API, only apply client-side search
     const filteredUsers = users.filter(user => {
-      // Text search filter (client-side for now)
+      // Only apply text search filter client-side
       const matchesSearch = userSearchTerm === '' || 
         user.firstName.toLowerCase().includes(userSearchTerm.toLowerCase()) ||
         user.lastName.toLowerCase().includes(userSearchTerm.toLowerCase()) ||
         user.email.toLowerCase().includes(userSearchTerm.toLowerCase()) ||
         user.role.toLowerCase().includes(userSearchTerm.toLowerCase());
       
-      // Status filter (client-side for now) 
-      const matchesStatus = userStatusFilter === 'all' || user.status === userStatusFilter;
-      
-      return matchesSearch && matchesStatus;
+      return matchesSearch;
     });
     
     const handleCreateUser = () => {
@@ -576,81 +656,159 @@ const AdminPortal = ({ darkMode, setDarkMode, selectedStation, setSelectedStatio
 
         <div className={`${darkMode ? 'bg-gray-800' : 'bg-white'} rounded-lg shadow`}>
           <div className={`p-4 border-b ${darkMode ? 'border-gray-700' : 'border-gray-200'}`}>
-            <div className="flex flex-col space-y-4">
+            <div className="space-y-6">
               {/* Search Bar */}
-              <div className="relative">
-                <Search className={`w-4 h-4 absolute left-3 top-3 ${darkMode ? 'text-gray-400' : 'text-gray-400'}`} />
+              <div className="relative max-w-md">
+                <Search className={`w-5 h-5 absolute left-3 top-3 ${darkMode ? 'text-gray-400' : 'text-gray-400'}`} />
                 <input
                   type="text"
-                  placeholder="Search users..."
-                  className={`w-full pl-10 pr-4 py-2 border ${darkMode ? 'bg-gray-700 border-gray-600 text-gray-200 placeholder-gray-400' : 'bg-white border-gray-300 text-gray-700 placeholder-gray-400'} rounded-md`}
+                  placeholder="Search users by name, email, or role..."
+                  className={`w-full pl-11 pr-4 py-3 border ${darkMode ? 'bg-gray-700 border-gray-600 text-gray-200 placeholder-gray-400 focus:border-blue-500' : 'bg-white border-gray-300 text-gray-700 placeholder-gray-400 focus:border-blue-500'} rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-opacity-50`}
                   value={userSearchTerm}
                   onChange={(e) => setUserSearchTerm(e.target.value)}
                 />
               </div>
               
-              {/* Filters and Export */}
-              <div className="flex flex-wrap items-center gap-4">
-                <div className="flex items-center space-x-2">
-                  <Filter className={`w-4 h-4 ${darkMode ? 'text-gray-400' : 'text-gray-500'}`} />
-                  <span className={`text-sm font-medium ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>Filters:</span>
+              {/* Filters Section */}
+              <div className={`${darkMode ? 'bg-gray-750' : 'bg-gray-50'} rounded-lg p-4`}>
+                <div className="flex items-center mb-3">
+                  <Filter className={`w-5 h-5 ${darkMode ? 'text-blue-400' : 'text-blue-500'} mr-2`} />
+                  <h3 className={`text-lg font-semibold ${darkMode ? 'text-white' : 'text-gray-900'}`}>Filters</h3>
                 </div>
                 
-                {/* Role Filter */}
-                <select
-                  value={userRoleFilter}
-                  onChange={(e) => handleUserRoleFilterChange(e.target.value)}
-                  className={`px-3 py-2 border rounded-md text-sm ${
-                    darkMode 
-                      ? 'bg-gray-700 border-gray-600 text-gray-200' 
-                      : 'bg-white border-gray-300 text-gray-700'
-                  }`}
-                >
-                  <option value="all">All Roles</option>
-                  <option value="admin">Admin</option>
-                  <option value="firefighter">Firefighter</option>
-                </select>
+                <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-4">
+                  {/* Role Filter */}
+                  <div className="space-y-2">
+                    <label className={`block text-sm font-medium ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>
+                      Role
+                    </label>
+                    <select
+                      value={userRoleFilter}
+                      onChange={(e) => handleUserRoleFilterChange(e.target.value)}
+                      className={`w-full px-3 py-2 border rounded-lg text-sm transition-colors ${
+                        darkMode 
+                          ? 'bg-gray-700 border-gray-600 text-gray-200 focus:border-blue-500' 
+                          : 'bg-white border-gray-300 text-gray-700 focus:border-blue-500'
+                      } focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-opacity-50`}
+                    >
+                      <option value="all">All Roles</option>
+                      <option value="admin">Admin</option>
+                      <option value="firefighter">Firefighter</option>
+                    </select>
+                  </div>
+                  
+                  {/* Status Filter */}
+                  <div className="space-y-2">
+                    <label className={`block text-sm font-medium ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>
+                      Status
+                    </label>
+                    <select
+                      value={userStatusFilter}
+                      onChange={(e) => handleUserStatusFilterChange(e.target.value)}
+                      className={`w-full px-3 py-2 border rounded-lg text-sm transition-colors ${
+                        darkMode 
+                          ? 'bg-gray-700 border-gray-600 text-gray-200 focus:border-blue-500' 
+                          : 'bg-white border-gray-300 text-gray-700 focus:border-blue-500'
+                      } focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-opacity-50`}
+                    >
+                      <option value="all">All Status</option>
+                      <option value="active">Active</option>
+                      <option value="inactive">Inactive</option>
+                    </select>
+                  </div>
+
+                  {/* Rank Filter */}
+                  <div className="space-y-2">
+                    <label className={`block text-sm font-medium ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>
+                      Rank
+                    </label>
+                    <select
+                      value={userRankFilter}
+                      onChange={(e) => handleUserRankFilterChange(e.target.value)}
+                      className={`w-full px-3 py-2 border rounded-lg text-sm transition-colors ${
+                        darkMode 
+                          ? 'bg-gray-700 border-gray-600 text-gray-200 focus:border-blue-500' 
+                          : 'bg-white border-gray-300 text-gray-700 focus:border-blue-500'
+                      } focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-opacity-50`}
+                    >
+                      <option value="all">All Ranks</option>
+                      <option value="Firefighter">Firefighter</option>
+                      <option value="Captain">Captain</option>
+                      <option value="Deputy Chief">Deputy Chief</option>
+                      <option value="Battalion Chief">Battalion Chief</option>
+                      <option value="Chief">Chief</option>
+                    </select>
+                  </div>
+                  
+                  {/* Clear Filters Button */}
+                  <div className="space-y-2">
+                    <label className="block text-sm font-medium text-transparent">Actions</label>
+                    {(userRoleFilter !== 'all' || userStatusFilter !== 'all' || userRankFilter !== 'all') && (
+                      <button
+                        onClick={() => {
+                          setUserRoleFilter('all');
+                          setUserStatusFilter('all');
+                          setUserRankFilter('all');
+                        }}
+                        className={`w-full px-3 py-2 text-sm border rounded-lg transition-all duration-200 ${
+                          darkMode 
+                            ? 'border-red-600 text-red-400 hover:bg-red-600 hover:text-white' 
+                            : 'border-red-500 text-red-600 hover:bg-red-500 hover:text-white'
+                        } focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-opacity-50`}
+                      >
+                        Clear Filters
+                      </button>
+                    )}
+                  </div>
+                </div>
                 
-                {/* Status Filter */}
-                <select
-                  value={userStatusFilter}
-                  onChange={(e) => setUserStatusFilter(e.target.value)}
-                  className={`px-3 py-2 border rounded-md text-sm ${
-                    darkMode 
-                      ? 'bg-gray-700 border-gray-600 text-gray-200' 
-                      : 'bg-white border-gray-300 text-gray-700'
-                  }`}
-                >
-                  <option value="all">All Status</option>
-                  <option value="active">Active</option>
-                  <option value="inactive">Inactive</option>
-                </select>
-                
-                {/* Clear Filters Button */}
-                {(userRoleFilter !== 'all' || userStatusFilter !== 'all' || userSearchTerm !== '') && (
-                  <button
-                    onClick={() => {
-                      setUserRoleFilter('all');
-                      setUserStatusFilter('all');
-                      setUserSearchTerm('');
-                    }}
-                    className={`px-3 py-2 text-sm border rounded-md transition-colors ${
-                      darkMode 
-                        ? 'border-gray-600 text-gray-300 hover:bg-gray-700' 
-                        : 'border-gray-300 text-gray-700 hover:bg-gray-50'
-                    }`}
-                  >
-                    Clear Filters
-                  </button>
+                {/* Active Filters Display */}
+                {(userRoleFilter !== 'all' || userStatusFilter !== 'all' || userRankFilter !== 'all') && (
+                  <div className="mt-4 flex flex-wrap gap-2">
+                    <span className={`text-sm ${darkMode ? 'text-gray-300' : 'text-gray-600'}`}>Active filters:</span>
+                    {userRoleFilter !== 'all' && (
+                      <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
+                        darkMode ? 'bg-blue-900 text-blue-200' : 'bg-blue-100 text-blue-800'
+                      }`}>
+                        Role: {userRoleFilter}
+                      </span>
+                    )}
+                    {userStatusFilter !== 'all' && (
+                      <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
+                        darkMode ? 'bg-green-900 text-green-200' : 'bg-green-100 text-green-800'
+                      }`}>
+                        Status: {userStatusFilter}
+                      </span>
+                    )}
+                    {userRankFilter !== 'all' && (
+                      <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
+                        darkMode ? 'bg-purple-900 text-purple-200' : 'bg-purple-100 text-purple-800'
+                      }`}>
+                        Rank: {userRankFilter}
+                      </span>
+                    )}
+                  </div>
                 )}
-                
+              </div>
+              
+              {/* Results and Export Section */}
+              <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
                 {/* Results Count */}
-                <span className={`text-sm ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>
-                  Showing {users.length} of {totalUsers} users
-                </span>
+                <div className="flex items-center space-x-2">
+                  <span className={`text-sm font-medium ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>
+                    Showing {filteredUsers.length} of {totalUsers} users
+                  </span>
+                  {(userRoleFilter !== 'all' || userStatusFilter !== 'all' || userRankFilter !== 'all' || userSearchTerm !== '') && (
+                    <span className={`text-xs px-2 py-1 rounded-full ${
+                      darkMode ? 'bg-yellow-900 text-yellow-200' : 'bg-yellow-100 text-yellow-800'
+                    }`}>
+                      Filtered
+                    </span>
+                  )}
+                </div>
                 
                 {/* Export Buttons */}
-                <div className="ml-auto flex space-x-2">
+                <div className="flex space-x-3">
                   {/* Export Current Page */}
                   <button 
                     onClick={(e) => {
@@ -678,14 +836,14 @@ const AdminPortal = ({ darkMode, setDarkMode, selectedStation, setSelectedStatio
                       
                       performExport();
                     }}
-                    className={`flex items-center px-3 py-2 border rounded-md transition-colors ${
+                    className={`flex items-center px-4 py-2 border rounded-lg transition-all duration-200 ${
                       darkMode 
-                        ? 'border-gray-600 text-gray-300 hover:bg-gray-700' 
-                        : 'border-gray-300 text-gray-700 hover:bg-gray-50'
-                    }`}
+                        ? 'border-blue-600 text-blue-300 hover:bg-blue-600 hover:text-white hover:border-blue-500' 
+                        : 'border-blue-500 text-blue-600 hover:bg-blue-500 hover:text-white'
+                    } focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-opacity-50`}
                   >
                     <Download className="w-4 h-4 mr-2" />
-                    Export Page ({users.length})
+                    Export Page ({filteredUsers.length})
                   </button>
 
                   {/* Export All */}
@@ -738,11 +896,11 @@ const AdminPortal = ({ darkMode, setDarkMode, selectedStation, setSelectedStatio
                       
                       await performExportAll();
                     }}
-                    className={`flex items-center px-3 py-2 border rounded-md transition-colors ${
+                    className={`flex items-center px-4 py-2 border rounded-lg transition-all duration-200 ${
                       darkMode 
-                        ? 'border-blue-600 text-blue-300 hover:bg-blue-700 border-2' 
-                        : 'border-blue-500 text-blue-600 hover:bg-blue-50 border-2'
-                    }`}
+                        ? 'border-green-600 text-green-300 hover:bg-green-600 hover:text-white hover:border-green-500' 
+                        : 'border-green-500 text-green-600 hover:bg-green-500 hover:text-white'
+                    } focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-opacity-50`}
                   >
                     <Download className="w-4 h-4 mr-2" />
                     Export All ({totalUsers})
@@ -762,6 +920,9 @@ const AdminPortal = ({ darkMode, setDarkMode, selectedStation, setSelectedStatio
                     </th>
                     <th className={`px-6 py-3 text-left text-xs font-medium ${darkMode ? 'text-gray-300' : 'text-gray-500'} uppercase tracking-wider`}>
                       Role
+                    </th>
+                    <th className={`px-6 py-3 text-left text-xs font-medium ${darkMode ? 'text-gray-300' : 'text-gray-500'} uppercase tracking-wider`}>
+                      Rank
                     </th>
                     <th className={`px-6 py-3 text-left text-xs font-medium ${darkMode ? 'text-gray-300' : 'text-gray-500'} uppercase tracking-wider`}>
                       Station
@@ -797,6 +958,9 @@ const AdminPortal = ({ darkMode, setDarkMode, selectedStation, setSelectedStatio
                         <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getRoleColor(user.role)}`}>
                           {user.role}
                         </span>
+                      </td>
+                      <td className={`px-6 py-4 whitespace-nowrap text-sm ${darkMode ? 'text-gray-300' : 'text-gray-900'}`}>
+                        {user.rank || 'Firefighter'}
                       </td>
                       <td className={`px-6 py-4 whitespace-nowrap text-sm ${darkMode ? 'text-gray-300' : 'text-gray-900'}`}>
                         {getStationName(user.stationId)}
@@ -1016,9 +1180,7 @@ const AdminPortal = ({ darkMode, setDarkMode, selectedStation, setSelectedStatio
                   }
                 };
                 
-                await refreshStations();
-                
-                // Show detailed success message
+                // Show success message then reload page to refresh all data
                 let successMsg = `${stationName} deleted successfully.`;
                 if (result.affected) {
                   const { users, logs, assessments } = result.affected;
@@ -1027,6 +1189,11 @@ const AdminPortal = ({ darkMode, setDarkMode, selectedStation, setSelectedStatio
                   if (assessments > 0) successMsg += ` Archived ${assessments} assessment(s).`;
                 }
                 showStatusMessage(successMsg, "success");
+                
+                // Reload page after short delay to show success message
+                setTimeout(() => {
+                  window.location.reload();
+                }, 1500);
               } else {
                 // Hide processing message
                 setStatusMessage(prev => ({ ...prev, visible: false }));
@@ -1363,7 +1530,7 @@ const AdminPortal = ({ darkMode, setDarkMode, selectedStation, setSelectedStatio
 
     const handleViewUserActivity = () => {
       // Navigate to analytics section
-      setAdminActiveSection('analytics');
+      updateAdminSection('analytics');
     };
 
     return (
@@ -1501,7 +1668,7 @@ const AdminPortal = ({ darkMode, setDarkMode, selectedStation, setSelectedStatio
         <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4">
           <div className="flex items-center">
             <button 
-              onClick={() => setAdminActiveSection('reports')}
+              onClick={() => updateAdminSection('reports')}
               className={`mr-3 md:mr-4 p-2 rounded-full ${darkMode ? 'hover:bg-gray-700' : 'hover:bg-gray-100'}`}
             >
               <ArrowLeft className={`h-5 w-5 ${darkMode ? 'text-gray-400' : 'text-gray-600'}`} />
@@ -2049,8 +2216,10 @@ const AdminPortal = ({ darkMode, setDarkMode, selectedStation, setSelectedStatio
                 }
               };
               
-              await refreshStations();
-              setShowStationModal(false);
+              // Reload page after short delay to show success message
+              setTimeout(() => {
+                window.location.reload();
+              }, 1500);
             } else {
               console.error("Failed to save station");
             }

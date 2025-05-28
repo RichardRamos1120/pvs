@@ -328,56 +328,119 @@ const App = () => {
     },
 
     // Get paginated users  
-    getPaginatedUsers: async (page = 1, usersPerPage = 20, roleFilter = null, stationFilter = null) => {
+    getPaginatedUsers: async (page = 1, usersPerPage = 20, roleFilter = null, stationFilter = null, statusFilter = null, rankFilter = null) => {
       try {
+        console.log('API getPaginatedUsers called with:', { page, usersPerPage, roleFilter, stationFilter, statusFilter, rankFilter });
+        
         const usersRef = collection(db, "users");
-        let baseQuery = usersRef;
-
-        // Build query conditions
-        const conditions = [orderBy("createdAt", "desc")];
         
-        if (roleFilter && roleFilter !== 'all') {
-          conditions.unshift(where("role", "==", roleFilter));
-        }
-        
-        if (stationFilter && stationFilter !== 'all') {
-          conditions.unshift(where("station", "==", stationFilter));
-        }
-
-        // Get total count
-        const countQuery = query(baseQuery, ...conditions.filter(c => c.type !== 'orderBy'));
-        const countSnapshot = await getCountFromServer(countQuery);
-        const totalUsers = countSnapshot.data().count;
-
-        // Get paginated data
-        const offset = (page - 1) * usersPerPage;
-        const paginatedQuery = query(baseQuery, ...conditions, limit(usersPerPage));
-
-        let finalQuery = paginatedQuery;
-        if (offset > 0) {
-          const prevPageQuery = query(baseQuery, ...conditions, limit(offset));
-          const prevPageSnapshot = await getDocs(prevPageQuery);
-          const lastDoc = prevPageSnapshot.docs[prevPageSnapshot.docs.length - 1];
+        // Try server-side filtering first, fall back to client-side if indexes are missing
+        try {
+          // Build query conditions
+          const conditions = [orderBy("createdAt", "desc")];
           
-          if (lastDoc) {
-            finalQuery = query(baseQuery, ...conditions, startAfter(lastDoc), limit(usersPerPage));
+          if (roleFilter && roleFilter !== 'all') {
+            console.log('Adding role filter:', roleFilter);
+            conditions.unshift(where("role", "==", roleFilter));
           }
+          
+          if (stationFilter && stationFilter !== 'all') {
+            console.log('Adding station filter:', stationFilter);
+            conditions.unshift(where("station", "==", stationFilter));
+          }
+          
+          if (statusFilter && statusFilter !== 'all') {
+            console.log('Adding status filter:', statusFilter);
+            conditions.unshift(where("status", "==", statusFilter));
+          }
+          
+          if (rankFilter && rankFilter !== 'all') {
+            console.log('Adding rank filter:', rankFilter);
+            conditions.unshift(where("rank", "==", rankFilter));
+          }
+
+          console.log('Trying server-side filtering with', conditions.length, 'conditions');
+
+          // Get total count
+          const countQuery = query(usersRef, ...conditions.filter(c => c.type !== 'orderBy'));
+          const countSnapshot = await getCountFromServer(countQuery);
+          const totalUsers = countSnapshot.data().count;
+
+          // Get paginated data
+          const offset = (page - 1) * usersPerPage;
+          const paginatedQuery = query(usersRef, ...conditions, limit(usersPerPage));
+
+          let finalQuery = paginatedQuery;
+          if (offset > 0) {
+            const prevPageQuery = query(usersRef, ...conditions, limit(offset));
+            const prevPageSnapshot = await getDocs(prevPageQuery);
+            const lastDoc = prevPageSnapshot.docs[prevPageSnapshot.docs.length - 1];
+            
+            if (lastDoc) {
+              finalQuery = query(usersRef, ...conditions, startAfter(lastDoc), limit(usersPerPage));
+            }
+          }
+
+          const snapshot = await getDocs(finalQuery);
+          const usersList = snapshot.docs.map(doc => ({
+            id: doc.id,
+            ...doc.data()
+          }));
+
+          console.log('Server-side filtering successful:', usersList.length, 'users returned');
+
+          return {
+            users: usersList,
+            totalUsers,
+            totalPages: Math.ceil(totalUsers / usersPerPage),
+            currentPage: page,
+            hasNextPage: offset + usersPerPage < totalUsers,
+            hasPrevPage: page > 1
+          };
+
+        } catch (serverError) {
+          console.warn('Server-side filtering failed, falling back to client-side:', serverError.message);
+          
+          // Fall back to client-side filtering
+          console.log('Falling back to client-side filtering...');
+          const allUsersSnapshot = await getDocs(query(usersRef, orderBy("createdAt", "desc")));
+          let allUsers = allUsersSnapshot.docs.map(doc => ({
+            id: doc.id,
+            ...doc.data()
+          }));
+
+          // Apply client-side filters
+          const filteredUsers = allUsers.filter(user => {
+            // Ensure all required fields exist with defaults
+            const userRole = user.role || 'firefighter';
+            const userStatus = user.status || 'active';
+            const userRank = user.rank || 'Firefighter';
+            
+            const matchesRole = !roleFilter || roleFilter === 'all' || userRole === roleFilter;
+            const matchesStatus = !statusFilter || statusFilter === 'all' || userStatus === statusFilter;
+            const matchesRank = !rankFilter || rankFilter === 'all' || userRank === rankFilter;
+            const matchesStation = !stationFilter || stationFilter === 'all' || user.stationId === stationFilter || user.station === stationFilter;
+            
+            return matchesRole && matchesStatus && matchesRank && matchesStation;
+          });
+
+          console.log('Client-side filtering complete:', filteredUsers.length, 'users match filters');
+
+          // Apply pagination client-side
+          const totalUsers = filteredUsers.length;
+          const offset = (page - 1) * usersPerPage;
+          const paginatedUsers = filteredUsers.slice(offset, offset + usersPerPage);
+
+          return {
+            users: paginatedUsers,
+            totalUsers,
+            totalPages: Math.ceil(totalUsers / usersPerPage),
+            currentPage: page,
+            hasNextPage: offset + usersPerPage < totalUsers,
+            hasPrevPage: page > 1,
+            clientSideFiltered: true // Flag to indicate fallback was used
+          };
         }
-
-        const snapshot = await getDocs(finalQuery);
-        const usersList = snapshot.docs.map(doc => ({
-          id: doc.id,
-          ...doc.data()
-        }));
-
-        return {
-          users: usersList,
-          totalUsers,
-          totalPages: Math.ceil(totalUsers / usersPerPage),
-          currentPage: page,
-          hasNextPage: offset + usersPerPage < totalUsers,
-          hasPrevPage: page > 1
-        };
       } catch (error) {
         console.error("Error getting paginated users:", error);
         return {
@@ -668,6 +731,66 @@ const App = () => {
       } catch (error) {
         console.error("Error getting all users:", error);
         return [];
+      }
+    },
+
+    // Fix users missing required fields for filtering
+    fixUserFieldsForFiltering: async () => {
+      try {
+        console.log("Checking and fixing user fields for filtering...");
+        const usersRef = collection(db, "users");
+        const snapshot = await getDocs(usersRef);
+        
+        let fixedCount = 0;
+        const batch = [];
+        
+        for (const userDoc of snapshot.docs) {
+          const userData = userDoc.data();
+          const userId = userDoc.id;
+          
+          let needsUpdate = false;
+          const updates = {};
+          
+          // Ensure role field exists
+          if (!userData.role) {
+            updates.role = 'firefighter';
+            needsUpdate = true;
+            console.log(`Adding missing role for user ${userId}`);
+          }
+          
+          // Ensure status field exists
+          if (!userData.status) {
+            updates.status = 'active';
+            needsUpdate = true;
+            console.log(`Adding missing status for user ${userId}`);
+          }
+          
+          // Ensure rank field exists
+          if (!userData.rank) {
+            updates.rank = 'Firefighter';
+            needsUpdate = true;
+            console.log(`Adding missing rank for user ${userId}`);
+          }
+          
+          // Ensure createdAt field exists
+          if (!userData.createdAt) {
+            updates.createdAt = serverTimestamp();
+            needsUpdate = true;
+            console.log(`Adding missing createdAt for user ${userId}`);
+          }
+          
+          if (needsUpdate) {
+            const userRef = doc(db, "users", userId);
+            await updateDoc(userRef, updates);
+            fixedCount++;
+          }
+        }
+        
+        console.log(`Fixed ${fixedCount} users with missing fields`);
+        return { success: true, fixedCount };
+      } catch (error) {
+        console.error("Error fixing user fields:", error);
+        return { success: false, error: error.message };
       }
     },
     

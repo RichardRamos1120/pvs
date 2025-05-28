@@ -86,8 +86,8 @@ const TodayLog = () => {
   const [saveSuccess, setSaveSuccess] = useState(false);
   // States for crew management
   const [showCrewModal, setShowCrewModal] = useState(false);
-  const [availableFirefighters, setAvailableFirefighters] = useState([]);
-  const [filteredFirefighters, setFilteredFirefighters] = useState([]);
+  const [availableFirefighters, setAvailableFirefighters] = useState([]); // Now includes all users (firefighters, admins, etc.)
+  const [filteredFirefighters, setFilteredFirefighters] = useState([]); // Now includes all users
   const [selectedCrew, setSelectedCrew] = useState([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [stationFilter, setStationFilter] = useState('all');
@@ -270,29 +270,29 @@ const TodayLog = () => {
     if (showCrewModal) {
       const fetchFirefighters = async () => {
         try {
-          // Get all firefighters by role without station filter
-          const firefighters = await firestoreOperations.getUsersByRole('firefighter');
-          setAvailableFirefighters(firefighters);
-          setFilteredFirefighters(firefighters);
+          // Get ALL users regardless of role (firefighters, admins, etc.)
+          const allUsers = await firestoreOperations.getAllUsers();
+          setAvailableFirefighters(allUsers);
+          setFilteredFirefighters(allUsers);
           
           // If we have existing crew but no crewIds (backwards compatibility),
           // try to convert crew names to IDs
           if (todayLog && todayLog.crew && todayLog.crew.length > 0 && (!todayLog.crewIds || todayLog.crewIds.length === 0)) {
             const matchedIds = [];
             todayLog.crew.forEach(crewName => {
-              const firefighter = firefighters.find(f => 
+              const user = allUsers.find(f => 
                 (f.displayName && f.displayName === crewName) ||
                 (f.firstName && f.lastName && `${f.firstName} ${f.lastName}` === crewName) ||
                 (f.firstName && f.firstName === crewName)
               );
-              if (firefighter) {
-                matchedIds.push(firefighter.id);
+              if (user) {
+                matchedIds.push(user.id);
               }
             });
             setSelectedCrew(matchedIds);
           }
         } catch (error) {
-          console.error("Error fetching firefighters:", error);
+          console.error("Error fetching users for crew selection:", error);
         }
       };
 
@@ -689,10 +689,10 @@ const TodayLog = () => {
       
       // Convert crew IDs to names for display
       const crewNames = crewIds.map(id => {
-        const firefighter = availableFirefighters.find(f => f.id === id);
-        return firefighter ? 
-          (firefighter.displayName || firefighter.firstName || 'Unknown User') + 
-          (firefighter.lastName ? ` ${firefighter.lastName}` : '') 
+        const user = availableFirefighters.find(f => f.id === id);
+        return user ? 
+          (user.displayName || user.firstName || 'Unknown User') + 
+          (user.lastName ? ` ${user.lastName}` : '') 
           : 'Unknown User';
       });
 
