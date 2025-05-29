@@ -5,7 +5,7 @@ import { getAuth } from 'firebase/auth';
 import { FirestoreContext } from '../App';
 import Layout from './Layout';
 import { getFirestore, collection, query, where, getDocs } from 'firebase/firestore';
-import { getTodayFormattedPST, formatTimeRangePST } from '../utils/timezone';
+import { getTodayFormattedPST, formatTimeRangePST, getCurrentPSTDate } from '../utils/timezone';
 import {
   Plus,
   Check,
@@ -152,11 +152,20 @@ const TodayLog = () => {
       const formattedToday = getTodayFormattedPST();
       const today = new Date();
 
+      // Determine current shift based on time of day
+      const currentHour = getCurrentPSTDate().getHours();
+      let currentShift;
+      if (currentHour >= 6 && currentHour < 18) {
+        currentShift = "Day Shift";
+      } else {
+        currentShift = "Night Shift";
+      }
+
       const newLog = {
         date: formattedToday,
         rawDate: today.toISOString(),
         station: selectedStation,
-        shift: "B",
+        shift: currentShift,
         crew: [],
         crewIds: [],
         activities: [],
@@ -887,7 +896,7 @@ const TodayLog = () => {
               <div>
                 <h2 className="text-xl font-bold text-gray-900 dark:text-white">{todayLog.date} - Daily Activity Log</h2>
                 <p className="text-sm text-gray-500 dark:text-gray-400">
-                  {todayLog.station} • {todayLog.shift} Shift
+                  {todayLog.station} • {todayLog.shift === "B" ? "Day Shift" : todayLog.shift}
                   {readOnlyMode && (
                     <span className="ml-2 inline-flex items-center text-xs text-amber-500">
                       <Eye className="h-3 w-3 mr-1" /> View Only
@@ -1061,6 +1070,26 @@ const TodayLog = () => {
                                   <span className="text-gray-500 dark:text-gray-400">Document Type:</span> {activity.details.documentType}
                                 </div>
                               )}
+                            </div>
+                          )}
+
+                          {/* Display assigned crew for this activity */}
+                          {activity.assignedCrewNames && activity.assignedCrewNames.length > 0 && (
+                            <div className="mt-3 text-sm">
+                              <div className="flex items-center mb-2">
+                                <Users className="h-4 w-4 text-gray-500 dark:text-gray-400 mr-1" />
+                                <span className="text-gray-500 dark:text-gray-400 font-medium">Assigned Crew ({activity.assignedCrewNames.length}):</span>
+                              </div>
+                              <div className="flex flex-wrap gap-1">
+                                {activity.assignedCrewNames.map((name, idx) => (
+                                  <span
+                                    key={idx}
+                                    className="inline-flex items-center px-2 py-1 bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-200 text-xs rounded-md"
+                                  >
+                                    {name}
+                                  </span>
+                                ))}
+                              </div>
                             </div>
                           )}
 

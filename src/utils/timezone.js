@@ -48,30 +48,76 @@ export const convertToPST = (date) => {
  * Format date for display in PST
  */
 export const formatDatePST = (date, options = {}) => {
-  const pstDate = convertToPST(date);
-  if (!pstDate) return 'Invalid Date';
+  if (!date) return 'Invalid Date';
+  
+  let dateObj;
+  
+  // Handle Firestore Timestamp objects
+  if (date && typeof date === 'object' && date.seconds) {
+    dateObj = new Date(date.seconds * 1000);
+  }
+  // Handle Firestore Timestamp objects with toDate method
+  else if (date && typeof date.toDate === 'function') {
+    dateObj = date.toDate();
+  }
+  // Handle ISO strings
+  else if (typeof date === 'string') {
+    dateObj = new Date(date);
+  }
+  // Handle regular Date objects or numbers
+  else {
+    dateObj = new Date(date);
+  }
+  
+  // Check if the date is valid
+  if (isNaN(dateObj.getTime())) {
+    return 'Invalid Date';
+  }
   
   const defaultOptions = {
     timeZone: PST_TIMEZONE,
     ...options
   };
   
-  return pstDate.toLocaleDateString('en-US', defaultOptions);
+  return dateObj.toLocaleDateString('en-US', defaultOptions);
 };
 
 /**
  * Format date and time for display in PST
  */
 export const formatDateTimePST = (date, options = {}) => {
-  const pstDate = convertToPST(date);
-  if (!pstDate) return 'Invalid Date';
+  if (!date) return 'Invalid Date';
+  
+  let dateObj;
+  
+  // Handle Firestore Timestamp objects
+  if (date && typeof date === 'object' && date.seconds) {
+    dateObj = new Date(date.seconds * 1000);
+  }
+  // Handle Firestore Timestamp objects with toDate method
+  else if (date && typeof date.toDate === 'function') {
+    dateObj = date.toDate();
+  }
+  // Handle ISO strings
+  else if (typeof date === 'string') {
+    dateObj = new Date(date);
+  }
+  // Handle regular Date objects or numbers
+  else {
+    dateObj = new Date(date);
+  }
+  
+  // Check if the date is valid
+  if (isNaN(dateObj.getTime())) {
+    return 'Invalid Date';
+  }
   
   const defaultOptions = {
     timeZone: PST_TIMEZONE,
     ...options
   };
   
-  return pstDate.toLocaleString('en-US', defaultOptions);
+  return dateObj.toLocaleString('en-US', defaultOptions);
 };
 
 /**

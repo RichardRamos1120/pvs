@@ -6,6 +6,7 @@ import { FirestoreContext } from '../App';
 import Layout from './Layout';
 import Pagination from './Pagination';
 import { downloadCSV, formatLogDataForExport } from '../utils/csvExport';
+import { formatDatePST, getCurrentPSTDate } from '../utils/timezone';
 import {
   Calendar,
   Search,
@@ -241,19 +242,28 @@ const Reports = () => {
       }
 
       // Otherwise, create a new log
-      const formattedToday = today.toLocaleDateString('en-US', {
+      const formattedToday = formatDatePST(today, {
         weekday: 'short',
         month: 'short',
         day: 'numeric',
         year: 'numeric'
       });
 
+      // Determine current shift based on time of day
+      const currentHour = getCurrentPSTDate().getHours();
+      let currentShift;
+      if (currentHour >= 6 && currentHour < 18) {
+        currentShift = "Day Shift";
+      } else {
+        currentShift = "Night Shift";
+      }
+
       const newLog = {
         date: formattedToday,
         rawDate: today.toISOString(),
         captain: userProfile?.displayName || auth.currentUser?.displayName || 'Captain',
         station: selectedStation,
-        shift: "B",
+        shift: currentShift,
         crew: [],
         activities: [],
         totalHours: "0.0",
@@ -709,7 +719,7 @@ const Reports = () => {
                             </td>
                             <td className="px-6 py-4 whitespace-nowrap">
                               <div className="text-sm text-gray-600 dark:text-gray-400">
-                                {log.shift} Shift {log.createdByName ? `• ${log.createdByName}` : log.captain ? `• ${log.captain}` : ''}
+                                {log.shift === "B" ? "Day Shift" : log.shift} {log.createdByName ? `• ${log.createdByName}` : log.captain ? `• ${log.captain}` : ''}
                               </div>
                             </td>
                             <td className="px-6 py-4 whitespace-nowrap">
@@ -805,7 +815,7 @@ const Reports = () => {
                           <div>
                             <h4 className="font-medium text-gray-900 dark:text-white">{log.date}</h4>
                             <div className="text-sm text-gray-500 dark:text-gray-400">
-                              {log.createdByName || log.captain || 'Unknown'} • {log.shift} Shift
+                              {log.createdByName || log.captain || 'Unknown'} • {log.shift === "B" ? "Day Shift" : log.shift}
                             </div>
                           </div>
                         </div>

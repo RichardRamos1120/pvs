@@ -4,6 +4,7 @@ import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { getAuth, signOut } from 'firebase/auth';
 import { getFirestore, collection, query, where, getDocs } from 'firebase/firestore';
 import { FirestoreContext } from '../App';
+import { formatDatePST } from '../utils/timezone';
 import {
   Clipboard,
   Calendar,
@@ -182,7 +183,7 @@ const Layout = ({ children, darkMode, setDarkMode, selectedStation, setSelectedS
               <div className="text-sm flex items-center whitespace-nowrap">
                 <Calendar className="w-4 h-4 mr-1 flex-shrink-0" />
                 <span>
-                  {new Date().toLocaleDateString('en-US', {
+                  {formatDatePST(new Date(), {
                     weekday: 'short',
                     month: 'short', 
                     day: 'numeric',
@@ -233,7 +234,7 @@ const Layout = ({ children, darkMode, setDarkMode, selectedStation, setSelectedS
             <div className={`px-2 pt-2 pb-3 space-y-1 shadow-inner ${darkMode ? 'bg-gray-800' : 'bg-blue-800'}`}>
               <div className="flex items-center mb-2 text-sm">
                 <Calendar className="w-4 h-4 mr-1" />
-                {new Date().toLocaleDateString('en-US', {
+                {formatDatePST(new Date(), {
                   weekday: 'short',
                   month: 'short', 
                   day: 'numeric',

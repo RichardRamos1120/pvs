@@ -4,6 +4,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { getAuth } from 'firebase/auth';
 import { FirestoreContext } from '../App';
 import Layout from './Layout';
+import { formatDatePST, formatDateTimePST } from '../utils/timezone';
 import { 
   ArrowLeft, 
   Building, 
@@ -151,7 +152,7 @@ const ReportDetail = () => {
     if (!log) return;
 
     // Import required libraries dynamically
-    import('jspdf').then(({ default: jsPDF }) => {
+    import('jspdf').then(async ({ default: jsPDF }) => {
       // Create a new jsPDF instance
       const pdf = new jsPDF({
         orientation: 'portrait',
@@ -213,22 +214,88 @@ const ReportDetail = () => {
         return y + (lines.length * 6);
       };
 
-      // Add logo/header with background
-      pdf.setFillColor(42, 72, 120); // Navy blue header
-      pdf.rect(0, 0, 210, 25, 'F');
-      pdf.setTextColor(255, 255, 255); // White text
-      pdf.setFontSize(20);
+      // Clean Professional Header with Logo
+      // Load and add logo
+      const logoImg = new Image();
+      logoImg.crossOrigin = 'anonymous';
+      
+      try {
+        // Try to load the logo
+        await new Promise((resolve, reject) => {
+          logoImg.onload = resolve;
+          logoImg.onerror = reject;
+          logoImg.src = '/SMFD_1@2x.webp';
+        });
+        
+        // Add logo to PDF (left side)
+        const logoWidth = 25;
+        const logoHeight = 25;
+        const logoX = 15;
+        const logoY = 10;
+        
+        // Convert image to base64 and add to PDF
+        const canvas = document.createElement('canvas');
+        const ctx = canvas.getContext('2d');
+        canvas.width = logoImg.naturalWidth;
+        canvas.height = logoImg.naturalHeight;
+        ctx.drawImage(logoImg, 0, 0);
+        const logoDataUrl = canvas.toDataURL('image/png');
+        
+        pdf.addImage(logoDataUrl, 'PNG', logoX, logoY, logoWidth, logoHeight);
+      } catch (error) {
+        console.warn('Could not load logo for PDF:', error);
+        // Continue without logo if it fails to load
+      }
+      
+      // Black text for clean header
+      pdf.setTextColor(0, 0, 0);
+      
+      // Department name and title (center)
+      pdf.setFontSize(16);
       pdf.setFont('helvetica', 'bold');
-      pdf.text(`${log.station} - Daily Activity Log`, 105, 15, { align: 'center' });
+      pdf.text('SOUTHERN MARIN FIRE DEPARTMENT', 105, 18, { align: 'center' });
+      pdf.setFontSize(14);
+      pdf.setFont('helvetica', 'normal');
+      pdf.text('Daily Activity Report', 105, 28, { align: 'center' });
+      
+      // Date stamp (right side)
+      pdf.setFontSize(10);
+      pdf.text(formatDatePST(new Date(), { month: 'numeric', day: 'numeric', year: 'numeric' }), 190, 25, { align: 'right' });
+      
+      // Add a subtle line under header
+      pdf.setDrawColor(200, 200, 200);
+      pdf.setLineWidth(0.5);
+      pdf.line(15, 38, 195, 38);
 
       // Reset text color
       pdf.setTextColor(0, 0, 0);
 
-      // Start positioning
-      let y = 35;
+      // Start positioning (adjusted for taller header with more bottom space)
+      let y = 55;
 
-      // Date and Shift subtitle
-      y = addSubtitle(`${log.date} • ${log.shift} Shift • ${log.status === 'complete' ? 'COMPLETED' : 'DRAFT'}`, y);
+      // Report information header
+      pdf.setFont('helvetica', 'bold');
+      pdf.setFontSize(14);
+      pdf.text(`${log.station} - ${log.date}`, 15, y);
+      
+      pdf.setFont('helvetica', 'normal');
+      pdf.setFontSize(10);
+      // Convert old "B" shift to meaningful name, or use existing meaningful names
+      const displayShift = log.shift === "B" ? "Day Shift" : log.shift;
+      pdf.text(displayShift, 15, y + 8);
+      
+      // Status badge
+      pdf.setFont('helvetica', 'bold');
+      if (log.status === 'complete') {
+        pdf.setTextColor(0, 120, 0);
+        pdf.text('[COMPLETED]', 140, y + 8);
+      } else {
+        pdf.setTextColor(200, 100, 0);
+        pdf.text('[DRAFT]', 140, y + 8);
+      }
+      pdf.setTextColor(0, 0, 0);
+      
+      y += 20;
 
       // Staff Information Section
       y = addSectionTitle('STAFF INFORMATION', y + 5);
@@ -236,10 +303,17 @@ const ReportDetail = () => {
 
       // Crew members
       if (log.crew && log.crew.length > 0) {
-        y = addField('Crew on Duty:', '', y);
-        log.crew.forEach(member => {
-          y = addListItem(member, y, 50);
-        });
+        y = addField('Crew on Duty:', `${log.crew.length} firefighters`, y);
+        y += 2;
+        
+        // Display crew in groups of 3 per line
+        for (let i = 0; i < log.crew.length; i += 3) {
+          const crewLine = log.crew.slice(i, i + 3).join(' • ');
+          pdf.setFont('helvetica', 'normal');
+          pdf.text(`   ${crewLine}`, 50, y);
+          y += 5;
+        }
+        y += 3;
       } else {
         y = addField('Crew on Duty:', 'No crew members assigned', y);
       }
@@ -258,130 +332,190 @@ const ReportDetail = () => {
         hoursByCategory[category] += parseFloat(activity.hours || 0);
       });
 
-      // Display summary as a table
+      // Activity Summary Table
       if (Object.keys(hoursByCategory).length > 0) {
-        // Add table headers
-        pdf.setFillColor(240, 240, 240);
-        pdf.rect(15, y, 90, 7, 'F');
-        pdf.rect(105, y, 30, 7, 'F');
-
+        y += 5; // Space before table
+        
+        // Table headers
         pdf.setFont('helvetica', 'bold');
         pdf.setFontSize(10);
-        pdf.text('CATEGORY', 20, y + 5);
-        pdf.text('HOURS', 110, y + 5);
+        pdf.text('CATEGORY', 15, y);
+        pdf.text('HOURS', 120, y);
+        
+        y += 8; // Space after headers
+        
+        // Header underline
+        pdf.setDrawColor(100, 100, 100);
+        pdf.setLineWidth(0.5);
+        pdf.line(15, y, 140, y);
+        
+        y += 8; // Space after line
 
-        y += 10;
-
-        // Add table rows
-        Object.entries(hoursByCategory).forEach(([category, hours], index) => {
-          if (index % 2 === 0) {
-            pdf.setFillColor(250, 250, 250);
-            pdf.rect(15, y - 5, 90, 7, 'F');
-            pdf.rect(105, y - 5, 30, 7, 'F');
-          }
-
+        // Table rows
+        Object.entries(hoursByCategory).forEach(([category, hours]) => {
           pdf.setFont('helvetica', 'normal');
-          pdf.text(category, 20, y);
-          pdf.text(hours.toFixed(1), 110, y);
-
-          y += 7;
+          pdf.text(category, 15, y);
+          pdf.text(hours.toFixed(1), 120, y);
+          y += 7; // Proper row spacing
         });
 
-        // Add total row
-        pdf.setFillColor(220, 230, 240);
-        pdf.rect(15, y - 5, 90, 7, 'F');
-        pdf.rect(105, y - 5, 30, 7, 'F');
+        y += 3; // Space before total line
+        
+        // Total separator line
+        pdf.setLineWidth(0.8);
+        pdf.line(15, y, 140, y);
+        
+        y += 8; // Space after line
 
+        // Total row
         pdf.setFont('helvetica', 'bold');
-        pdf.text('TOTAL', 20, y);
-        pdf.text(log.totalHours || "0.0", 110, y);
+        pdf.text('TOTAL HOURS', 15, y);
+        pdf.text(log.totalHours || "0.0", 120, y);
 
-        y += 10;
+        y += 15; // Space after table
       } else {
         y = addParagraph('No activities recorded for this log.', y);
       }
 
       // Activity Details Section
-      y = addSectionTitle('ACTIVITY DETAILS', y + 5);
+      y = addSectionTitle('DAILY ACTIVITIES', y + 10);
 
       if (log.activities && log.activities.length > 0) {
         log.activities.forEach((activity, index) => {
-          // Add activity header with background
-          pdf.setFillColor(245, 245, 245);
-          pdf.rect(15, y - 5, 180, 7, 'F');
-
+          // Check if we need a new page before starting a new activity
+          if (y > 240) {
+            pdf.addPage();
+            y = 20;
+          }
+          
+          y += 8; // Space before each activity
+          
+          // Activity number and type header
           pdf.setFont('helvetica', 'bold');
-          pdf.setFontSize(11);
-          pdf.text(`${index + 1}. ${activity.type}: ${activity.description}`, 20, y);
-          y += 7;
-
+          pdf.setFontSize(12);
+          pdf.text(`${index + 1}.`, 15, y);
+          
+          // Activity type badge
           pdf.setFontSize(10);
+          pdf.text(`[${activity.type}]`, 25, y);
+          
+          y += 6;
+          
+          // Activity description
           pdf.setFont('helvetica', 'normal');
-          pdf.text(`Time: ${formatTimeRange(activity.details?.startTime, activity.details?.endTime)} • ${activity.hours} hrs`, 25, y);
-          y += 7;
+          pdf.setFontSize(10);
+          const descLines = pdf.splitTextToSize(activity.description, 160);
+          pdf.text(descLines, 25, y);
+          y += descLines.length * 5 + 6;
+
+          // Time and duration box
+          pdf.setFont('helvetica', 'normal');
+          pdf.text(`Time: ${formatTimeRange(activity.details?.startTime, activity.details?.endTime)}`, 25, y);
+          pdf.text(`Duration: ${activity.hours} hours`, 100, y);
+          y += 8;
 
           // Type-specific details
+          let hasDetails = false;
+          
           if (activity.type === 'MAINTENANCE') {
-            if (activity.details?.apparatus) {
-              pdf.text(`Apparatus: ${activity.details.apparatus}`, 25, y);
-              y += 5;
-            }
-            if (activity.details?.maintenanceType) {
-              pdf.text(`Type: ${activity.details.maintenanceType}`, 25, y);
-              y += 5;
-            }
-            if (activity.details?.passFailStatus) {
-              pdf.text(`Status: ${activity.details.passFailStatus}`, 25, y);
-              y += 5;
+            if (activity.details?.apparatus || activity.details?.maintenanceType || activity.details?.passFailStatus) {
+              hasDetails = true;
+              pdf.setFont('helvetica', 'normal');
+              if (activity.details?.apparatus) {
+                pdf.text(`Apparatus: ${activity.details.apparatus}`, 25, y);
+                y += 6;
+              }
+              if (activity.details?.maintenanceType) {
+                pdf.text(`Type: ${activity.details.maintenanceType}`, 25, y);
+                y += 6;
+              }
+              if (activity.details?.passFailStatus) {
+                pdf.text(`Status: ${activity.details.passFailStatus}`, 25, y);
+                y += 6;
+              }
             }
           }
 
           if (activity.type === 'TRAINING' && activity.details?.trainingMethod) {
+            hasDetails = true;
             pdf.text(`Method: ${activity.details.trainingMethod}`, 25, y);
-            y += 5;
+            y += 6;
           }
 
           if (activity.type === 'OPERATIONS') {
-            if (activity.details?.stationCoverage) {
-              pdf.text(`Station: ${activity.details.stationCoverage}`, 25, y);
-              y += 5;
-            }
-            if (activity.details?.apparatus) {
-              pdf.text(`Apparatus: ${activity.details.apparatus}`, 25, y);
-              y += 5;
+            if (activity.details?.stationCoverage || activity.details?.apparatus) {
+              hasDetails = true;
+              if (activity.details?.stationCoverage) {
+                pdf.text(`Station Coverage: ${activity.details.stationCoverage}`, 25, y);
+                y += 6;
+              }
+              if (activity.details?.apparatus) {
+                pdf.text(`Apparatus: ${activity.details.apparatus}`, 25, y);
+                y += 6;
+              }
             }
           }
 
           if (activity.type === 'ADMIN' && activity.details?.documentType) {
+            hasDetails = true;
             pdf.text(`Document Type: ${activity.details.documentType}`, 25, y);
-            y += 5;
+            y += 6;
           }
 
-          // Notes with background
-          if (activity.notes) {
-            pdf.setFillColor(250, 250, 245);
-            pdf.rect(25, y, 165, 12, 'F');
-            pdf.setDrawColor(220, 220, 200);
-            pdf.setLineWidth(0.2);
-            pdf.rect(25, y, 165, 12);
+          if (hasDetails) y += 4; // Space after details
 
+          // Assigned crew section
+          if (activity.assignedCrewNames && activity.assignedCrewNames.length > 0) {
+            pdf.setFont('helvetica', 'bold');
+            pdf.text(`Crew Assigned (${activity.assignedCrewNames.length}):`, 25, y);
+            y += 6;
+            
+            pdf.setFont('helvetica', 'normal');
+            // Group crew names in rows of 3
+            for (let i = 0; i < activity.assignedCrewNames.length; i += 3) {
+              const crewLine = activity.assignedCrewNames.slice(i, i + 3).join(' • ');
+              pdf.text(`   ${crewLine}`, 25, y);
+              y += 5;
+            }
+            y += 4; // Space after crew
+          }
+
+          // Notes section
+          if (activity.notes) {
+            pdf.setFont('helvetica', 'bold');
+            pdf.text('Notes:', 25, y);
+            y += 6;
+            
             pdf.setFont('helvetica', 'italic');
-            pdf.text(`Notes: ${activity.notes}`, 30, y + 5);
-            y += 16;
+            const noteLines = pdf.splitTextToSize(activity.notes, 160);
+            pdf.text(noteLines, 30, y);
+            y += noteLines.length * 5 + 6;
           }
           
           // Added by information
           if (activity.addedByName) {
-            pdf.setFont('helvetica', 'italic');
+            pdf.setFont('helvetica', 'normal');
             pdf.setFontSize(8);
-            pdf.text(`Added by ${activity.addedByName}`, 25, y);
-            y += 5;
+            pdf.setTextColor(100, 100, 100);
+            pdf.text(`Logged by: ${activity.addedByName}`, 25, y);
+            pdf.setTextColor(0, 0, 0); // Reset color
+            pdf.setFontSize(10);
+            y += 8;
           }
 
-          y += 5;
+          // Activity separator (except for last activity)
+          if (index < log.activities.length - 1) {
+            y += 6;
+            pdf.setDrawColor(180, 180, 180);
+            pdf.setLineWidth(0.3);
+            pdf.line(20, y, 190, y);
+            y += 8;
+          } else {
+            y += 12; // Extra space after last activity
+          }
 
-          // Check if we need to add a new page
-          if (y > 270) {
+          // Check if we need to add a new page for the next activity
+          if (y > 250) {
             pdf.addPage();
             y = 20;
           }
@@ -398,19 +532,19 @@ const ReportDetail = () => {
           y = 20;
         }
 
-        y = addSectionTitle("NOTES", y + 5);
-
-        // Add notes with a background box
-        pdf.setFillColor(255, 252, 230); // Light yellow background
-        pdf.rect(15, y, 180, 30, 'F');
-        pdf.setDrawColor(220, 210, 180); // Light brown border
-        pdf.setLineWidth(0.3);
-        pdf.rect(15, y, 180, 30);
-
-        y = addParagraph(log.notes, y + 5, 170);
+        y = addSectionTitle("CAPTAIN'S NOTES", y + 12);
+        
+        y += 5; // Space after title
+        
+        // Add notes content with proper formatting
+        pdf.setFont('helvetica', 'normal');
+        pdf.setFontSize(10);
+        const notesLines = pdf.splitTextToSize(log.notes, 170);
+        pdf.text(notesLines, 15, y);
+        y += notesLines.length * 6 + 10; // Better line spacing and space after
       }
 
-      // Verification Section (if complete)
+      // Completion Information Section (if complete)
       if (log.status === 'complete') {
         // Check if we need to add a new page
         if (y > 250) {
@@ -418,15 +552,14 @@ const ReportDetail = () => {
           y = 20;
         }
 
-        y = addSectionTitle("VERIFICATION", y + 5);
+        y = addSectionTitle("LOG COMPLETION", y + 12);
+        
+        y += 5; // Space after title
+        
         y = addField('Completed by:', log.completedBy || log.createdByName || log.captain || 'Unknown', y);
-        y = addField('Date:', log.completedAt ? new Date(log.completedAt).toLocaleString() : 'Not recorded', y);
-
-        // Simple verification stamp
-        pdf.setFontSize(10);
-        pdf.setFont('helvetica', 'italic');
-        pdf.setTextColor(0, 100, 0); // Dark green
-        pdf.text('Verified', 150, y - 5);
+        y = addField('Date Completed:', log.completedAt ? formatDateTimePST(log.completedAt) : 'Not recorded', y);
+        
+        y += 10; // Extra space at end
       }
 
       // Footer with page numbers
@@ -438,7 +571,7 @@ const ReportDetail = () => {
         pdf.setFont('helvetica', 'normal');
         pdf.setTextColor(100, 100, 100);
         pdf.text(`Page ${i} of ${totalPages}`, 105, 290, { align: 'center' });
-        pdf.text(`Generated on ${new Date().toLocaleString()}`, 190, 290, { align: 'right' });
+        pdf.text(`Generated on ${formatDateTimePST(new Date())}`, 190, 290, { align: 'right' });
       }
 
       // Save the PDF
@@ -526,7 +659,7 @@ const ReportDetail = () => {
               </button>
               <div>
                 <h2 className="text-xl font-bold">{log.station} Daily Log</h2>
-                <p className="text-gray-500 dark:text-gray-400">{log.date} • {log.shift} Shift</p>
+                <p className="text-gray-500 dark:text-gray-400">{log.date} • {log.shift === "B" ? "Day Shift" : log.shift}</p>
               </div>
             </div>
             
@@ -553,7 +686,7 @@ const ReportDetail = () => {
                 <h3 className="text-lg font-semibold">Captain: {log.captain}</h3>
                 <p className="text-sm text-gray-600 dark:text-gray-400">
                   {log.completedAt ? 
-                    `Completed on ${new Date(log.completedAt).toLocaleDateString()} at ${new Date(log.completedAt).toLocaleTimeString()}` : 
+                    `Completed on ${formatDateTimePST(log.completedAt)}` : 
                     (log.status === 'draft' ? 'Draft - Not completed' : 'Completed')}
                 </p>
               </div>
@@ -715,6 +848,26 @@ const ReportDetail = () => {
                           </div>
                         )}
                         
+                        {/* Display assigned crew for this activity */}
+                        {activity.assignedCrewNames && activity.assignedCrewNames.length > 0 && (
+                          <div className="mt-3 text-sm">
+                            <div className="flex items-center mb-2">
+                              <User className="h-4 w-4 text-gray-500 dark:text-gray-400 mr-1" />
+                              <span className="text-gray-500 dark:text-gray-400 font-medium">Assigned Crew ({activity.assignedCrewNames.length}):</span>
+                            </div>
+                            <div className="flex flex-wrap gap-1">
+                              {activity.assignedCrewNames.map((name, idx) => (
+                                <span
+                                  key={idx}
+                                  className="inline-flex items-center px-2 py-1 bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-200 text-xs rounded-md"
+                                >
+                                  {name}
+                                </span>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                        
                         {activity.notes && (
                           <div className="mt-2 text-sm bg-gray-50 dark:bg-gray-750 p-2 rounded border border-gray-200 dark:border-gray-700">
                             <span className="text-gray-500 dark:text-gray-400">Notes:</span> {activity.notes}
@@ -796,7 +949,7 @@ const ReportDetail = () => {
               <div>
                 <p className="font-medium">Completed by {log.captain || log.completedBy || 'Unknown'}</p>
                 <p className="text-sm text-gray-500 dark:text-gray-400">
-                  {log.completedAt ? new Date(log.completedAt).toLocaleString() : 'Date not recorded'}
+                  {log.completedAt ? formatDateTimePST(log.completedAt) : 'Date not recorded'}
                 </p>
               </div>
             </div>

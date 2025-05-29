@@ -22,7 +22,7 @@ import {
     AlertCircle
 } from 'lucide-react';
 import Layout from './Layout';
-import { getTodayFormattedPST, getCurrentDateWithWeekdayPST } from '../utils/timezone';
+import { getTodayFormattedPST, getCurrentDateWithWeekdayPST, getCurrentPSTDate } from '../utils/timezone';
 
 const Dashboard = () => {
     // Initialize darkMode from localStorage with default to true (dark mode)
@@ -149,12 +149,21 @@ const Dashboard = () => {
                 const formattedToday = getTodayFormattedPST();
                 const today = new Date();
 
+                // Determine current shift based on time of day
+                const currentHour = getCurrentPSTDate().getHours();
+                let currentShift;
+                if (currentHour >= 6 && currentHour < 18) {
+                    currentShift = "Day Shift";
+                } else {
+                    currentShift = "Night Shift";
+                }
+
                 const newLog = {
                     date: formattedToday,
                     rawDate: today.toISOString(),
                     captain: auth.currentUser?.displayName || "Captain",
                     station: selectedStation,
-                    shift: "B",
+                    shift: currentShift,
                     crew: [],
                     activities: [],
                     totalHours: "0.0",
