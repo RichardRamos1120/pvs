@@ -22,6 +22,7 @@ import {
     AlertCircle
 } from 'lucide-react';
 import Layout from './Layout';
+import { getTodayFormattedPST, getCurrentDateWithWeekdayPST } from '../utils/timezone';
 
 const Dashboard = () => {
     // Initialize darkMode from localStorage with default to true (dark mode)
@@ -144,14 +145,9 @@ const Dashboard = () => {
         // Create today log immediately and then navigate to it
         const tryCreateLog = async () => {
             try {
-                // Create new log for today
+                // Create new log for today using PST
+                const formattedToday = getTodayFormattedPST();
                 const today = new Date();
-                const formattedToday = today.toLocaleDateString('en-US', {
-                    weekday: 'short',
-                    month: 'short',
-                    day: 'numeric',
-                    year: 'numeric'
-                });
 
                 const newLog = {
                     date: formattedToday,
@@ -362,12 +358,7 @@ const Dashboard = () => {
                                 Welcome, {userProfile?.displayName || auth.currentUser?.displayName || 'Captain'}
                             </h2>
                             <p className="text-gray-600 dark:text-gray-400">
-                                {new Date().toLocaleDateString('en-US', {
-                                    weekday: 'long',
-                                    month: 'long',
-                                    day: 'numeric',
-                                    year: 'numeric'
-                                })} • {selectedStation}
+                                {getCurrentDateWithWeekdayPST()} • {selectedStation}
                             </p>
                         </div>
                         <div className="mt-4 md:mt-0 flex flex-wrap gap-2">

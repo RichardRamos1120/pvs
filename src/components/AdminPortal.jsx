@@ -36,6 +36,7 @@ import {
   Eye,
   ArrowLeft
 } from 'lucide-react';
+import { formatDatePST, formatDateTimePST } from '../utils/timezone';
 
 const AdminPortal = ({ darkMode, setDarkMode, selectedStation, setSelectedStation }) => {
   // Initialize adminActiveSection from localStorage with default to 'overview'
@@ -338,11 +339,11 @@ const AdminPortal = ({ darkMode, setDarkMode, selectedStation, setSelectedStatio
   };
 
   const formatDate = (dateString) => {
-    return new Date(dateString).toLocaleDateString();
+    return formatDatePST(dateString);
   };
 
   const formatDateTime = (dateString) => {
-    return new Date(dateString).toLocaleString();
+    return formatDateTimePST(dateString);
   };
 
 
@@ -1919,7 +1920,7 @@ const AdminPortal = ({ darkMode, setDarkMode, selectedStation, setSelectedStatio
                 {Object.values(analytics.dailyActivity).map((day) => (
                   <div key={day.date} className="flex justify-between items-center">
                     <span className={`text-xs ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>
-                      {new Date(day.date).toLocaleDateString('en-US', { 
+                      {formatDatePST(day.date, { 
                         weekday: 'short', 
                         month: 'short', 
                         day: 'numeric' 

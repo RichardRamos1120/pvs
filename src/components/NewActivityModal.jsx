@@ -1,6 +1,7 @@
 // src/components/NewActivityModal.js
 import React, { useState, useEffect, useContext } from 'react';
 import { FirestoreContext } from '../App';
+import { calculateEndTimePST } from '../utils/timezone';
 import {
   FileSpreadsheet,
   Truck,
@@ -194,15 +195,7 @@ const NewActivityModal = ({ show, onClose, onAddActivity, darkMode, currentStati
   // Calculate end time based on start time + duration
   const calculateEndTime = (startTime, durationHours) => {
     if (!startTime || !durationHours) return "";
-    
-    const [hours, minutes] = startTime.split(':').map(Number);
-    const startDate = new Date();
-    startDate.setHours(hours, minutes, 0, 0);
-    
-    const durationMinutes = parseFloat(durationHours) * 60;
-    const endDate = new Date(startDate.getTime() + durationMinutes * 60000);
-    
-    return endDate.toTimeString().slice(0, 5); // Format as HH:MM
+    return calculateEndTimePST(startTime, durationHours);
   };
   
   // Reset form fields

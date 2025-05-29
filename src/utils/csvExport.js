@@ -1,4 +1,6 @@
 // CSV Export Utility
+import { formatDateForExportPST } from './timezone';
+
 export const downloadCSV = (data, filename) => {
   if (!data || data.length === 0) {
     alert('No data to export');
@@ -49,40 +51,9 @@ export const downloadCSV = (data, filename) => {
   }
 };
 
-// Helper function to safely format dates
+// Helper function to safely format dates in PST
 const formatDateForExport = (dateValue) => {
-  if (!dateValue) return '';
-  
-  try {
-    let date;
-    
-    // Handle Firestore Timestamp objects
-    if (dateValue && typeof dateValue === 'object' && dateValue.seconds) {
-      date = new Date(dateValue.seconds * 1000);
-    }
-    // Handle Firestore Timestamp objects with toDate method
-    else if (dateValue && typeof dateValue.toDate === 'function') {
-      date = dateValue.toDate();
-    }
-    // Handle ISO strings
-    else if (typeof dateValue === 'string') {
-      date = new Date(dateValue);
-    }
-    // Handle regular Date objects or numbers
-    else {
-      date = new Date(dateValue);
-    }
-    
-    // Check if the date is valid
-    if (isNaN(date.getTime())) {
-      return 'Invalid Date';
-    }
-    
-    return date.toLocaleString();
-  } catch (error) {
-    console.warn('Error formatting date:', dateValue, error);
-    return 'Invalid Date';
-  }
+  return formatDateForExportPST(dateValue);
 };
 
 // Export specific data formatters

@@ -5,6 +5,7 @@ import { getAuth } from 'firebase/auth';
 import { FirestoreContext } from '../App';
 import Layout from './Layout';
 import { getFirestore, collection, query, where, getDocs } from 'firebase/firestore';
+import { getTodayFormattedPST, formatTimeRangePST } from '../utils/timezone';
 import {
   Plus,
   Check,
@@ -147,14 +148,9 @@ const TodayLog = () => {
       
       setLoading(true);
 
-      // Get today's date
+      // Get today's date in PST
+      const formattedToday = getTodayFormattedPST();
       const today = new Date();
-      const formattedToday = today.toLocaleDateString('en-US', {
-        weekday: 'short',
-        month: 'short',
-        day: 'numeric',
-        year: 'numeric'
-      });
 
       const newLog = {
         date: formattedToday,
@@ -547,11 +543,9 @@ const TodayLog = () => {
     }
   };
 
-  // Format time for display
+  // Format time for display (using PST)
   const formatTimeRange = (start, end) => {
-    if (!start && !end) return "—";
-    if (start && !end) return `${start} - ongoing`;
-    return `${start} - ${end}`;
+    return formatTimeRangePST(start, end);
   };
 
   // Add new activity to today's log
