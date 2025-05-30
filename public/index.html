@@ -2,6 +2,13 @@
 <html lang="en">
   <head>
     <meta charset="utf-8" />
+    <!-- Security Headers -->
+    <meta http-equiv="X-Content-Type-Options" content="nosniff" />
+    <meta http-equiv="X-Frame-Options" content="DENY" />
+    <meta http-equiv="X-XSS-Protection" content="1; mode=block" />
+    <meta http-equiv="Referrer-Policy" content="strict-origin-when-cross-origin" />
+    <meta http-equiv="Permissions-Policy" content="accelerometer=(), camera=(), geolocation=(), gyroscope=(), magnetometer=(), microphone=(), payment=(), usb=()" />
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' https://apis.google.com https://www.gstatic.com https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: https:; connect-src 'self' https://*.firebaseio.com https://*.googleapis.com https://identitytoolkit.googleapis.com https://securetoken.googleapis.com https://api.emailjs.com wss://*.firebaseio.com; frame-src 'self' https://pvs-v1.firebaseapp.com;" />
     <link rel="icon" href="%PUBLIC_URL%/firefighter-helmet.png" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta name="theme-color" content="#000000" />
@@ -25,6 +32,44 @@
       Learn how to configure a non-root public URL by running `npm run build`.
     -->
     <title>Fire Department Daily Log</title>
+    <!-- Additional Security -->
+    <script>
+      // Disable right-click context menu
+      document.addEventListener('contextmenu', function(e) {
+        if (!e.target.matches('input, textarea')) {
+          e.preventDefault();
+        }
+      });
+      
+      // Session timeout warning (30 minutes)
+      let warningTimer;
+      let logoutTimer;
+      
+      function resetTimers() {
+        clearTimeout(warningTimer);
+        clearTimeout(logoutTimer);
+        
+        // Warning after 25 minutes
+        warningTimer = setTimeout(() => {
+          if (window.confirm('Your session will expire in 5 minutes. Do you want to continue?')) {
+            resetTimers();
+          }
+        }, 25 * 60 * 1000);
+        
+        // Auto logout after 30 minutes
+        logoutTimer = setTimeout(() => {
+          window.location.href = '/login?session=expired';
+        }, 30 * 60 * 1000);
+      }
+      
+      // Reset timers on user activity
+      ['mousedown', 'keypress', 'scroll', 'touchstart'].forEach(event => {
+        document.addEventListener(event, resetTimers, true);
+      });
+      
+      // Initialize timers
+      window.addEventListener('load', resetTimers);
+    </script>
   </head>
   <body>
     <noscript>You need to enable JavaScript to run this app.</noscript>
