@@ -4,7 +4,6 @@ import { getAuth } from 'firebase/auth';
 import { Calendar, Clock, ChevronRight, ChevronLeft, Edit, AlertTriangle, CheckCircle, FileText, Home, Trash2, Save } from 'lucide-react';
 import Layout from './Layout';
 import { FirestoreContext } from '../App';
-import { v4 as uuidv4 } from 'uuid';
 
 // Main component
 const GARAssessment = () => {
@@ -88,6 +87,7 @@ const GARAssessment = () => {
   const [userChecked, setUserChecked] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(null);
   const [hasChanges, setHasChanges] = useState(false);
+  const [currentDraftId, setCurrentDraftId] = useState(null);
 
   // Local state to avoid saving on every keystroke - SIMPLE VERSION
   const [localMitigations, setLocalMitigations] = useState({});
@@ -113,13 +113,13 @@ const GARAssessment = () => {
   const [currentStep, setCurrentStep] = useState(1);
   const [currentAssessmentId, setCurrentAssessmentId] = useState(null);
   const [assessmentData, setAssessmentData] = useState({
-    id: uuidv4(),
     date: new Date().toISOString().split('T')[0],
     rawDate: new Date().toISOString(),
     time: new Date().toTimeString().substring(0, 5),
     type: "Department-wide",
     station: selectedStation,
     status: "draft",
+    userId: null, // Will be set when creating assessment
     weather: {
       temperature: "37",
       temperatureUnit: "°F",
@@ -158,20 +158,20 @@ const GARAssessment = () => {
     setSelectedStation(station);
     localStorage.setItem('selectedStation', station);
     
-    // If we're on the assessment list view, refresh the assessments for the new station
+    // If we're on the assessment list view, refresh the assessments
     if (!showAssessment && pastAssessments.length > 0) {
-      fetchAssessments(station);
+      fetchAssessments();
     }
   };
   
-  // Fetch assessments from Firebase
-  const fetchAssessments = async (station) => {
+  // Fetch all assessments from Firebase (no longer filtered by station)
+  const fetchAssessments = async () => {
     try {
       setLoading(true);
       setError(''); // Clear any previous errors
       
-      console.log("Fetching assessments for station:", station);
-      const assessments = await firestoreOperations.getAssessmentsByStation(station);
+      console.log("Fetching all assessments from database...");
+      const assessments = await firestoreOperations.getAllAssessments();
       console.log("Fetched assessments:", assessments);
       
       // Check each assessment has an ID
@@ -280,8 +280,8 @@ const GARAssessment = () => {
         console.log(`Setting selected station to: ${stationToUse}`);
         handleStationChange(stationToUse);
         
-        // Load assessments for the selected station
-        await fetchAssessments(stationToUse);
+        // Load all assessments
+        await fetchAssessments();
         
         setUserChecked(true);
       } catch (error) {
@@ -299,6 +299,34 @@ const GARAssessment = () => {
     // Execute the initialization
     loadComponentData();
   }, [auth, firestoreOperations]);
+  
+  // CRITICAL: Monitor station data to ensure UI updates correctly
+  useEffect(() => {
+    console.log("%c STATION STATE CHANGE DETECTED:", "background: red; color: white; font-size: 16px");
+    console.log("%c Current stations array:", "font-weight: bold", stations);
+    console.log("%c Stations array length:", "font-weight: bold", stations.length);
+    console.log("%c Selected station:", "font-weight: bold", selectedStation);
+    
+    // IMPORTANT SAFETY MEASURE: Force verify if stations exist in database again
+    (async () => {
+      try {
+        // This is a verification check only - the main data loading is in the component mount effect
+        const stationsData = await firestoreOperations.getStations();
+        console.log("%c VERIFICATION - Database stations:", "background: blue; color: white", 
+          stationsData && Array.isArray(stationsData) ? stationsData : "NONE");
+        
+        // If database has no stations but our state shows stations, force reset it
+        if (!stationsData || !Array.isArray(stationsData) || stationsData.length === 0) {
+          if (stations.length > 0) {
+            console.log("%c CRITICAL MISMATCH - Resetting stations to empty", "background: red; color: white");
+            setStations([]);
+          }
+        }
+      } catch (err) {
+        console.error("Error in station verification:", err);
+      }
+    })();
+  }, [stations, selectedStation, firestoreOperations]);
   
   // Calculate total risk score and determine risk level
   const calculateRiskScore = () => {
@@ -322,46 +350,112 @@ const GARAssessment = () => {
     return "bg-red-500";
   };
 
-  // Handle slider change
+  // Handle slider change with auto-update
   const handleSliderChange = (factor, value) => {
-    setAssessmentData({
+    const updatedAssessmentData = {
       ...assessmentData,
       riskFactors: {
         ...assessmentData.riskFactors,
         [factor]: parseInt(value)
       }
-    });
+    };
+    
+    setAssessmentData(updatedAssessmentData);
+    setHasChanges(true);
+    
+    // Auto-update draft in database
+    updateDraftInDatabase(updatedAssessmentData);
   };
 
   // SIMPLIFIED HANDLERS FOR INPUT FIELDS
-  // Handle mitigation text change - use the simple approach from TodayLog
+  // Handle mitigation text change with auto-update
   const handleMitigationChange = (factor, text) => {
-    setLocalMitigations(prev => ({
-      ...prev,
+    const updatedMitigations = {
+      ...localMitigations,
       [factor]: text
-    }));
+    };
     
+    setLocalMitigations(updatedMitigations);
     setHasChanges(true);
+    
+    // Auto-update draft in database
+    const assessmentUpdate = {
+      ...assessmentData,
+      mitigations: {
+        ...assessmentData.mitigations,
+        ...updatedMitigations
+      }
+    };
+    
+    updateDraftInDatabase(assessmentUpdate);
   };
 
-  // Handle form field changes - simple direct approach
+  // Auto-update draft in database whenever fields change
+  const updateDraftInDatabase = async (updatedData) => {
+    if (!currentDraftId) return;
+    
+    try {
+      await firestoreOperations.updateAssessment(currentDraftId, {
+        ...updatedData,
+        status: "draft",
+        captain: auth.currentUser?.displayName || "Captain",
+        userId: auth.currentUser?.uid // Required for security rules
+      });
+      console.log("Draft auto-updated in database");
+    } catch (error) {
+      console.error("Error auto-updating draft:", error);
+    }
+  };
+
+  // Handle form field changes with bidirectional logic and auto-update
   const handleInputChange = (section, field, value) => {
+    let updatedFormData;
+    
     if (section) {
-      setLocalFormData(prevData => ({
-        ...prevData,
+      updatedFormData = {
+        ...localFormData,
         [section]: {
-          ...prevData[section],
+          ...localFormData[section],
           [field]: value
         }
-      }));
+      };
     } else {
-      setLocalFormData(prevData => ({
-        ...prevData,
+      updatedFormData = {
+        ...localFormData,
         [field]: value
-      }));
+      };
     }
     
+    // Bidirectional station/type logic
+    if (field === 'station') {
+      if (value === 'All Stations') {
+        updatedFormData.type = 'Department-wide';
+      } else if (value && value !== 'All Stations' && stations.includes(value)) {
+        updatedFormData.type = 'Mission-specific';
+      }
+    } else if (field === 'type') {
+      if (value === 'Department-wide') {
+        updatedFormData.station = 'All Stations';
+      } else if (value === 'Mission-specific' && updatedFormData.station === 'All Stations') {
+        // Auto-select first station when switching to mission-specific
+        updatedFormData.station = stations.length > 0 ? stations[0] : '';
+      }
+    }
+    
+    setLocalFormData(updatedFormData);
     setHasChanges(true);
+    
+    // Auto-update draft in database
+    const assessmentUpdate = {
+      ...assessmentData,
+      date: updatedFormData.date,
+      time: updatedFormData.time,
+      type: updatedFormData.type,
+      station: updatedFormData.station,
+      weather: updatedFormData.weather
+    };
+    
+    updateDraftInDatabase(assessmentUpdate);
   };
 
   // Sync local mitigations to assessment data when navigating between steps
@@ -555,7 +649,7 @@ const GARAssessment = () => {
   /**
    * Start a new assessment
    * This function is called when the user clicks "Create New Assessment"
-   * It verifies stations exist in the database before allowing creation
+   * It creates an initial draft in the database immediately
    */
   const startAssessment = async () => {
     // Check if we have stations from the database before doing anything
@@ -583,18 +677,16 @@ const GARAssessment = () => {
     // At this point we've verified stations exist in the database
     console.log("Creating new assessment with stations from database");
     
-    // Use a valid station for the assessment
-    const useStation = stations.includes(selectedStation) ? selectedStation : stations[0];
-    console.log(`Using station: ${useStation} for new assessment`);
-      
+    // Use All Stations for department-wide by default
     const newAssessmentData = {
-      id: uuidv4(),
       date: new Date().toISOString().split('T')[0],
       rawDate: new Date().toISOString(),
       time: new Date().toTimeString().substring(0, 5),
       type: "Department-wide",
-      station: useStation, // Using validated station from database
+      station: "All Stations", // Default to All Stations for department-wide
       status: "draft",
+      captain: auth.currentUser?.displayName || "Captain",
+      userId: auth.currentUser?.uid, // Required for security rules
       weather: {
         temperature: "37",
         temperatureUnit: "°F",
@@ -623,6 +715,27 @@ const GARAssessment = () => {
       }
     };
     
+    // Create initial draft in database immediately
+    try {
+      setLoading(true);
+      const created = await firestoreOperations.createAssessment(newAssessmentData);
+      if (created && created.id) {
+        console.log("Created initial draft with ID:", created.id);
+        setCurrentDraftId(created.id);
+        setCurrentAssessmentId(created.id);
+      } else {
+        console.error("Failed to create initial draft:", created);
+        setError('Failed to create assessment draft. Please try again.');
+        return;
+      }
+    } catch (error) {
+      console.error("Error creating initial draft:", error);
+      setError('Error creating assessment. Please try again.');
+      return;
+    } finally {
+      setLoading(false);
+    }
+    
     // Set assessment data
     setAssessmentData(newAssessmentData);
     
@@ -640,7 +753,6 @@ const GARAssessment = () => {
     
     // Reset control states
     setHasChanges(false);
-    setCurrentAssessmentId(null);
     setCurrentStep(1);
     setShowAssessment(true);
   };
@@ -649,6 +761,7 @@ const GARAssessment = () => {
     setShowAssessment(false);
     setCurrentStep(1);
     setCurrentAssessmentId(null);
+    setCurrentDraftId(null);
   };
 
   // Fixed viewAssessment function that properly handles errors and logging
@@ -677,6 +790,10 @@ const GARAssessment = () => {
         // Store assessment data in state
         setAssessmentData(assessment);
         setCurrentAssessmentId(assessmentId);
+        // Set draft ID for auto-updates (if it's a draft, allow auto-updates)
+        if (assessment.status === "draft") {
+          setCurrentDraftId(assessmentId);
+        }
 
         // IMPORTANT: Initialize local state copies to match the loaded assessment
         // For Step 3: Mitigation strategies
@@ -723,7 +840,7 @@ const GARAssessment = () => {
       await firestoreOperations.deleteAssessment(assessmentId);
       
       // Refresh assessments list
-      await fetchAssessments(selectedStation);
+      await fetchAssessments();
       setConfirmDelete(null);
     } catch (error) {
       console.error("Error deleting assessment:", error);
@@ -743,6 +860,7 @@ const GARAssessment = () => {
         station: selectedStation,
         status: "draft",
         captain: auth.currentUser?.displayName || "Captain",
+        userId: auth.currentUser?.uid, // Required for security rules
       };
       
       if (currentAssessmentId) {
@@ -771,28 +889,38 @@ const GARAssessment = () => {
     try {
       setLoading(true);
       
-      const assessmentToPublish = {
+      // Sync all current form data
+      const finalAssessmentData = {
         ...assessmentData,
-        station: selectedStation,
+        date: localFormData.date,
+        time: localFormData.time,
+        type: localFormData.type,
+        station: localFormData.station,
+        weather: localFormData.weather,
+        mitigations: {
+          ...assessmentData.mitigations,
+          ...localMitigations
+        },
         status: "complete",
         captain: auth.currentUser?.displayName || "Captain",
+        userId: auth.currentUser?.uid, // Required for security rules
         completedAt: new Date().toISOString(),
         completedBy: auth.currentUser?.displayName || "Captain"
       };
       
-      if (currentAssessmentId) {
-        // Update existing assessment
-        await firestoreOperations.updateAssessment(currentAssessmentId, assessmentToPublish);
+      if (currentDraftId || currentAssessmentId) {
+        // Update existing draft to complete status
+        await firestoreOperations.updateAssessment(currentDraftId || currentAssessmentId, finalAssessmentData);
       } else {
-        // Create new assessment
-        await firestoreOperations.createAssessment(assessmentToPublish);
+        // Fallback: create new assessment if somehow we don't have a draft ID
+        await firestoreOperations.createAssessment(finalAssessmentData);
       }
       
       alert(`GAR Assessment published with risk level: ${riskLevel.level} and score: ${totalScore}`);
       closeAssessment();
       
       // Refresh assessments list
-      await fetchAssessments(selectedStation);
+      await fetchAssessments();
     } catch (error) {
       console.error("Error publishing assessment:", error);
       setError("Failed to publish assessment");
@@ -906,7 +1034,7 @@ const GARAssessment = () => {
             onChange={(e) => handleInputChange(null, 'type', e.target.value)}
           >
             <option value="Department-wide">Department-wide</option>
-            <option value="Station-specific">Mission-specific</option>
+            <option value="Mission-specific">Mission-specific</option>
           </select>
         </div>
         <div>
@@ -923,9 +1051,9 @@ const GARAssessment = () => {
               className="w-full p-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
               value={localFormData.station}
               onChange={(e) => handleInputChange(null, 'station', e.target.value)}
-              disabled={localFormData.type !== "Station-specific"}
+              disabled={localFormData.type !== "Mission-specific"}
             >
-              {localFormData.type !== "Station-specific" && (
+              {localFormData.type !== "Mission-specific" && (
                 <option value="All Stations">All Stations</option>
               )}
               
@@ -1441,34 +1569,6 @@ const GARAssessment = () => {
     );
   };
 
-  // CRITICAL: Monitor station data to ensure UI updates correctly
-  useEffect(() => {
-    console.log("%c STATION STATE CHANGE DETECTED:", "background: red; color: white; font-size: 16px");
-    console.log("%c Current stations array:", "font-weight: bold", stations);
-    console.log("%c Stations array length:", "font-weight: bold", stations.length);
-    console.log("%c Selected station:", "font-weight: bold", selectedStation);
-    
-    // IMPORTANT SAFETY MEASURE: Force verify if stations exist in database again
-    (async () => {
-      try {
-        // This is a verification check only - the main data loading is in the component mount effect
-        const stationsData = await firestoreOperations.getStations();
-        console.log("%c VERIFICATION - Database stations:", "background: blue; color: white", 
-          stationsData && Array.isArray(stationsData) ? stationsData : "NONE");
-        
-        // If database has no stations but our state shows stations, force reset it
-        if (!stationsData || !Array.isArray(stationsData) || stationsData.length === 0) {
-          if (stations.length > 0) {
-            console.log("%c CRITICAL MISMATCH - Resetting stations to empty", "background: red; color: white");
-            setStations([]);
-          }
-        }
-      } catch (err) {
-        console.error("Error in station verification:", err);
-      }
-    })();
-  }, [stations, selectedStation, firestoreOperations]);
-  
   // Main application rendering
   return (
     <Layout darkMode={darkMode} setDarkMode={handleDarkModeChange} selectedStation={selectedStation} setSelectedStation={handleStationChange}>
@@ -1540,7 +1640,7 @@ const GARAssessment = () => {
           
           <div className="bg-white dark:bg-gray-800 rounded-lg shadow">
             <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700 flex justify-between items-center">
-              <h2 className="text-xl font-semibold text-gray-900 dark:text-white">Assessment History</h2>
+              <h2 className="text-xl font-semibold text-gray-900 dark:text-white">All Assessment History</h2>
             </div>
             
             {pastAssessments.length > 0 ? (
@@ -1560,7 +1660,9 @@ const GARAssessment = () => {
                           <AlertTriangle className="w-5 h-5" />
                         </div>
                         <div>
-                          <h3 className="font-medium text-gray-900 dark:text-white">{assessment.type || "Unknown Type"}</h3>
+                          <h3 className="font-medium text-gray-900 dark:text-white">
+                            {assessment.type || "Unknown Type"} - {assessment.station || "Unknown Station"}
+                          </h3>
                           <p className="text-sm text-gray-500 dark:text-gray-400">
                             {assessment.date || "No date"} • Score: {assessmentScore} ({assessmentRisk.level})
                           </p>

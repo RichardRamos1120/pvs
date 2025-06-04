@@ -10,7 +10,7 @@ import Reports from './components/Reports';
 import ReportDetail from './components/ReportDetail';
 import Login from './components/Login';
 import Signup from './components/Signup';
-import GARAssessment from './components/SimpleGARAssessment';
+import GARAssessment from './components/GARAssessment';
 import AdminPortal from './components/AdminPortal';
 import './App.css';
 
@@ -510,43 +510,88 @@ const App = () => {
 
     getPaginatedAssessments: async (page = 1, assessmentsPerPage = 5, stationFilter = null) => {
       try {
+        console.log(`[ASSESSMENT DEBUG] getPaginatedAssessments called with: page=${page}, assessmentsPerPage=${assessmentsPerPage}, stationFilter=${stationFilter}`);
+        
         const assessmentsRef = collection(db, "assessments");
         
-        // Build query conditions
-        const conditions = [orderBy("rawDate", "desc")];
+        // Build query conditions (without orderBy to include old assessments)
+        const conditions = [];
         
-        if (stationFilter && stationFilter !== 'all') {
-          conditions.unshift(where("station", "==", stationFilter));
-        }
+        // TEMPORARILY DISABLE STATION FILTERING TO DEBUG
+        console.log(`[ASSESSMENT DEBUG] Temporarily fetching ALL assessments to debug station names`);
+        console.log(`[ASSESSMENT DEBUG] Original stationFilter was: ${stationFilter}`);
+        
+        // Comment out station filtering temporarily
+        // if (stationFilter && stationFilter !== 'all') {
+        //   conditions.push(where("station", "==", stationFilter));
+        //   console.log(`[ASSESSMENT DEBUG] Adding station filter: ${stationFilter}`);
+        // }
 
-        // Get total count
-        const countQuery = query(assessmentsRef, ...conditions.filter(c => c.type !== 'orderBy'));
-        const countSnapshot = await getCountFromServer(countQuery);
-        const totalAssessments = countSnapshot.data().count;
-
-        // Get paginated data
-        const offset = (page - 1) * assessmentsPerPage;
-        const paginatedQuery = query(assessmentsRef, ...conditions, limit(assessmentsPerPage));
-
-        let finalQuery = paginatedQuery;
-        if (offset > 0) {
-          const prevPageQuery = query(assessmentsRef, ...conditions, limit(offset));
-          const prevPageSnapshot = await getDocs(prevPageQuery);
-          const lastDoc = prevPageSnapshot.docs[prevPageSnapshot.docs.length - 1];
-          
-          if (lastDoc) {
-            finalQuery = query(assessmentsRef, ...conditions, startAfter(lastDoc), limit(assessmentsPerPage));
-          }
-        }
-
-        const snapshot = await getDocs(finalQuery);
-        const assessmentsList = snapshot.docs.map(doc => ({
+        // Get all assessments first, then sort and paginate client-side
+        const baseQuery = conditions.length > 0 ? query(assessmentsRef, ...conditions) : assessmentsRef;
+        console.log(`[ASSESSMENT DEBUG] Executing query with ${conditions.length} conditions`);
+        
+        const snapshot = await getDocs(baseQuery);
+        console.log(`[ASSESSMENT DEBUG] Raw snapshot returned ${snapshot.docs.length} documents`);
+        
+        // Convert to array and sort by date
+        const allAssessments = snapshot.docs.map(doc => ({
           id: doc.id,
           ...doc.data()
-        }));
+        })).sort((a, b) => {
+          // Sort by rawDate if available, otherwise use date, with fallback for invalid dates
+          let dateA, dateB;
+          
+          // Try to get a valid date for assessment A
+          if (a.rawDate) {
+            dateA = new Date(a.rawDate);
+            if (isNaN(dateA.getTime())) {
+              dateA = a.date ? new Date(a.date) : new Date(0);
+            }
+          } else if (a.date) {
+            dateA = new Date(a.date);
+            if (isNaN(dateA.getTime())) {
+              dateA = new Date(0);
+            }
+          } else {
+            dateA = new Date(0); // Very old date as fallback
+          }
+          
+          // Try to get a valid date for assessment B
+          if (b.rawDate) {
+            dateB = new Date(b.rawDate);
+            if (isNaN(dateB.getTime())) {
+              dateB = b.date ? new Date(b.date) : new Date(0);
+            }
+          } else if (b.date) {
+            dateB = new Date(b.date);
+            if (isNaN(dateB.getTime())) {
+              dateB = new Date(0);
+            }
+          } else {
+            dateB = new Date(0); // Very old date as fallback
+          }
+          
+          return dateB - dateA; // Descending order (newest first)
+        });
+
+        console.log(`[ASSESSMENT DEBUG] After conversion and sorting: ${allAssessments.length} assessments`);
+        console.log(`[ASSESSMENT DEBUG] Assessment dates:`, allAssessments.map(a => ({ id: a.id, date: a.date, rawDate: a.rawDate, station: a.station })));
+        
+        // Debug: Show unique station names in all assessments
+        const uniqueStations = [...new Set(allAssessments.map(a => a.station))];
+        console.log(`[ASSESSMENT DEBUG] Unique station names in database:`, uniqueStations);
+
+        const totalAssessments = allAssessments.length;
+
+        // Paginate client-side
+        const offset = (page - 1) * assessmentsPerPage;
+        const paginatedAssessments = allAssessments.slice(offset, offset + assessmentsPerPage);
+
+        console.log(`[ASSESSMENT DEBUG] Pagination: offset=${offset}, returning ${paginatedAssessments.length} assessments`);
 
         return {
-          assessments: assessmentsList,
+          assessments: paginatedAssessments,
           totalAssessments,
           totalPages: Math.ceil(totalAssessments / assessmentsPerPage),
           currentPage: page,
@@ -637,9 +682,40 @@ const App = () => {
     },
 
     // Delete a log
-    deleteLog: async (logId) => {
+    deleteLog: async (logId, userInfo = {}) => {
       try {
-        await deleteDoc(doc(db, "logs", logId));
+        // First get the log data before deleting
+        const logRef = doc(db, "logs", logId);
+        const logSnap = await getDoc(logRef);
+        
+        if (!logSnap.exists()) {
+          console.error("Log not found for deletion:", logId);
+          return false;
+        }
+        
+        const logData = logSnap.data();
+        
+        // Create audit log entry with enhanced user information
+        const auditData = {
+          deletedBy: userInfo.userEmail || auth.currentUser?.email || 'Unknown',
+          deletedByName: userInfo.userDisplayName || 'Unknown User',
+          deletedByUid: userInfo.userId || auth.currentUser?.uid || 'Unknown',
+          deletedAt: serverTimestamp(),
+          deletedItem: {
+            ...logData,
+            id: logId
+          },
+          itemType: 'daily_log',
+          itemId: logId,
+          station: logData.station || 'Unknown'
+        };
+        
+        // Add to audit_logs collection
+        await addDoc(collection(db, "audit_logs"), auditData);
+        console.log("Audit log created for deletion of log:", logId);
+        
+        // Now delete the actual log
+        await deleteDoc(logRef);
         return true;
       } catch (error) {
         console.error("Error deleting log:", error);
@@ -1081,6 +1157,8 @@ const App = () => {
     // Create a new GAR assessment
     createAssessment: async (assessmentData) => {
       try {
+        console.log('📝 Creating assessment with station:', assessmentData.station);
+        
         const newAssessment = {
           ...assessmentData,
           createdAt: serverTimestamp(),
@@ -1094,9 +1172,9 @@ const App = () => {
         if (userId) {
           await firestoreOperations.trackUserActivity(userId, 'gar_created', {
             assessmentId: docRef.id,
-            station: assessmentData.station,
-            overallRisk: assessmentData.overallRisk,
-            status: assessmentData.status
+            station: assessmentData.station || 'Unknown',
+            overallRisk: assessmentData.overallRisk || 'Not Calculated',
+            status: assessmentData.status || 'draft'
           });
         }
         
@@ -1185,12 +1263,16 @@ const App = () => {
     getAllAssessments: async () => {
       try {
         const assessmentsRef = collection(db, "assessments");
-        const q = query(assessmentsRef, orderBy("rawDate", "desc"));
-        const snapshot = await getDocs(q);
+        const snapshot = await getDocs(assessmentsRef);
         const assessmentsList = snapshot.docs.map(doc => ({
           id: doc.id,
           ...doc.data()
-        }));
+        })).sort((a, b) => {
+          // Sort by rawDate if available, otherwise use date
+          const dateA = a.rawDate ? new Date(a.rawDate) : new Date(a.date);
+          const dateB = b.rawDate ? new Date(b.rawDate) : new Date(b.date);
+          return dateB - dateA; // Descending order (newest first)
+        });
         return assessmentsList;
       } catch (error) {
         console.error("Error getting all assessments:", error);
@@ -1208,13 +1290,11 @@ const App = () => {
         if (status) {
           q = query(assessmentsRef,
             where("station", "==", stationId),
-            where("status", "==", status),
-            orderBy("rawDate", "desc")
+            where("status", "==", status)
           );
         } else {
           q = query(assessmentsRef,
-            where("station", "==", stationId),
-            orderBy("rawDate", "desc")
+            where("station", "==", stationId)
           );
         }
 
@@ -1227,6 +1307,11 @@ const App = () => {
             id: doc.id,
             ...data
           };
+        }).sort((a, b) => {
+          // Sort by rawDate if available, otherwise use date
+          const dateA = a.rawDate ? new Date(a.rawDate) : new Date(a.date);
+          const dateB = b.rawDate ? new Date(b.rawDate) : new Date(b.date);
+          return dateB - dateA; // Descending order (newest first)
         });
 
         // Verify all assessments have IDs
@@ -1261,9 +1346,65 @@ const App = () => {
     },
 
     // Delete an assessment
-    deleteAssessment: async (assessmentId) => {
+    deleteAssessment: async (assessmentId, userInfo = {}) => {
       try {
-        await deleteDoc(doc(db, "assessments", assessmentId));
+        // First get the assessment data before deleting
+        const assessmentRef = doc(db, "assessments", assessmentId);
+        const assessmentSnap = await getDoc(assessmentRef);
+        
+        if (!assessmentSnap.exists()) {
+          console.error("Assessment not found for deletion:", assessmentId);
+          return false;
+        }
+        
+        const assessmentData = assessmentSnap.data();
+        
+        // Create audit log entry with proper station handling based on assessment type
+        let stationValue = 'Unknown';
+        
+        console.log('[AUDIT DEBUG] Assessment data:', {
+          assessmentType: assessmentData.assessmentType,
+          station: assessmentData.station
+        });
+        
+        if (!assessmentData.assessmentType || assessmentData.assessmentType === '') {
+          // No assessment type selected = Unknown Station
+          stationValue = 'Unknown';
+        } else if (assessmentData.assessmentType === 'department' || assessmentData.station === 'All Stations') {
+          // Department-wide assessments should show "All Stations"
+          stationValue = 'All Stations';
+        } else if (assessmentData.assessmentType === 'mission' && assessmentData.station && 
+                   assessmentData.station !== 'No Stations Available' && 
+                   assessmentData.station !== 'Error Loading Stations' &&
+                   assessmentData.station.trim() !== '' &&
+                   assessmentData.station !== 'Select station') {
+          // Mission-specific with valid station - use the ACTUAL selected station
+          stationValue = assessmentData.station;
+        }
+        // Otherwise leave as 'Unknown' for truly empty or invalid stations
+        
+        console.log('[AUDIT DEBUG] Final station value for audit log:', stationValue);
+        
+        const auditData = {
+          deletedBy: userInfo.userEmail || auth.currentUser?.email || 'Unknown',
+          deletedByName: userInfo.userDisplayName || auth.currentUser?.displayName || 'Unknown User',
+          deletedByUid: userInfo.userId || auth.currentUser?.uid || 'Unknown',
+          deletedAt: serverTimestamp(),
+          deletedItem: {
+            ...assessmentData,
+            id: assessmentId
+          },
+          itemType: 'gar_assessment',
+          itemId: assessmentId,
+          station: stationValue
+        };
+        
+        // Add to audit_logs collection
+        await addDoc(collection(db, "audit_logs"), auditData);
+        console.log("Audit log created for deletion of assessment:", assessmentId);
+        
+        // Now delete the actual assessment
+        await deleteDoc(assessmentRef);
         return true;
       } catch (error) {
         console.error("Error deleting assessment:", error);
@@ -1890,6 +2031,172 @@ const App = () => {
         console.error("Error getting system usage stats:", error);
         return null;
       }
+    },
+
+    // Get audit logs
+    getAuditLogs: async (filters = {}) => {
+      try {
+        const auditLogsRef = collection(db, "audit_logs");
+        let q = query(auditLogsRef, orderBy("deletedAt", "desc"));
+        
+        // Apply filters if provided
+        if (filters.itemType) {
+          q = query(auditLogsRef, 
+            where("itemType", "==", filters.itemType),
+            orderBy("deletedAt", "desc")
+          );
+        }
+        
+        if (filters.station) {
+          q = query(auditLogsRef, 
+            where("station", "==", filters.station),
+            orderBy("deletedAt", "desc")
+          );
+        }
+        
+        if (filters.limit) {
+          q = query(q, limit(filters.limit));
+        }
+        
+        const snapshot = await getDocs(q);
+        const auditLogs = snapshot.docs.map(doc => ({
+          id: doc.id,
+          ...doc.data()
+        }));
+        
+        return auditLogs;
+      } catch (error) {
+        console.error("Error getting audit logs:", error);
+        return [];
+      }
+    },
+
+    // Get paginated audit logs
+    getPaginatedAuditLogs: async (page = 1, logsPerPage = 10, filters = {}) => {
+      try {
+        const auditLogsRef = collection(db, "audit_logs");
+        
+        // Build query conditions
+        const conditions = [orderBy("deletedAt", "desc")];
+        
+        if (filters.itemType) {
+          conditions.unshift(where("itemType", "==", filters.itemType));
+        }
+        
+        if (filters.station) {
+          conditions.unshift(where("station", "==", filters.station));
+        }
+        
+        if (filters.deletedBy) {
+          conditions.unshift(where("deletedBy", "==", filters.deletedBy));
+        }
+        
+        // Get total count
+        const countQuery = query(auditLogsRef, ...conditions.filter(c => c.type !== 'orderBy'));
+        const countSnapshot = await getCountFromServer(countQuery);
+        const totalLogs = countSnapshot.data().count;
+        
+        // Get paginated data
+        const offset = (page - 1) * logsPerPage;
+        const paginatedQuery = query(auditLogsRef, ...conditions, limit(logsPerPage));
+        
+        let finalQuery = paginatedQuery;
+        if (offset > 0) {
+          const prevPageQuery = query(auditLogsRef, ...conditions, limit(offset));
+          const prevPageSnapshot = await getDocs(prevPageQuery);
+          const lastDoc = prevPageSnapshot.docs[prevPageSnapshot.docs.length - 1];
+          
+          if (lastDoc) {
+            finalQuery = query(auditLogsRef, ...conditions, startAfter(lastDoc), limit(logsPerPage));
+          }
+        }
+        
+        const snapshot = await getDocs(finalQuery);
+        const auditLogs = snapshot.docs.map(doc => ({
+          id: doc.id,
+          ...doc.data()
+        }));
+        
+        return {
+          logs: auditLogs,
+          totalLogs,
+          totalPages: Math.ceil(totalLogs / logsPerPage),
+          currentPage: page,
+          hasNextPage: offset + logsPerPage < totalLogs,
+          hasPrevPage: page > 1
+        };
+      } catch (error) {
+        console.error("Error getting paginated audit logs:", error);
+        return {
+          logs: [],
+          totalLogs: 0,
+          totalPages: 0,
+          currentPage: 1,
+          hasNextPage: false,
+          hasPrevPage: false
+        };
+      }
+    },
+
+    // Help Reports collection operations
+    createHelpReport: async (reportData) => {
+      try {
+        const newReport = {
+          ...reportData,
+          createdAt: serverTimestamp(),
+          updatedAt: serverTimestamp()
+        };
+
+        const docRef = await addDoc(collection(db, "help_reports"), newReport);
+        
+        return {
+          id: docRef.id,
+          ...newReport
+        };
+      } catch (error) {
+        console.error("Error creating help report:", error);
+        return null;
+      }
+    },
+
+    // Get all help reports (for admin)
+    getAllHelpReports: async () => {
+      try {
+        const reportsRef = collection(db, "help_reports");
+        const q = query(reportsRef, orderBy("createdAt", "desc"));
+        const snapshot = await getDocs(q);
+        const reportsList = snapshot.docs.map(doc => ({
+          id: doc.id,
+          ...doc.data()
+        }));
+        return reportsList;
+      } catch (error) {
+        console.error("Error getting help reports:", error);
+        return [];
+      }
+    },
+
+    // Update help report status
+    updateHelpReportStatus: async (reportId, status, response = '') => {
+      try {
+        const reportRef = doc(db, "help_reports", reportId);
+        const updateData = {
+          status,
+          updatedAt: serverTimestamp()
+        };
+        
+        if (response) {
+          updateData.adminResponse = response;
+          updateData.respondedAt = serverTimestamp();
+          updateData.respondedBy = auth.currentUser?.displayName || 'Admin';
+        }
+
+        await updateDoc(reportRef, updateData);
+        return true;
+      } catch (error) {
+        console.error("Error updating help report:", error);
+        return false;
+      }
     }
   };
 
@@ -1899,9 +2206,9 @@ const App = () => {
     return savedMode !== null ? savedMode === 'true' : true; // Default to true (dark mode)
   });
   
-  // Initialize selectedStation from localStorage with default to Station 1
+  // Initialize selectedStation from localStorage without hardcoded defaults
   const [selectedStation, setSelectedStation] = useState(() => {
-    return localStorage.getItem('selectedStation') || 'Station 1';
+    return localStorage.getItem('selectedStation') || '';
   });
 
   return (

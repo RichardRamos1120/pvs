@@ -34,7 +34,9 @@ import {
   Phone,
   CheckCircle,
   Eye,
-  ArrowLeft
+  ArrowLeft,
+  HelpCircle,
+  MessageCircle
 } from 'lucide-react';
 import { formatDatePST, formatDateTimePST } from '../utils/timezone';
 
@@ -80,6 +82,10 @@ const AdminPortal = ({ darkMode, setDarkMode, selectedStation, setSelectedStatio
 
   // Pagination state for stations
   const [currentStationPage, setCurrentStationPage] = useState(1);
+
+  // Help Reports state
+  const [helpReports, setHelpReports] = useState([]);
+  const [helpReportsLoading, setHelpReportsLoading] = useState(false);
   const [totalStations, setTotalStations] = useState(0);
   const [stationsPerPage] = useState(5); // Show 5 stations per page
 
@@ -414,6 +420,28 @@ const AdminPortal = ({ darkMode, setDarkMode, selectedStation, setSelectedStatio
         >
           <FileBarChart className="w-4 h-4 mr-1 md:mr-2" />
           <span>Reports</span>
+        </button>
+        <button
+          onClick={() => updateAdminSection('audit')}
+          className={`px-3 md:px-6 py-3 flex items-center whitespace-nowrap text-sm md:text-base ${
+            adminActiveSection === 'audit' 
+              ? `${darkMode ? 'bg-gray-700 text-blue-400 font-medium border-b-2 border-blue-500' : 'bg-blue-50 text-blue-600 font-medium border-b-2 border-blue-600'}` 
+              : `${darkMode ? 'text-gray-300 hover:bg-gray-700' : 'text-gray-600 hover:bg-gray-100'}`
+          }`}
+        >
+          <Eye className="w-4 h-4 mr-1 md:mr-2" />
+          <span>Audit Logs</span>
+        </button>
+        <button
+          onClick={() => updateAdminSection('help-reports')}
+          className={`px-3 md:px-6 py-3 flex items-center whitespace-nowrap text-sm md:text-base ${
+            adminActiveSection === 'help-reports' 
+              ? `${darkMode ? 'bg-gray-700 text-blue-400 font-medium border-b-2 border-blue-500' : 'bg-blue-50 text-blue-600 font-medium border-b-2 border-blue-600'}` 
+              : `${darkMode ? 'text-gray-300 hover:bg-gray-700' : 'text-gray-600 hover:bg-gray-100'}`
+          }`}
+        >
+          <HelpCircle className="w-4 h-4 mr-1 md:mr-2" />
+          <span>Help Reports</span>
         </button>
       </div>
     </div>
@@ -1978,6 +2006,819 @@ const AdminPortal = ({ darkMode, setDarkMode, selectedStation, setSelectedStatio
       </div>
     );
   };
+
+  // Audit Logs Component
+  const AuditLogs = () => {
+    const [auditLogs, setAuditLogs] = useState([]);
+    const [loading, setLoading] = useState(true);
+    const [currentPage, setCurrentPage] = useState(1);
+    const [totalLogs, setTotalLogs] = useState(0);
+    const [logsPerPage] = useState(10);
+    const [filterType, setFilterType] = useState('all');
+    const [filterStation, setFilterStation] = useState('all');
+    const [showDeletedItemModal, setShowDeletedItemModal] = useState(false);
+    const [selectedDeletedItem, setSelectedDeletedItem] = useState(null);
+
+    useEffect(() => {
+      const fetchAuditLogs = async () => {
+        try {
+          setLoading(true);
+          
+          const filters = {};
+          if (filterType !== 'all') filters.itemType = filterType;
+          if (filterStation !== 'all') filters.station = filterStation;
+          
+          console.log('Fetching audit logs with filters:', filters);
+          console.log('FilterStation value:', filterStation);
+          
+          const result = await firestoreOperations.getPaginatedAuditLogs(
+            currentPage,
+            logsPerPage,
+            filters
+          );
+          
+          console.log('Audit logs result:', result);
+          console.log('Number of logs returned:', result.logs?.length || 0);
+          if (result.logs && result.logs.length > 0) {
+            console.log('Sample log station field:', result.logs[0].station);
+          }
+          
+          setAuditLogs(result.logs || []);
+          setTotalLogs(result.totalLogs || 0);
+        } catch (error) {
+          console.error('Error fetching audit logs:', error);
+          showStatusMessage('Failed to load audit logs', 'error');
+        } finally {
+          setLoading(false);
+        }
+      };
+
+      fetchAuditLogs();
+    }, [currentPage, filterType, filterStation, firestoreOperations]);
+
+    const handlePageChange = (page) => {
+      setCurrentPage(page);
+    };
+
+    const formatTimestamp = (timestamp) => {
+      if (!timestamp) return 'Unknown';
+      const date = timestamp.toDate ? timestamp.toDate() : new Date(timestamp);
+      return formatDateTimePST(date);
+    };
+
+    // Get activity color based on category
+    const getActivityColor = (category) => {
+      switch(category) {
+        case "ADMIN":
+          return "bg-blue-500";
+        case "MAINTENANCE":
+          return "bg-green-500";
+        case "MEDICAL":
+          return "bg-red-500";
+        case "OPERATIONS":
+          return "bg-purple-500";
+        case "PR":
+          return "bg-yellow-500";
+        case "PREV":
+          return "bg-orange-500";
+        case "TRAINING":
+          return "bg-indigo-500";
+        case "UNION":
+          return "bg-pink-500";
+        case "ISO":
+          return "bg-gray-500";
+        default:
+          return "bg-gray-500";
+      }
+    };
+
+    // Format time for display
+    const formatTimeRange = (start, end) => {
+      if (!start && !end) return "—";
+      if (start && !end) return `${start} - ongoing`;
+      return `${start} - ${end}`;
+    };
+
+    // Helper function to format item types in camel case
+    const formatItemType = (itemType) => {
+      switch (itemType) {
+        case 'daily_log':
+          return 'Daily Log';
+        case 'gar_assessment':
+          return 'GAR Assessment';
+        case 'user':
+          return 'User';
+        default:
+          return itemType.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+      }
+    };
+
+    return (
+      <div className="space-y-6">
+        <div className="flex justify-between items-center">
+          <h2 className={`text-2xl font-bold ${darkMode ? 'text-white' : 'text-gray-900'}`}>Audit Logs</h2>
+          <p className={`text-sm ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>
+            Track all deletion activities in the system
+          </p>
+        </div>
+
+        {/* Filters */}
+        <div className={`${darkMode ? 'bg-gray-800' : 'bg-white'} rounded-lg shadow p-4`}>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            <div className="w-full">
+              <label className={`block text-sm font-medium mb-1 ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>
+                Type
+              </label>
+              <select
+                value={filterType}
+                onChange={(e) => {
+                  setFilterType(e.target.value);
+                  setCurrentPage(1);
+                }}
+                className={`w-full px-3 py-2 border rounded-md text-sm ${
+                  darkMode 
+                    ? 'bg-gray-700 border-gray-600 text-gray-200' 
+                    : 'bg-white border-gray-300 text-gray-700'
+                }`}
+              >
+                <option value="all">All Types</option>
+                <option value="daily_log">Daily Log</option>
+                <option value="assessment">Assessment</option>
+                <option value="gar_assessment">GAR Assessment</option>
+                <option value="user">User</option>
+              </select>
+            </div>
+
+            <div className="w-full">
+              <label className={`block text-sm font-medium mb-1 ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>
+                Station
+              </label>
+              <select
+                value={filterStation}
+                onChange={(e) => {
+                  setFilterStation(e.target.value);
+                  setCurrentPage(1);
+                }}
+                className={`w-full px-3 py-2 border rounded-md text-sm ${
+                  darkMode 
+                    ? 'bg-gray-700 border-gray-600 text-gray-200' 
+                    : 'bg-white border-gray-300 text-gray-700'
+                }`}
+              >
+                <option value="all">All Stations</option>
+                {allStations.map(station => (
+                  <option key={station.id} value={`Station ${station.number}`}>
+                    Station {station.number}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
+        </div>
+
+        {/* Audit Logs Table */}
+        <div className={`${darkMode ? 'bg-gray-800' : 'bg-white'} rounded-lg shadow overflow-hidden`}>
+          {loading ? (
+            <div className="flex justify-center items-center h-64">
+              <div className={`animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 ${darkMode ? 'border-blue-400' : 'border-blue-500'}`}></div>
+            </div>
+          ) : auditLogs.length > 0 ? (
+            <>
+              {/* Desktop Table View */}
+              <div className="hidden lg:block overflow-x-auto">
+                <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+                  <thead className={darkMode ? 'bg-gray-750' : 'bg-gray-50'}>
+                    <tr>
+                      <th className={`px-6 py-3 text-left text-xs font-medium uppercase tracking-wider ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>
+                        Deleted At
+                      </th>
+                      <th className={`px-6 py-3 text-left text-xs font-medium uppercase tracking-wider ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>
+                        Deleted By
+                      </th>
+                      <th className={`px-6 py-3 text-left text-xs font-medium uppercase tracking-wider ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>
+                        Item Type
+                      </th>
+                      <th className={`px-6 py-3 text-left text-xs font-medium uppercase tracking-wider ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>
+                        Station
+                      </th>
+                      <th className={`px-6 py-3 text-left text-xs font-medium uppercase tracking-wider ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>
+                        Details
+                      </th>
+                      <th className={`px-6 py-3 text-left text-xs font-medium uppercase tracking-wider ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>
+                        Actions
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody className={`divide-y ${darkMode ? 'divide-gray-700' : 'divide-gray-200'}`}>
+                    {auditLogs.map((log) => (
+                      <tr key={log.id} className={darkMode ? 'hover:bg-gray-700' : 'hover:bg-gray-50'}>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <div className={`text-sm ${darkMode ? 'text-gray-300' : 'text-gray-900'}`}>
+                            {formatTimestamp(log.deletedAt)}
+                          </div>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <div className={`text-sm ${darkMode ? 'text-gray-300' : 'text-gray-900'}`}>
+                            <div className="font-medium">{log.deletedByName || 'Unknown User'}</div>
+                            <div className={`text-xs ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>{log.deletedBy}</div>
+                          </div>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <span className={`inline-flex px-2 py-1 text-xs font-medium rounded-full ${
+                            log.itemType === 'daily_log' 
+                              ? (darkMode ? 'bg-blue-900 text-blue-200' : 'bg-blue-100 text-blue-800')
+                              : log.itemType === 'gar_assessment'
+                              ? (darkMode ? 'bg-amber-900 text-amber-200' : 'bg-amber-100 text-amber-800')
+                              : (darkMode ? 'bg-gray-700 text-gray-300' : 'bg-gray-100 text-gray-800')
+                          }`}>
+                            {formatItemType(log.itemType)}
+                          </span>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <div className={`text-sm ${darkMode ? 'text-gray-300' : 'text-gray-900'}`}>
+                            {log.station === 'All Stations' ? 
+                              'All Stations' :
+                              log.station === 'Unknown' || !log.station ? 
+                                'Unknown Station' : 
+                                (log.station.includes('Station') ? log.station : `Station ${log.station}`)
+                            }
+                          </div>
+                        </td>
+                        <td className="px-6 py-4">
+                          <div className={`text-sm ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>
+                            {log.itemType === 'daily_log' && log.deletedItem && (
+                              <div>
+                                <p>Date: {log.deletedItem.date}</p>
+                                <p>Captain: {log.deletedItem.captain}</p>
+                                <p>Status: {log.deletedItem.status}</p>
+                              </div>
+                            )}
+                          </div>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <button
+                            onClick={() => {
+                              setSelectedDeletedItem({
+                                ...log,
+                                deletedAtFormatted: formatTimestamp(log.deletedAt)
+                              });
+                              setShowDeletedItemModal(true);
+                            }}
+                            className={`text-sm ${darkMode ? 'text-blue-400 hover:text-blue-300' : 'text-blue-600 hover:text-blue-800'}`}
+                          >
+                            View Full Details
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+
+              {/* Mobile Card View */}
+              <div className="lg:hidden">
+                <div className="space-y-4 p-4">
+                  {auditLogs.map((log) => (
+                    <div 
+                      key={log.id} 
+                      className={`rounded-lg p-4 ${darkMode ? 'bg-gray-750 border border-gray-700' : 'bg-gray-50 border border-gray-200'}`}
+                    >
+                      {/* Header with Type Badge */}
+                      <div className="flex justify-between items-start mb-3">
+                        <span className={`inline-flex px-2 py-1 text-xs font-medium rounded-full ${
+                          log.itemType === 'daily_log' 
+                            ? (darkMode ? 'bg-blue-900 text-blue-200' : 'bg-blue-100 text-blue-800')
+                            : log.itemType === 'gar_assessment'
+                            ? (darkMode ? 'bg-amber-900 text-amber-200' : 'bg-amber-100 text-amber-800')
+                            : (darkMode ? 'bg-gray-700 text-gray-300' : 'bg-gray-100 text-gray-800')
+                        }`}>
+                          {formatItemType(log.itemType)}
+                        </span>
+                        <span className={`text-xs ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>
+                          {log.station === 'All Stations' ? 
+                            'All Stations' :
+                            log.station === 'Unknown' || !log.station ? 
+                              'Unknown Station' : 
+                              (log.station.includes('Station') ? log.station : `Station ${log.station}`)
+                          }
+                        </span>
+                      </div>
+
+                      {/* Deleted Info */}
+                      <div className="space-y-2 mb-3">
+                        <div>
+                          <span className={`text-xs ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>Deleted At</span>
+                          <p className={`text-sm font-medium ${darkMode ? 'text-gray-300' : 'text-gray-900'}`}>
+                            {formatTimestamp(log.deletedAt)}
+                          </p>
+                        </div>
+                        <div>
+                          <span className={`text-xs ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>Deleted By</span>
+                          <p className={`text-sm font-medium ${darkMode ? 'text-gray-300' : 'text-gray-900'}`}>
+                            {log.deletedByName || 'Unknown User'}
+                          </p>
+                          <p className={`text-xs ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>
+                            {log.deletedBy}
+                          </p>
+                        </div>
+                      </div>
+
+                      {/* Details Preview */}
+                      {log.itemType === 'daily_log' && log.deletedItem && (
+                        <div className={`text-sm mb-3 p-2 rounded ${darkMode ? 'bg-gray-800' : 'bg-gray-100'}`}>
+                          <p><span className="font-medium">Date:</span> {log.deletedItem.date}</p>
+                          <p><span className="font-medium">Captain:</span> {log.deletedItem.captain}</p>
+                          <p><span className="font-medium">Status:</span> {log.deletedItem.status}</p>
+                        </div>
+                      )}
+
+                      {/* Action Button */}
+                      <button
+                        onClick={() => {
+                          setSelectedDeletedItem({
+                            ...log,
+                            deletedAtFormatted: formatTimestamp(log.deletedAt)
+                          });
+                          setShowDeletedItemModal(true);
+                        }}
+                        className={`w-full text-center py-2 px-4 rounded-md text-sm font-medium ${
+                          darkMode 
+                            ? 'bg-gray-700 text-blue-400 hover:bg-gray-600' 
+                            : 'bg-white text-blue-600 hover:bg-gray-50 border border-gray-300'
+                        }`}
+                      >
+                        View Full Details
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Pagination */}
+              {totalLogs > logsPerPage && (
+                <div className="py-4 px-4 lg:px-6">
+                  <Pagination
+                    currentPage={currentPage}
+                    totalPages={Math.ceil(totalLogs / logsPerPage)}
+                    totalItems={totalLogs}
+                    itemsPerPage={logsPerPage}
+                    onPageChange={handlePageChange}
+                    darkMode={darkMode}
+                    showItemCount={true}
+                  />
+                </div>
+              )}
+            </>
+          ) : (
+            <div className={`text-center py-8 ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>
+              <Eye className="w-12 h-12 mx-auto mb-4 opacity-50" />
+              <p>No audit logs found</p>
+              <p className="text-sm mt-2">Deletion activities will appear here</p>
+            </div>
+          )}
+        </div>
+
+        {/* Deleted Item Details Modal */}
+        {showDeletedItemModal && selectedDeletedItem && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
+            <div className={`${darkMode ? 'bg-gray-800' : 'bg-white'} rounded-lg shadow-xl w-full max-w-4xl max-h-[90vh] overflow-hidden flex flex-col lg:max-w-4xl`}>
+              {/* Modal Header */}
+              <div className={`px-6 py-4 border-b ${darkMode ? 'border-gray-700' : 'border-gray-200'} flex justify-between items-center`}>
+                <h3 className="text-lg font-semibold">Deleted Log Details</h3>
+                <button
+                  onClick={() => {
+                    setShowDeletedItemModal(false);
+                    setSelectedDeletedItem(null);
+                  }}
+                  className={`p-2 rounded-lg ${darkMode ? 'hover:bg-gray-700' : 'hover:bg-gray-100'}`}
+                >
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
+
+              {/* Modal Body */}
+              <div className="flex-1 overflow-y-auto p-6">
+                {/* Deletion Info */}
+                <div className={`mb-6 p-4 rounded-lg ${darkMode ? 'bg-gray-750' : 'bg-gray-50'}`}>
+                  <h4 className="font-semibold mb-2 text-sm uppercase text-gray-500 dark:text-gray-400">Deletion Information</h4>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
+                    <div>
+                      <span className="text-gray-500 dark:text-gray-400">Deleted By:</span>
+                      <p className="font-medium">{selectedDeletedItem.deletedBy}</p>
+                    </div>
+                    <div>
+                      <span className="text-gray-500 dark:text-gray-400">Deleted At:</span>
+                      <p className="font-medium">{selectedDeletedItem.deletedAtFormatted}</p>
+                    </div>
+                    <div>
+                      <span className="text-gray-500 dark:text-gray-400">Item Type:</span>
+                      <p className="font-medium">{formatItemType(selectedDeletedItem.itemType)}</p>
+                    </div>
+                    <div>
+                      <span className="text-gray-500 dark:text-gray-400">Item ID:</span>
+                      <p className="font-medium text-xs">{selectedDeletedItem.itemId}</p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Log Details */}
+                {selectedDeletedItem.deletedItem && (
+                  <div className="space-y-6">
+                    {/* Log Header Info */}
+                    <div className={`p-4 rounded-lg border ${darkMode ? 'border-gray-700 bg-gray-750' : 'border-gray-200 bg-gray-50'}`}>
+                      <h4 className="font-semibold mb-3">Log Information</h4>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
+                        <div>
+                          <span className="text-gray-500 dark:text-gray-400">Station:</span>
+                          <p className="font-medium">{selectedDeletedItem.deletedItem.station ? `Station ${selectedDeletedItem.deletedItem.station}` : 'N/A'}</p>
+                        </div>
+                        <div>
+                          <span className="text-gray-500 dark:text-gray-400">Date:</span>
+                          <p className="font-medium">{selectedDeletedItem.deletedItem.date || 'N/A'}</p>
+                        </div>
+                        <div>
+                          <span className="text-gray-500 dark:text-gray-400">Shift:</span>
+                          <p className="font-medium">{selectedDeletedItem.deletedItem.shift || 'N/A'}</p>
+                        </div>
+                        <div>
+                          <span className="text-gray-500 dark:text-gray-400">Captain:</span>
+                          <p className="font-medium">{selectedDeletedItem.deletedItem.captain || 'N/A'}</p>
+                        </div>
+                        <div>
+                          <span className="text-gray-500 dark:text-gray-400">Status:</span>
+                          <p className="font-medium capitalize">{selectedDeletedItem.deletedItem.status || 'N/A'}</p>
+                        </div>
+                        <div>
+                          <span className="text-gray-500 dark:text-gray-400">Created By:</span>
+                          <p className="font-medium">{selectedDeletedItem.deletedItem.createdByName || 'N/A'}</p>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Crew Members */}
+                    {selectedDeletedItem.deletedItem.crew && selectedDeletedItem.deletedItem.crew.length > 0 && (
+                      <div>
+                        <h4 className="font-semibold mb-3">Crew Members</h4>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2">
+                          {selectedDeletedItem.deletedItem.crew.map((member, index) => (
+                            <div 
+                              key={index} 
+                              className={`flex items-center p-2 rounded-lg border ${darkMode ? 'border-gray-700 bg-gray-750' : 'border-gray-200 bg-gray-50'}`}
+                            >
+                              <User className="w-4 h-4 mr-2 text-gray-500" />
+                              <span className="text-sm">{member}</span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Activities */}
+                    {selectedDeletedItem.deletedItem.activities && selectedDeletedItem.deletedItem.activities.length > 0 && (
+                      <div>
+                        <h4 className="font-semibold mb-3">Activities ({selectedDeletedItem.deletedItem.activities.length})</h4>
+                        <div className="space-y-3">
+                          {selectedDeletedItem.deletedItem.activities.map((activity, index) => (
+                            <div 
+                              key={activity.id || index} 
+                              className={`p-4 rounded-lg border ${darkMode ? 'border-gray-700' : 'border-gray-200'}`}
+                            >
+                              <div className="flex justify-between items-start mb-2">
+                                <div className="flex items-start space-x-3">
+                                  <div className={`w-2 h-2 rounded-full mt-1.5 ${getActivityColor(activity.type)}`}></div>
+                                  <div className="flex-1">
+                                    <p className="font-medium">{activity.description}</p>
+                                    <p className="text-sm text-gray-500 dark:text-gray-400">
+                                      {formatTimeRange(activity.details?.startTime, activity.details?.endTime)} • {activity.hours} hrs
+                                    </p>
+                                  </div>
+                                </div>
+                                <span className={`px-2 py-1 rounded-full text-xs ${darkMode ? 'bg-gray-700' : 'bg-gray-100'}`}>
+                                  {activity.type}
+                                </span>
+                              </div>
+
+                              {/* Activity Details */}
+                              <div className="ml-5 space-y-2">
+                                {activity.type === 'MAINTENANCE' && activity.details && (
+                                  <div className="text-sm text-gray-600 dark:text-gray-400">
+                                    {activity.details.apparatus && <p>Apparatus: {activity.details.apparatus}</p>}
+                                    {activity.details.maintenanceType && <p>Type: {activity.details.maintenanceType}</p>}
+                                    {activity.details.passFailStatus && <p>Status: {activity.details.passFailStatus}</p>}
+                                  </div>
+                                )}
+                                
+                                {activity.type === 'TRAINING' && activity.details?.trainingMethod && (
+                                  <div className="text-sm text-gray-600 dark:text-gray-400">
+                                    <p>Method: {activity.details.trainingMethod}</p>
+                                  </div>
+                                )}
+                                
+                                {activity.type === 'OPERATIONS' && activity.details && (
+                                  <div className="text-sm text-gray-600 dark:text-gray-400">
+                                    {activity.details.stationCoverage && <p>Station: {activity.details.stationCoverage}</p>}
+                                    {activity.details.apparatus && <p>Apparatus: {activity.details.apparatus}</p>}
+                                  </div>
+                                )}
+                                
+                                {activity.type === 'ADMIN' && activity.details?.documentType && (
+                                  <div className="text-sm text-gray-600 dark:text-gray-400">
+                                    <p>Document Type: {activity.details.documentType}</p>
+                                  </div>
+                                )}
+
+                                {/* Assigned Crew */}
+                                {activity.assignedCrewNames && activity.assignedCrewNames.length > 0 && (
+                                  <div className="text-sm">
+                                    <span className="text-gray-500 dark:text-gray-400">Assigned Crew: </span>
+                                    <span>{activity.assignedCrewNames.join(', ')}</span>
+                                  </div>
+                                )}
+
+                                {/* Notes */}
+                                {activity.notes && (
+                                  <div className={`text-sm p-2 rounded ${darkMode ? 'bg-gray-750' : 'bg-gray-100'}`}>
+                                    <span className="text-gray-500 dark:text-gray-400">Notes: </span>
+                                    {activity.notes}
+                                  </div>
+                                )}
+
+                                {/* Added By */}
+                                {activity.addedByName && (
+                                  <div className="text-xs text-gray-500 dark:text-gray-400 italic">
+                                    Added by {activity.addedByName}
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Captain's Notes */}
+                    {selectedDeletedItem.deletedItem.notes && (
+                      <div>
+                        <h4 className="font-semibold mb-3">Captain's Notes</h4>
+                        <div className={`p-4 rounded-lg ${darkMode ? 'bg-gray-750' : 'bg-gray-100'}`}>
+                          <p className="whitespace-pre-wrap">{selectedDeletedItem.deletedItem.notes}</p>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Raw JSON (Collapsible) */}
+                    <details className={`border rounded-lg ${darkMode ? 'border-gray-700' : 'border-gray-200'}`}>
+                      <summary className={`cursor-pointer p-4 font-medium ${darkMode ? 'hover:bg-gray-750' : 'hover:bg-gray-50'}`}>
+                        Show Raw Data (JSON)
+                      </summary>
+                      <div className="p-4">
+                        <pre className={`text-xs overflow-x-auto p-4 rounded ${darkMode ? 'bg-gray-900' : 'bg-gray-100'}`}>
+                          {JSON.stringify(selectedDeletedItem.deletedItem, null, 2)}
+                        </pre>
+                      </div>
+                    </details>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+    );
+  };
+
+  // Help Reports Component
+  const HelpReports = () => {
+    const [helpReportsData, setHelpReportsData] = useState([]);
+    const [helpReportsLoading, setHelpReportsLoading] = useState(false);
+    const [selectedReport, setSelectedReport] = useState(null);
+    const [responseText, setResponseText] = useState('');
+
+    useEffect(() => {
+      const fetchHelpReports = async () => {
+        try {
+          setHelpReportsLoading(true);
+          const reports = await firestoreOperations.getAllHelpReports();
+          setHelpReportsData(reports);
+        } catch (error) {
+          console.error('Error fetching help reports:', error);
+          setError('Failed to load help reports');
+        } finally {
+          setHelpReportsLoading(false);
+        }
+      };
+
+      fetchHelpReports();
+    }, []);
+
+    const updateReportStatus = async (reportId, status, response = '') => {
+      try {
+        await firestoreOperations.updateHelpReportStatus(reportId, status, response);
+        
+        // Update local state
+        setHelpReportsData(prev => prev.map(report => 
+          report.id === reportId 
+            ? { 
+                ...report, 
+                status, 
+                adminResponse: response || report.adminResponse,
+                respondedAt: response ? new Date().toISOString() : report.respondedAt,
+                respondedBy: response ? auth.currentUser?.displayName || 'Admin' : report.respondedBy
+              }
+            : report
+        ));
+        
+        setSelectedReport(null);
+        setResponseText('');
+        setStatusMessage({ text: 'Report updated successfully', type: 'success', visible: true });
+        setTimeout(() => setStatusMessage({ text: '', type: '', visible: false }), 3000);
+      } catch (error) {
+        console.error('Error updating report:', error);
+        setStatusMessage({ text: 'Failed to update report', type: 'error', visible: true });
+        setTimeout(() => setStatusMessage({ text: '', type: '', visible: false }), 3000);
+      }
+    };
+
+    const getPriorityColor = (priority) => {
+      switch (priority) {
+        case 'urgent': return 'bg-red-100 text-red-800 dark:bg-red-900/20 dark:text-red-300';
+        case 'high': return 'bg-orange-100 text-orange-800 dark:bg-orange-900/20 dark:text-orange-300';
+        case 'medium': return 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/20 dark:text-yellow-300';
+        case 'low': return 'bg-green-100 text-green-800 dark:bg-green-900/20 dark:text-green-300';
+        default: return 'bg-gray-100 text-gray-800 dark:bg-gray-900/20 dark:text-gray-300';
+      }
+    };
+
+    const getStatusColor = (status) => {
+      switch (status) {
+        case 'open': return 'bg-blue-100 text-blue-800 dark:bg-blue-900/20 dark:text-blue-300';
+        case 'in-progress': return 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/20 dark:text-yellow-300';
+        case 'resolved': return 'bg-green-100 text-green-800 dark:bg-green-900/20 dark:text-green-300';
+        case 'closed': return 'bg-gray-100 text-gray-800 dark:bg-gray-900/20 dark:text-gray-300';
+        default: return 'bg-gray-100 text-gray-800 dark:bg-gray-900/20 dark:text-gray-300';
+      }
+    };
+
+    const getTypeIcon = (type) => {
+      switch (type) {
+        case 'bug': return <AlertTriangle className="w-4 h-4" />;
+        case 'feature': return <FileText className="w-4 h-4" />;
+        case 'help': return <HelpCircle className="w-4 h-4" />;
+        default: return <MessageCircle className="w-4 h-4" />;
+      }
+    };
+
+    if (helpReportsLoading) {
+      return (
+        <div className="flex justify-center items-center h-64">
+          <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-blue-500"></div>
+          <span className="ml-2 text-gray-600 dark:text-gray-400">Loading help reports...</span>
+        </div>
+      );
+    }
+
+    return (
+      <div className="space-y-6">
+        <div className={`${darkMode ? 'bg-gray-800' : 'bg-white'} rounded-lg shadow p-6`}>
+          <h2 className="text-xl font-semibold mb-4 text-gray-900 dark:text-white">
+            Help & Bug Reports ({helpReportsData.length})
+          </h2>
+          
+          {helpReportsData.length === 0 ? (
+            <div className="text-center py-8 text-gray-500 dark:text-gray-400">
+              <HelpCircle className="w-12 h-12 mx-auto mb-4 opacity-30" />
+              <p>No help reports submitted yet</p>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              {helpReportsData.map(report => (
+                <div key={report.id} className={`border ${darkMode ? 'border-gray-700' : 'border-gray-200'} rounded-lg p-4`}>
+                  <div className="flex items-start justify-between">
+                    <div className="flex-1">
+                      <div className="flex items-center space-x-3 mb-2">
+                        <div className={`p-1 rounded ${getPriorityColor(report.priority)}`}>
+                          {getTypeIcon(report.type)}
+                        </div>
+                        <h3 className="font-medium text-gray-900 dark:text-white">
+                          {report.subject}
+                        </h3>
+                        <span className={`px-2 py-1 rounded-full text-xs ${getPriorityColor(report.priority)}`}>
+                          {report.priority}
+                        </span>
+                        <span className={`px-2 py-1 rounded-full text-xs ${getStatusColor(report.status)}`}>
+                          {report.status}
+                        </span>
+                      </div>
+                      
+                      <p className="text-gray-600 dark:text-gray-400 mb-2 line-clamp-2">
+                        {report.description}
+                      </p>
+                      
+                      <div className="text-sm text-gray-500 dark:text-gray-400 space-y-1">
+                        <p><strong>From:</strong> {report.submittedBy} ({report.submittedByEmail})</p>
+                        <p><strong>Page:</strong> {report.page}</p>
+                        <p><strong>Station:</strong> {report.station}</p>
+                        <p><strong>Date:</strong> {formatDateTimePST(new Date(report.submittedAt))}</p>
+                        {report.adminResponse && (
+                          <p><strong>Response:</strong> {report.adminResponse}</p>
+                        )}
+                      </div>
+                    </div>
+                    
+                    <div className="flex flex-col space-y-2 ml-4">
+                      <button
+                        onClick={() => setSelectedReport(report)}
+                        className="px-3 py-1 bg-blue-600 text-white rounded text-sm hover:bg-blue-700"
+                      >
+                        Respond
+                      </button>
+                      
+                      {report.status === 'open' && (
+                        <button
+                          onClick={() => updateReportStatus(report.id, 'in-progress')}
+                          className="px-3 py-1 bg-yellow-600 text-white rounded text-sm hover:bg-yellow-700"
+                        >
+                          In Progress
+                        </button>
+                      )}
+                      
+                      {report.status !== 'resolved' && report.status !== 'closed' && (
+                        <button
+                          onClick={() => updateReportStatus(report.id, 'resolved')}
+                          className="px-3 py-1 bg-green-600 text-white rounded text-sm hover:bg-green-700"
+                        >
+                          Resolve
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* Response Modal */}
+        {selectedReport && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
+            <div className="bg-white dark:bg-gray-800 rounded-lg shadow-lg p-6 max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+              <h3 className="text-lg font-semibold mb-4 text-gray-900 dark:text-white">
+                Respond to Report: {selectedReport.subject}
+              </h3>
+              
+              <div className="mb-4 p-4 bg-gray-50 dark:bg-gray-700 rounded">
+                <p className="text-sm text-gray-600 dark:text-gray-400 mb-2">
+                  <strong>Original Report:</strong>
+                </p>
+                <p className="text-gray-900 dark:text-white">{selectedReport.description}</p>
+              </div>
+              
+              <div className="mb-4">
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                  Admin Response
+                </label>
+                <textarea
+                  className="w-full p-3 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                  rows="4"
+                  placeholder="Enter your response to the user..."
+                  value={responseText}
+                  onChange={(e) => setResponseText(e.target.value)}
+                />
+              </div>
+              
+              <div className="flex justify-end space-x-3">
+                <button
+                  onClick={() => {
+                    setSelectedReport(null);
+                    setResponseText('');
+                  }}
+                  className="px-4 py-2 border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-200 rounded-md bg-white dark:bg-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={() => updateReportStatus(selectedReport.id, 'resolved', responseText)}
+                  disabled={!responseText.trim()}
+                  className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  Send Response & Resolve
+                </button>
+                <button
+                  onClick={() => updateReportStatus(selectedReport.id, 'in-progress', responseText)}
+                  disabled={!responseText.trim()}
+                  className="px-4 py-2 bg-yellow-600 text-white rounded-md hover:bg-yellow-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  Send Response & Mark In Progress
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+    );
+  };
   
   // Render admin content based on active section
   const renderAdminContent = () => {
@@ -1992,6 +2833,10 @@ const AdminPortal = ({ darkMode, setDarkMode, selectedStation, setSelectedStatio
         return <AdminReports />;
       case 'analytics':
         return <AnalyticsComponent />;
+      case 'audit':
+        return <AuditLogs />;
+      case 'help-reports':
+        return <HelpReports />;
       default:
         return <AdminOverview />;
     }

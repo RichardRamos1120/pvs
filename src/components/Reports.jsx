@@ -307,10 +307,20 @@ const Reports = () => {
     }
 
     try {
-      await firestoreOperations.deleteLog(logToDelete.id);
+      // Pass user info to the delete function for audit logging
+      const deleteSuccess = await firestoreOperations.deleteLog(logToDelete.id, {
+        userEmail: auth.currentUser?.email,
+        userDisplayName: userProfile?.displayName || auth.currentUser?.displayName || 'Unknown User',
+        userId: auth.currentUser?.uid
+      });
 
-      // Update the logs list by filtering out the deleted log
-      setPastLogs(pastLogs.filter(log => log.id !== logToDelete.id));
+      if (deleteSuccess) {
+        // Update the logs list by filtering out the deleted log
+        setPastLogs(pastLogs.filter(log => log.id !== logToDelete.id));
+        
+        // Update total count
+        setTotalLogs(prev => Math.max(0, prev - 1));
+      }
 
       // Close the confirmation modal
       setDeleteConfirmOpen(false);

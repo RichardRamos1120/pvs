@@ -47,7 +47,7 @@ service cloud.firestore {
     }
     
     // GAR assessments collection
-    match /garAssessments/{assessmentId} {
+    match /assessments/{assessmentId} {
       allow read: if isAuthenticated();
       allow create: if isAuthenticated();
       allow update: if isAuthenticated() &&
@@ -67,6 +67,22 @@ service cloud.firestore {
     match /settings/{settingId} {
       allow read: if isAuthenticated();
       allow write: if hasRole('admin');
+    }
+    
+    // Audit logs collection - only admins can read, system creates via deleteLog function
+    match /audit_logs/{auditId} {
+      allow read: if hasRole('admin');
+      allow create: if isAuthenticated() && canManageLogs();
+      allow update: if false; // Audit logs should never be updated
+      allow delete: if false; // Audit logs should never be deleted
+    }
+    
+    // Help reports collection - users can create, admins can read and update
+    match /help_reports/{reportId} {
+      allow read: if hasRole('admin');
+      allow create: if isAuthenticated();
+      allow update: if hasRole('admin');
+      allow delete: if hasRole('admin');
     }
     
     // Catch-all for any other collections during development

@@ -16,7 +16,8 @@ import {
   Menu,
   X,
   AlertTriangle,
-  Shield
+  Shield,
+  HelpCircle
 } from 'lucide-react';
 
 const Layout = ({ children, darkMode, setDarkMode, selectedStation, setSelectedStation }) => {
@@ -24,6 +25,14 @@ const Layout = ({ children, darkMode, setDarkMode, selectedStation, setSelectedS
   const [isAdmin, setIsAdmin] = useState(false);
   const [stations, setStations] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [showHelpModal, setShowHelpModal] = useState(false);
+  const [helpReport, setHelpReport] = useState({
+    type: 'bug',
+    subject: '',
+    description: '',
+    page: '',
+    priority: 'medium'
+  });
   
   const navigate = useNavigate();
   const location = useLocation();
@@ -130,6 +139,49 @@ const Layout = ({ children, darkMode, setDarkMode, selectedStation, setSelectedS
     return false;
   };
 
+  // Handle help report submission
+  const submitHelpReport = async () => {
+    try {
+      const reportData = {
+        ...helpReport,
+        page: location.pathname,
+        submittedBy: auth.currentUser?.displayName || 'Unknown User',
+        submittedByEmail: auth.currentUser?.email || 'Unknown Email',
+        submittedByUid: auth.currentUser?.uid || 'Unknown UID',
+        submittedAt: new Date().toISOString(),
+        status: 'open',
+        userAgent: navigator.userAgent,
+        station: selectedStation
+      };
+
+      await firestoreOperations.createHelpReport(reportData);
+      
+      // Reset form and close modal
+      setHelpReport({
+        type: 'bug',
+        subject: '',
+        description: '',
+        page: '',
+        priority: 'medium'
+      });
+      setShowHelpModal(false);
+      
+      alert('Help report submitted successfully! Thank you for your feedback.');
+    } catch (error) {
+      console.error('Error submitting help report:', error);
+      alert('Error submitting report. Please try again.');
+    }
+  };
+
+  // Open help modal and set current page
+  const openHelpModal = () => {
+    setHelpReport(prev => ({
+      ...prev,
+      page: location.pathname
+    }));
+    setShowHelpModal(true);
+  };
+
   return (
     <div className={`min-h-screen ${darkMode ? 'dark-mode bg-gray-900' : 'bg-gray-100'} flex flex-col`}>
       {/* Header - Increased height */}
@@ -142,42 +194,43 @@ const Layout = ({ children, darkMode, setDarkMode, selectedStation, setSelectedS
             </div>
             
             <div className="hidden md:flex items-center space-x-6">
-              {/* Station selector - disabled on Reports pages, GAR Assessment, Admin pages, or when no stations */}
-              {location.pathname === '/reports' ||
-               location.pathname.startsWith('/report/') ||
-               location.pathname === '/gar-assessment' ||
-               location.pathname.startsWith('/gar-assessment/') ||
-               location.pathname === '/admin' ||
-               location.pathname.startsWith('/admin/') ||
-               stations.length === 0 ? (
-                <div className={`${darkMode ? 'bg-gray-700' : 'bg-blue-700'} text-white rounded-md px-3 py-1 text-sm min-w-[120px] ${stations.length === 0 ? 'bg-opacity-60 dark:bg-opacity-60' : 'opacity-50'}`}>
-                  {location.pathname === '/admin' || location.pathname.startsWith('/admin/') ? 
-                    'All Stations' : 
-                    stations.length === 0 ?
-                    (selectedStation === 'Error Loading Stations' ? 
-                      <span className="text-red-300">Error Loading</span> : 'No Stations') :
-                    selectedStation}
-                </div>
-              ) : (
-                <select
-                  className={`${darkMode ? 'bg-gray-700' : 'bg-blue-700'} text-white rounded-md px-3 py-1 text-sm border-none focus:ring-2 focus:ring-blue-400 min-w-[120px]`}
-                  value={selectedStation}
-                  onChange={(e) => {
-                    setSelectedStation(e.target.value);
-                    localStorage.setItem('selectedStation', e.target.value);
-                  }}
-                  disabled={loading}
-                >
-                  {loading ? (
-                    <option>Loading...</option>
-                  ) : stations.length > 0 ? (
-                    stations.map(station => (
-                      <option key={station} value={station}>{station}</option>
-                    ))
-                  ) : (
-                    <option value={selectedStation}>{selectedStation}</option>
-                  )}
-                </select>
+              {/* Station selector - hidden on GAR Assessment pages, disabled on Reports/Admin pages */}
+              {(location.pathname === '/gar-assessment' || 
+                location.pathname.startsWith('/gar-assessment/')) ? null : (
+                location.pathname === '/reports' ||
+                location.pathname.startsWith('/report/') ||
+                location.pathname === '/admin' ||
+                location.pathname.startsWith('/admin/') ||
+                stations.length === 0 ? (
+                  <div className={`${darkMode ? 'bg-gray-700' : 'bg-blue-700'} text-white rounded-md px-3 py-1 text-sm min-w-[120px] ${stations.length === 0 ? 'bg-opacity-60 dark:bg-opacity-60' : 'opacity-50'}`}>
+                    {location.pathname === '/admin' || location.pathname.startsWith('/admin/') ? 
+                      'All Stations' : 
+                      stations.length === 0 ?
+                      (selectedStation === 'Error Loading Stations' ? 
+                        <span className="text-red-300">Error Loading</span> : 'No Stations') :
+                      selectedStation}
+                  </div>
+                ) : (
+                  <select
+                    className={`${darkMode ? 'bg-gray-700' : 'bg-blue-700'} text-white rounded-md px-3 py-1 text-sm border-none focus:ring-2 focus:ring-blue-400 min-w-[120px]`}
+                    value={selectedStation}
+                    onChange={(e) => {
+                      setSelectedStation(e.target.value);
+                      localStorage.setItem('selectedStation', e.target.value);
+                    }}
+                    disabled={loading}
+                  >
+                    {loading ? (
+                      <option>Loading...</option>
+                    ) : stations.length > 0 ? (
+                      stations.map(station => (
+                        <option key={station} value={station}>{station}</option>
+                      ))
+                    ) : (
+                      <option value={selectedStation}>{selectedStation}</option>
+                    )}
+                  </select>
+                )
               )}
               
               <div className="text-sm flex items-center whitespace-nowrap">
@@ -198,6 +251,15 @@ const Layout = ({ children, darkMode, setDarkMode, selectedStation, setSelectedS
                   {auth.currentUser?.displayName || 'Captain'}
                 </span>
               </div>
+              
+              <button
+                onClick={openHelpModal}
+                className={`p-2 rounded-lg ${darkMode ? 'hover:bg-gray-700' : 'hover:bg-blue-700'} flex-shrink-0`}
+                aria-label="Help & Bug Report"
+                title="Help & Bug Report"
+              >
+                <HelpCircle className="h-5 w-5" />
+              </button>
               
               <button
                 onClick={toggleDarkMode}
@@ -247,49 +309,61 @@ const Layout = ({ children, darkMode, setDarkMode, selectedStation, setSelectedS
                 <span>{auth.currentUser?.displayName || 'Captain'}</span>
               </div>
               
-              {/* Mobile station selector - disabled on Reports pages, GAR Assessment, Admin pages, or when no stations */}
-              {location.pathname === '/reports' ||
-               location.pathname.startsWith('/report/') ||
-               location.pathname === '/gar-assessment' ||
-               location.pathname.startsWith('/gar-assessment/') ||
-               location.pathname === '/admin' ||
-               location.pathname.startsWith('/admin/') || 
-               stations.length === 0 ? (
-                <div className={`w-full ${darkMode ? 'bg-gray-700' : 'bg-blue-700'} text-white rounded-md px-3 py-2 text-sm mb-2 ${stations.length === 0 ? 'bg-opacity-60 dark:bg-opacity-60' : 'opacity-50'} flex items-center`}>
-                  <span>Station: </span>
-                  <span className="ml-2 font-medium">
-                    {location.pathname === '/admin' || location.pathname.startsWith('/admin/') ? 
-                      'All Stations' : 
-                      stations.length === 0 ?
-                      (selectedStation === 'Error Loading Stations' ? 
-                        <span className="text-red-300">Error Loading</span> : 'No Stations') :
-                      selectedStation}
-                  </span>
-                </div>
-              ) : (
-                <select
-                  className={`w-full ${darkMode ? 'bg-gray-700' : 'bg-blue-700'} text-white rounded-md px-3 py-2 text-sm border-none focus:ring-2 focus:ring-blue-400 mb-2`}
-                  value={selectedStation}
-                  onChange={(e) => {
-                    setSelectedStation(e.target.value);
-                    localStorage.setItem('selectedStation', e.target.value);
-                    setMenuOpen(false);
-                  }}
-                  disabled={loading}
-                >
-                  {loading ? (
-                    <option>Loading...</option>
-                  ) : stations.length > 0 ? (
-                    stations.map(station => (
-                      <option key={station} value={station}>{station}</option>
-                    ))
-                  ) : (
-                    <option value={selectedStation}>{selectedStation}</option>
-                  )}
-                </select>
+              {/* Mobile station selector - hidden on GAR Assessment pages, disabled on Reports/Admin pages */}
+              {(location.pathname === '/gar-assessment' || 
+                location.pathname.startsWith('/gar-assessment/')) ? null : (
+                location.pathname === '/reports' ||
+                location.pathname.startsWith('/report/') ||
+                location.pathname === '/admin' ||
+                location.pathname.startsWith('/admin/') || 
+                stations.length === 0 ? (
+                  <div className={`w-full ${darkMode ? 'bg-gray-700' : 'bg-blue-700'} text-white rounded-md px-3 py-2 text-sm mb-2 ${stations.length === 0 ? 'bg-opacity-60 dark:bg-opacity-60' : 'opacity-50'} flex items-center`}>
+                    <span>Station: </span>
+                    <span className="ml-2 font-medium">
+                      {location.pathname === '/admin' || location.pathname.startsWith('/admin/') ? 
+                        'All Stations' : 
+                        stations.length === 0 ?
+                        (selectedStation === 'Error Loading Stations' ? 
+                          <span className="text-red-300">Error Loading</span> : 'No Stations') :
+                        selectedStation}
+                    </span>
+                  </div>
+                ) : (
+                  <select
+                    className={`w-full ${darkMode ? 'bg-gray-700' : 'bg-blue-700'} text-white rounded-md px-3 py-2 text-sm border-none focus:ring-2 focus:ring-blue-400 mb-2`}
+                    value={selectedStation}
+                    onChange={(e) => {
+                      setSelectedStation(e.target.value);
+                      localStorage.setItem('selectedStation', e.target.value);
+                      setMenuOpen(false);
+                    }}
+                    disabled={loading}
+                  >
+                    {loading ? (
+                      <option>Loading...</option>
+                    ) : stations.length > 0 ? (
+                      stations.map(station => (
+                        <option key={station} value={station}>{station}</option>
+                      ))
+                    ) : (
+                      <option value={selectedStation}>{selectedStation}</option>
+                    )}
+                  </select>
+                )
               )}
               
               <div className="flex flex-col space-y-2">
+                <button
+                  onClick={() => {
+                    openHelpModal();
+                    setMenuOpen(false);
+                  }}
+                  className={`flex items-center px-3 py-2 rounded-md text-sm font-medium ${darkMode ? 'hover:bg-gray-700' : 'hover:bg-blue-700'}`}
+                >
+                  <HelpCircle className="h-5 w-5 mr-2" />
+                  Help & Bug Report
+                </button>
+                
                 <button
                   onClick={toggleDarkMode}
                   className={`flex items-center px-3 py-2 rounded-md text-sm font-medium ${darkMode ? 'hover:bg-gray-700' : 'hover:bg-blue-700'}`}
@@ -384,6 +458,99 @@ const Layout = ({ children, darkMode, setDarkMode, selectedStation, setSelectedS
           {children}
         </div>
       </main>
+
+      {/* Help & Bug Report Modal */}
+      {showHelpModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
+          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-lg p-6 max-w-md w-full max-h-[90vh] overflow-y-auto">
+            <h3 className="text-lg font-semibold mb-4 text-gray-900 dark:text-white">Help & Bug Report</h3>
+            
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                  Report Type
+                </label>
+                <select
+                  className="w-full p-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                  value={helpReport.type}
+                  onChange={(e) => setHelpReport(prev => ({ ...prev, type: e.target.value }))}
+                >
+                  <option value="bug">Bug Report</option>
+                  <option value="feature">Feature Request</option>
+                  <option value="help">Need Help</option>
+                  <option value="other">Other</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                  Priority
+                </label>
+                <select
+                  className="w-full p-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                  value={helpReport.priority}
+                  onChange={(e) => setHelpReport(prev => ({ ...prev, priority: e.target.value }))}
+                >
+                  <option value="low">Low</option>
+                  <option value="medium">Medium</option>
+                  <option value="high">High</option>
+                  <option value="urgent">Urgent</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                  Subject
+                </label>
+                <input
+                  type="text"
+                  className="w-full p-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                  placeholder="Brief description of the issue or request"
+                  value={helpReport.subject}
+                  onChange={(e) => setHelpReport(prev => ({ ...prev, subject: e.target.value }))}
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                  Description
+                </label>
+                <textarea
+                  className="w-full p-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                  rows="4"
+                  placeholder="Please provide detailed information about the issue, what you expected to happen, and steps to reproduce (if applicable)"
+                  value={helpReport.description}
+                  onChange={(e) => setHelpReport(prev => ({ ...prev, description: e.target.value }))}
+                />
+              </div>
+
+              <div className="bg-gray-50 dark:bg-gray-700 p-3 rounded-md">
+                <div className="text-sm text-gray-600 dark:text-gray-400">
+                  <p><strong>Current Page:</strong> {location.pathname}</p>
+                  <p><strong>Station:</strong> {selectedStation}</p>
+                  <p><strong>User:</strong> {auth.currentUser?.displayName || 'Unknown'}</p>
+                </div>
+              </div>
+            </div>
+
+            <div className="flex justify-end space-x-3 mt-6">
+              <button
+                onClick={() => setShowHelpModal(false)}
+                className="px-4 py-2 border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-200 rounded-md bg-white dark:bg-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={submitHelpReport}
+                disabled={!helpReport.subject.trim() || !helpReport.description.trim()}
+                className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                Submit Report
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
