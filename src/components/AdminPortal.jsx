@@ -1,5 +1,5 @@
 // src/components/AdminPortal.jsx
-import React, { useState, useEffect, useContext } from 'react';
+import React, { useState, useEffect, useLayoutEffect, useContext, useRef, useCallback, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { getAuth } from 'firebase/auth';
 import { FirestoreContext } from '../App';
@@ -36,9 +36,15 @@ import {
   Eye,
   ArrowLeft,
   HelpCircle,
-  MessageCircle
+  MessageCircle,
+  MessageSquare,
+  Send,
+  Bot,
+  Clock
 } from 'lucide-react';
 import { formatDatePST, formatDateTimePST } from '../utils/timezone';
+
+// REMOVED - Old HelpChats component - Using the one inside AdminPortal instead
 
 const AdminPortal = ({ darkMode, setDarkMode, selectedStation, setSelectedStation }) => {
   // Initialize adminActiveSection from localStorage with default to 'overview'
@@ -84,10 +90,9 @@ const AdminPortal = ({ darkMode, setDarkMode, selectedStation, setSelectedStatio
   const [currentStationPage, setCurrentStationPage] = useState(1);
 
   // Help Reports state
-  const [helpReports, setHelpReports] = useState([]);
-  const [helpReportsLoading, setHelpReportsLoading] = useState(false);
   const [totalStations, setTotalStations] = useState(0);
   const [stationsPerPage] = useState(5); // Show 5 stations per page
+  const [totalUnreadHelpMessages, setTotalUnreadHelpMessages] = useState(0);
 
   const navigate = useNavigate();
   const auth = getAuth();
@@ -135,96 +140,72 @@ const AdminPortal = ({ darkMode, setDarkMode, selectedStation, setSelectedStatio
     initializeComponent();
   }, [auth, firestoreOperations, navigate]);
 
-  // Debug function to check actual user data structure
-  const debugUserData = async () => {
+  // Memoized user formatter to prevent unnecessary re-processing
+  const formatUserData = useCallback((users) => {
+    return users.map(user => ({
+      id: user.id || user.userId,
+      firstName: user.firstName || user.displayName?.split(' ')[0] || '',
+      lastName: user.lastName || user.displayName?.split(' ').slice(1).join(' ') || '',
+      email: user.email || '',
+      role: user.role || 'firefighter',
+      rank: user.rank || 'Firefighter',
+      stationId: user.stationId || user.station || '',
+      status: user.status || 'active',
+      lastLogin: user.lastLogin || user.lastSignInTime || new Date().toISOString(),
+      createdAt: user.createdAt || user.creationTime || new Date().toISOString(),
+      permissions: user.permissions || []
+    }));
+  }, []);
+
+  // Helper to show status messages (moved here to fix declaration order)
+  const showStatusMessage = useCallback((text, type = 'success') => {
+    setStatusMessage({ text, type, visible: true });
+    
+    // Hide message after 3 seconds
+    setTimeout(() => {
+      setStatusMessage(prev => ({ ...prev, visible: false }));
+    }, 3000);
+  }, []);
+
+  // Memoized fetch function to prevent recreation on every render
+  const fetchUsers = useCallback(async () => {
+    if (!auth.currentUser) return;
+
     try {
-      const allUsers = await firestoreOperations.getAllUsers();
-      console.log('=== DEBUG: ALL USERS DATA ===');
-      console.log('Total users found:', allUsers.length);
-      allUsers.forEach((user, index) => {
-        console.log(`User ${index + 1}:`, {
-          id: user.id,
-          role: user.role,
-          status: user.status,
-          rank: user.rank,
-          firstName: user.firstName,
-          email: user.email
-        });
-      });
-      console.log('=== END DEBUG ===');
-    } catch (error) {
-      console.error('Debug error:', error);
-    }
-  };
-
-  // Separate effect for fetching users when filters or pagination change
-  useEffect(() => {
-    const fetchUsers = async () => {
-      if (!auth.currentUser) return;
-
-      try {
-        // Call debug function to see actual data
-        await debugUserData();
-        
-        console.log('Fetching users with filters:', {
-          page: currentUserPage,
-          role: userRoleFilter,
-          status: userStatusFilter,
-          rank: userRankFilter
-        });
-
-        const paginatedResult = await firestoreOperations.getPaginatedUsers(
-          currentUserPage,
-          usersPerPage,
-          userRoleFilter === 'all' ? null : userRoleFilter,
-          null, // No station filter for now
-          userStatusFilter === 'all' ? null : userStatusFilter,
-          userRankFilter === 'all' ? null : userRankFilter
-        );
-        
-        console.log('Received users result:', paginatedResult);
-        
-        // Show notification if using client-side filtering
-        if (paginatedResult.clientSideFiltered) {
-          showStatusMessage("Using client-side filtering (Firestore indexes pending)", "info");
-        }
-        
-        if (paginatedResult.users) {
-          // Format data to match our component's expected structure
-          const formattedUsers = paginatedResult.users.map(user => ({
-            id: user.id || user.userId,
-            firstName: user.firstName || user.displayName?.split(' ')[0] || '',
-            lastName: user.lastName || user.displayName?.split(' ').slice(1).join(' ') || '',
-            email: user.email || '',
-            role: user.role || 'firefighter',
-            rank: user.rank || 'Firefighter',
-            stationId: user.stationId || user.station || '',
-            status: user.status || 'active',
-            lastLogin: user.lastLogin || user.lastSignInTime || new Date().toISOString(),
-            createdAt: user.createdAt || user.creationTime || new Date().toISOString(),
-            permissions: user.permissions || []
-          }));
-          
-          console.log('Setting formatted users:', formattedUsers.length);
-          setUsers(formattedUsers);
-          setTotalUsers(paginatedResult.totalUsers || 0);
-        } else {
-          // No users found
-          setUsers([]);
-          setTotalUsers(0);
-        }
-      } catch (error) {
-        console.error("Error fetching users:", error);
-        setError("Failed to load users.");
-        
-        // No fallback data, just empty array
+      const paginatedResult = await firestoreOperations.getPaginatedUsers(
+        currentUserPage,
+        usersPerPage,
+        userRoleFilter === 'all' ? null : userRoleFilter,
+        null, // No station filter for now
+        userStatusFilter === 'all' ? null : userStatusFilter,
+        userRankFilter === 'all' ? null : userRankFilter
+      );
+      
+      // Show notification if using client-side filtering
+      if (paginatedResult.clientSideFiltered) {
+        showStatusMessage("Using client-side filtering (Firestore indexes pending)", "info");
+      }
+      
+      if (paginatedResult.users) {
+        const formattedUsers = formatUserData(paginatedResult.users);
+        setUsers(formattedUsers);
+        setTotalUsers(paginatedResult.totalUsers || 0);
+      } else {
         setUsers([]);
         setTotalUsers(0);
       }
-    };
+    } catch (error) {
+      console.error("Error fetching users:", error);
+      setError("Failed to load users.");
+      setUsers([]);
+      setTotalUsers(0);
+    }
+  }, [auth.currentUser, firestoreOperations, currentUserPage, usersPerPage, userRoleFilter, userStatusFilter, userRankFilter, formatUserData, showStatusMessage]);
 
+  // Optimized effect for fetching users - uses memoized function
+  useEffect(() => {
     fetchUsers();
-  }, [auth, firestoreOperations, currentUserPage, userRoleFilter, userStatusFilter, userRankFilter, usersPerPage]);
+  }, [fetchUsers]);
 
   // Function to fetch ALL stations for dropdowns (reusable)
   const fetchAllStations = async () => {
@@ -253,7 +234,6 @@ const AdminPortal = ({ darkMode, setDarkMode, selectedStation, setSelectedStatio
   useEffect(() => {
     const fetchStations = async () => {
       try {
-        console.log(`Fetching paginated stations - Page: ${currentStationPage}`);
         
         const paginatedResult = await firestoreOperations.getPaginatedStations(
           currentStationPage,
@@ -305,19 +285,16 @@ const AdminPortal = ({ darkMode, setDarkMode, selectedStation, setSelectedStatio
 
   // Handle user role filter change
   const handleUserRoleFilterChange = (role) => {
-    console.log('Role filter changed to:', role);
     setUserRoleFilter(role);
     setCurrentUserPage(1); // Reset to first page when filter changes
   };
 
   const handleUserStatusFilterChange = (status) => {
-    console.log('Status filter changed to:', status);
     setUserStatusFilter(status);
     setCurrentUserPage(1); // Reset to first page when filter changes
   };
 
   const handleUserRankFilterChange = (rank) => {
-    console.log('Rank filter changed to:', rank);
     setUserRankFilter(rank);
     setCurrentUserPage(1); // Reset to first page when filter changes
   };
@@ -328,15 +305,6 @@ const AdminPortal = ({ darkMode, setDarkMode, selectedStation, setSelectedStatio
     return station ? `Station ${station.number}` : 'Unassigned';
   };
   
-  // Helper to show status messages
-  const showStatusMessage = (text, type = 'success') => {
-    setStatusMessage({ text, type, visible: true });
-    
-    // Hide message after 3 seconds
-    setTimeout(() => {
-      setStatusMessage(prev => ({ ...prev, visible: false }));
-    }, 3000);
-  };
 
   const getCaptainName = (captainId) => {
     if (!captainId) return 'No Captain Assigned';
@@ -433,15 +401,20 @@ const AdminPortal = ({ darkMode, setDarkMode, selectedStation, setSelectedStatio
           <span>Audit Logs</span>
         </button>
         <button
-          onClick={() => updateAdminSection('help-reports')}
+          onClick={() => updateAdminSection('help-chats')}
           className={`px-3 md:px-6 py-3 flex items-center whitespace-nowrap text-sm md:text-base ${
-            adminActiveSection === 'help-reports' 
+            adminActiveSection === 'help-chats' 
               ? `${darkMode ? 'bg-gray-700 text-blue-400 font-medium border-b-2 border-blue-500' : 'bg-blue-50 text-blue-600 font-medium border-b-2 border-blue-600'}` 
               : `${darkMode ? 'text-gray-300 hover:bg-gray-700' : 'text-gray-600 hover:bg-gray-100'}`
           }`}
         >
-          <HelpCircle className="w-4 h-4 mr-1 md:mr-2" />
-          <span>Help Reports</span>
+          <MessageSquare className="w-4 h-4 mr-1 md:mr-2" />
+          <span>Help Chats</span>
+          {totalUnreadHelpMessages > 0 && (
+            <span className="ml-2 bg-red-500 text-white text-xs font-bold rounded-full min-w-[18px] h-[18px] flex items-center justify-center px-1">
+              {totalUnreadHelpMessages > 99 ? '99+' : totalUnreadHelpMessages}
+            </span>
+          )}
         </button>
       </div>
     </div>
@@ -2588,237 +2561,791 @@ const AdminPortal = ({ darkMode, setDarkMode, selectedStation, setSelectedStatio
       </div>
     );
   };
+  
+  // Help Chats Component - Memoized to prevent recreation
+  const HelpChats = React.memo(({ darkMode, firestoreOperations, auth, showStatusMessage, formatDateTimePST, formatDatePST }) => {
+    // Debug: Log when component re-renders (reduced frequency)
+    if (Math.random() < 0.1) console.log('🔄 HelpChats component rendered/re-rendered');
+    const [conversations, setConversations] = useState([]);
+    const [selectedConversationId, setSelectedConversationId] = useState(() => 
+      localStorage.getItem('adminSelectedConversationId') || null
+    );
+    const [selectedConversation, setSelectedConversation] = useState(null);
+    const [messages, setMessages] = useState([]);
+    const [newMessage, setNewMessage] = useState('');
+    const [conversationsLoading, setConversationsLoading] = useState(false);
+    const [messagesLoading, setMessagesLoading] = useState(false);
+    
+    // Refs for auto-scroll functionality
+    const messagesContainerRef = useRef(null);
+    const messagesEndRef = useRef(null);
+    
+    // User scroll state for UI feedback
+    const [isUserScrolling, setIsUserScrolling] = useState(false);
+    const [showScrollToBottom, setShowScrollToBottom] = useState(false);
+    const wasNearBottomRef = useRef(true); // Track scroll position before new messages
+    
+    // Auto-mark as read state
+    const [isViewingConversation, setIsViewingConversation] = useState(false);
 
-  // Help Reports Component
-  const HelpReports = () => {
-    const [helpReportsData, setHelpReportsData] = useState([]);
-    const [helpReportsLoading, setHelpReportsLoading] = useState(false);
-    const [selectedReport, setSelectedReport] = useState(null);
-    const [responseText, setResponseText] = useState('');
-
-    useEffect(() => {
-      const fetchHelpReports = async () => {
-        try {
-          setHelpReportsLoading(true);
-          const reports = await firestoreOperations.getAllHelpReports();
-          setHelpReportsData(reports);
-        } catch (error) {
-          console.error('Error fetching help reports:', error);
-          setError('Failed to load help reports');
-        } finally {
-          setHelpReportsLoading(false);
-        }
-      };
-
-      fetchHelpReports();
+    // Instant scroll to bottom (no animation) - Messenger style
+    const scrollToBottomInstant = useCallback(() => {
+      if (messagesEndRef.current) {
+        messagesEndRef.current.scrollIntoView({ behavior: 'auto' });
+      }
     }, []);
 
-    const updateReportStatus = async (reportId, status, response = '') => {
+    // Smooth scroll to bottom (with animation) - for user-triggered actions
+    const scrollToBottomSmooth = useCallback(() => {
+      if (messagesEndRef.current) {
+        messagesEndRef.current.scrollIntoView({ behavior: 'smooth' });
+        setShowScrollToBottom(false);
+      }
+    }, []);
+
+    // Check if admin is near bottom of messages (memoized to prevent useLayoutEffect recreation)
+    const isNearBottom = useCallback(() => {
+      if (!messagesContainerRef.current) return true;
+      const { scrollTop, scrollHeight, clientHeight } = messagesContainerRef.current;
+      const distanceFromBottom = scrollHeight - scrollTop - clientHeight;
+      return distanceFromBottom < 50; // Within 50px of bottom for more responsive auto-scroll
+    }, []);
+
+    // Function to manually mark current conversation as read for admin - copy user-side approach
+    const markCurrentConversationAsRead = useCallback(async () => {
+      if (!selectedConversationId || !auth.currentUser?.uid) return;
+      
       try {
-        await firestoreOperations.updateHelpReportStatus(reportId, status, response);
+        await firestoreOperations.markHelpMessagesAsRead(selectedConversationId, auth.currentUser.uid, true);
         
-        // Update local state
-        setHelpReportsData(prev => prev.map(report => 
-          report.id === reportId 
-            ? { 
-                ...report, 
-                status, 
-                adminResponse: response || report.adminResponse,
-                respondedAt: response ? new Date().toISOString() : report.respondedAt,
-                respondedBy: response ? auth.currentUser?.displayName || 'Admin' : report.respondedBy
-              }
-            : report
-        ));
-        
-        setSelectedReport(null);
-        setResponseText('');
-        setStatusMessage({ text: 'Report updated successfully', type: 'success', visible: true });
-        setTimeout(() => setStatusMessage({ text: '', type: '', visible: false }), 3000);
+        // Update conversations list like user side does
+        setConversations(prev => {
+          const updatedConversations = prev.map(conv => 
+            conv.id === selectedConversationId ? { ...conv, adminUnreadCount: 0 } : conv
+          );
+          
+          return updatedConversations;
+        });
       } catch (error) {
-        console.error('Error updating report:', error);
-        setStatusMessage({ text: 'Failed to update report', type: 'error', visible: true });
-        setTimeout(() => setStatusMessage({ text: '', type: '', visible: false }), 3000);
+        console.error('Error marking conversation as read:', error);
       }
-    };
+    }, [selectedConversationId, auth.currentUser?.uid]);
 
-    const getPriorityColor = (priority) => {
-      switch (priority) {
-        case 'urgent': return 'bg-red-100 text-red-800 dark:bg-red-900/20 dark:text-red-300';
-        case 'high': return 'bg-orange-100 text-orange-800 dark:bg-orange-900/20 dark:text-orange-300';
-        case 'medium': return 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/20 dark:text-yellow-300';
-        case 'low': return 'bg-green-100 text-green-800 dark:bg-green-900/20 dark:text-green-300';
-        default: return 'bg-gray-100 text-gray-800 dark:bg-gray-900/20 dark:text-gray-300';
+    // Debounced auto-mark function to prevent multiple calls
+    const checkAutoMarkRef = useRef(null);
+    const checkAutoMark = useCallback(() => {
+      if (!selectedConversation || !isViewingConversation) return;
+      
+      // Check if there are unread messages
+      const hasUnreadMessages = (selectedConversation.adminUnreadCount || 0) > 0;
+      if (!hasUnreadMessages) return;
+      
+      // Clear any pending auto-mark
+      if (checkAutoMarkRef.current) {
+        clearTimeout(checkAutoMarkRef.current);
       }
-    };
+      
+      // Debounce the auto-mark to prevent multiple calls
+      checkAutoMarkRef.current = setTimeout(() => {
+        if (isViewingConversation && selectedConversation && (selectedConversation.adminUnreadCount || 0) > 0) {
+          markCurrentConversationAsRead();
+        }
+      }, 300); // 300ms delay to debounce
+    }, [selectedConversation, isViewingConversation, markCurrentConversationAsRead]);
 
-    const getStatusColor = (status) => {
-      switch (status) {
-        case 'open': return 'bg-blue-100 text-blue-800 dark:bg-blue-900/20 dark:text-blue-300';
-        case 'in-progress': return 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/20 dark:text-yellow-300';
-        case 'resolved': return 'bg-green-100 text-green-800 dark:bg-green-900/20 dark:text-green-300';
-        case 'closed': return 'bg-gray-100 text-gray-800 dark:bg-gray-900/20 dark:text-gray-300';
-        default: return 'bg-gray-100 text-gray-800 dark:bg-gray-900/20 dark:text-gray-300';
+    // Handle scroll events to detect admin scrolling (throttled for performance)
+    const scrollTimeoutRef = useRef(null);
+    const handleScroll = useCallback(() => {
+      if (!messagesContainerRef.current) return;
+      
+      // Throttle scroll handling
+      if (scrollTimeoutRef.current) {
+        clearTimeout(scrollTimeoutRef.current);
       }
-    };
+      
+      scrollTimeoutRef.current = setTimeout(() => {
+        if (!messagesContainerRef.current) return;
+        
+        const isAtBottom = isNearBottom();
+        setIsUserScrolling(!isAtBottom);
+        setShowScrollToBottom(!isAtBottom && messages.length > 0);
+        
+        // Update the ref for next auto-scroll decision
+        wasNearBottomRef.current = isAtBottom;
+        
+        // Check if we should auto-mark when admin scrolls to bottom
+        if (isAtBottom && isViewingConversation) {
+          checkAutoMark();
+        }
+      }, 100); // 100ms throttle
+    }, [isNearBottom, messages.length, isViewingConversation, checkAutoMark]);
 
-    const getTypeIcon = (type) => {
-      switch (type) {
-        case 'bug': return <AlertTriangle className="w-4 h-4" />;
-        case 'feature': return <FileText className="w-4 h-4" />;
-        case 'help': return <HelpCircle className="w-4 h-4" />;
-        default: return <MessageCircle className="w-4 h-4" />;
+    // Smart message merging to prevent reload behavior
+    const mergeMessages = useCallback((newMessages) => {
+      // Debug: Log mergeMessages calls (reduced frequency)
+      if (Math.random() < 0.3) console.log('📨 mergeMessages called with:', newMessages.length, 'messages');
+      setMessages(prevMessages => {
+        if (Math.random() < 0.3) console.log('📝 Previous messages:', prevMessages.length, 'New messages:', newMessages.length);
+        // If it's the first load (no previous messages), just set them
+        if (prevMessages.length === 0) {
+          return newMessages;
+        }
+
+        // Create maps for efficient lookup
+        const prevMessagesMap = new Map();
+        const optimisticMessagesMap = new Map();
+        
+        prevMessages.forEach(msg => {
+          if (msg.isOptimistic) {
+            // Use message content + senderId as key for optimistic messages
+            const key = `${msg.message}::${msg.senderId}`;
+            optimisticMessagesMap.set(key, msg);
+          }
+          prevMessagesMap.set(msg.id, msg);
+        });
+
+        // Process new messages and handle optimistic message replacement
+        const processedMessages = [];
+        const processedOptimisticKeys = new Set();
+        
+        newMessages.forEach(newMsg => {
+          if (!newMsg.isOptimistic) {
+            // Check if this real message replaces an optimistic one
+            const optimisticKey = `${newMsg.message}::${newMsg.senderId}`;
+            if (optimisticMessagesMap.has(optimisticKey)) {
+              // Mark optimistic message as processed
+              processedOptimisticKeys.add(optimisticKey);
+              const optimisticMsg = optimisticMessagesMap.get(optimisticKey);
+              // Preserve the same React key by keeping the optimistic message ID
+              processedMessages.push({
+                ...newMsg,
+                id: optimisticMsg.id, // Keep the same ID to prevent re-render
+                _realId: newMsg.id, // Store real ID for reference
+                isOptimistic: false
+              });
+            } else {
+              processedMessages.push(newMsg);
+            }
+          }
+        });
+
+        // Add remaining optimistic messages that weren't replaced
+        optimisticMessagesMap.forEach((msg, key) => {
+          if (!processedOptimisticKeys.has(key)) {
+            processedMessages.push(msg);
+          }
+        });
+
+        // Sort by timestamp to maintain order
+        processedMessages.sort((a, b) => {
+          const timeA = new Date(a.timestamp || 0).getTime();
+          const timeB = new Date(b.timestamp || 0).getTime();
+          return timeA - timeB;
+        });
+
+        return processedMessages;
+      });
+    }, []);
+
+    // Track if this is the initial load or a new message
+    const isInitialLoad = useRef(true);
+    const previousMessageCount = useRef(0);
+
+    // Effect to handle scroll positioning - Messenger style (before paint)
+    useLayoutEffect(() => {
+      if (messages.length === 0) return;
+
+      const isNewMessage = messages.length > previousMessageCount.current;
+      const isFirstLoad = isInitialLoad.current && messages.length > 0;
+      const lastMessage = messages[messages.length - 1];
+      const isOwnMessage = lastMessage?.senderId === auth.currentUser?.uid;
+
+      if (isFirstLoad) {
+        // On initial load, position instantly at bottom BEFORE paint
+        scrollToBottomInstant();
+        isInitialLoad.current = false;
+        wasNearBottomRef.current = true;
+      } else if (isNewMessage) {
+        // Use the PREVIOUS scroll state, don't recalculate after new message is added
+        const shouldAutoScroll = wasNearBottomRef.current;
+        
+        if (isOwnMessage) {
+          // Always auto-scroll for admin's own messages
+          scrollToBottomInstant();
+          wasNearBottomRef.current = true;
+        } else if (shouldAutoScroll) {
+          // Auto-scroll for user messages only if admin was near bottom
+          scrollToBottomInstant();
+          wasNearBottomRef.current = true;
+          // Only auto-mark if this is a user message and admin is viewing
+          if (!isOwnMessage && isViewingConversation) {
+            checkAutoMark();
+          }
+        } else {
+          // Show scroll to bottom button if admin was scrolled up
+          setShowScrollToBottom(true);
+        }
       }
-    };
 
-    if (helpReportsLoading) {
+      previousMessageCount.current = messages.length;
+    }, [messages.length, scrollToBottomInstant, auth.currentUser?.uid]);
+
+    // Reset initial load flag when conversation changes
+    useEffect(() => {
+      isInitialLoad.current = true;
+      previousMessageCount.current = 0;
+    }, [selectedConversationId]);
+
+    // Manage viewing state based on conversation visibility
+    useEffect(() => {
+      if (selectedConversationId && selectedConversation) {
+        setIsViewingConversation(true);
+        // Delayed auto-mark check to ensure proper state
+        const timer = setTimeout(() => {
+          if (selectedConversationId && selectedConversation && (selectedConversation.adminUnreadCount || 0) > 0) {
+            checkAutoMark();
+          }
+        }, 1000); // Increased delay to prevent rapid calls
+        
+        return () => clearTimeout(timer);
+      } else {
+        setIsViewingConversation(false);
+      }
+    }, [selectedConversationId, selectedConversation?.id, selectedConversation?.adminUnreadCount]);
+
+    // Memoized message component with custom comparison to prevent unnecessary re-renders
+    const MessageItem = React.memo(({ message, darkMode }) => (
+      <div
+        className={`flex ${message.sender === 'admin' ? 'justify-end' : 'justify-start'}`}
+      >
+        <div
+          className={`max-w-[70%] rounded-lg p-3 ${
+            message.sender === 'admin'
+              ? 'bg-blue-600 text-white'
+              : darkMode ? 'bg-gray-700 text-white' : 'bg-gray-100 text-gray-900'
+          }`}
+        >
+          <div className="flex items-center gap-2 mb-1">
+            {message.sender === 'admin' ? (
+              <Bot className="w-4 h-4" />
+            ) : (
+              <User className="w-4 h-4" />
+            )}
+            <span className="text-xs font-medium">{message.senderName}</span>
+          </div>
+          <p className="text-sm whitespace-pre-wrap">{message.message}</p>
+          <p className={`text-xs mt-1 ${
+            message.sender === 'admin' ? 'text-blue-100' : darkMode ? 'text-gray-400' : 'text-gray-500'
+          }`}>
+            {(() => {
+              try {
+                if (message.isOptimistic) return 'Sending...';
+                if (!message.timestamp) return 'Just now';
+                
+                let date;
+                if (message.timestamp?.seconds) {
+                  date = new Date(message.timestamp.seconds * 1000);
+                } else if (message.timestamp?.toDate) {
+                  date = message.timestamp.toDate();
+                } else if (typeof message.timestamp === 'string') {
+                  date = new Date(message.timestamp);
+                } else if (message.timestamp instanceof Date) {
+                  date = message.timestamp;
+                } else if (typeof message.timestamp === 'number') {
+                  date = new Date(message.timestamp);
+                } else {
+                  date = new Date(message.timestamp);
+                }
+                
+                if (isNaN(date.getTime())) return 'Just now';
+                return formatDateTimePST(date);
+              } catch (e) {
+                console.warn('Error formatting message timestamp:', e, 'Timestamp:', message.timestamp);
+                return 'Just now';
+              }
+            })()}
+          </p>
+        </div>
+      </div>
+    ), (prevProps, nextProps) => {
+      // Custom comparison to prevent unnecessary re-renders
+      // Only re-render if actual content changes, not just object references
       return (
-        <div className="flex justify-center items-center h-64">
-          <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-blue-500"></div>
-          <span className="ml-2 text-gray-600 dark:text-gray-400">Loading help reports...</span>
+        prevProps.message.id === nextProps.message.id &&
+        prevProps.message.message === nextProps.message.message &&
+        prevProps.message.senderName === nextProps.message.senderName &&
+        prevProps.message.sender === nextProps.message.sender &&
+        prevProps.message.isOptimistic === nextProps.message.isOptimistic &&
+        prevProps.message.timestamp === nextProps.message.timestamp &&
+        prevProps.darkMode === nextProps.darkMode
+      );
+    });
+
+    // Memoized messages list component to prevent unnecessary re-renders
+    const MessagesList = React.memo(({ messages, darkMode }) => {
+      // Debug: Log when MessagesList re-renders (reduced frequency)
+      if (Math.random() < 0.2) console.log('💬 MessagesList rendered with', messages.length, 'messages');
+      return (
+        <div className="space-y-4">
+        {messages.map((message) => (
+          <MessageItem
+            key={message.id}
+            message={message}
+            darkMode={darkMode}
+          />
+        ))}
         </div>
       );
-    }
+    }, (prevProps, nextProps) => {
+      // Only re-render if messages array length changes or darkMode changes
+      if (prevProps.messages.length !== nextProps.messages.length || 
+          prevProps.darkMode !== nextProps.darkMode) {
+        return false;
+      }
+      
+      // Deep compare messages only if lengths are same
+      return prevProps.messages.every((msg, index) => {
+        const nextMsg = nextProps.messages[index];
+        return msg.id === nextMsg.id && 
+               msg.message === nextMsg.message &&
+               msg.isOptimistic === nextMsg.isOptimistic;
+      });
+    });
+
+    // Update selected conversation when conversations list changes (FIXED - no circular dependency)
+    useEffect(() => {
+      if (selectedConversationId && conversations.length > 0) {
+        const conv = conversations.find(c => c.id === selectedConversationId);
+        if (conv) {
+          setSelectedConversation(conv);
+        }
+        // Don't clear selectedConversationId here to avoid circular dependency
+      }
+    }, [conversations, selectedConversationId]);
+
+    // Separate effect for localStorage restoration (FIXED - no circular dependency)  
+    useEffect(() => {
+      if (!selectedConversationId && conversations.length > 0) {
+        const storedId = localStorage.getItem('adminSelectedConversationId');
+        if (storedId) {
+          const conv = conversations.find(c => c.id === storedId);
+          if (conv) {
+            setSelectedConversationId(storedId);
+            setSelectedConversation(conv);
+          } else {
+            localStorage.removeItem('adminSelectedConversationId');
+          }
+        }
+      }
+    }, [conversations]); // REMOVED selectedConversationId from dependencies!
+
+    // Real-time conversations subscription - copy user-side approach
+    useEffect(() => {
+      const unsubscribe = firestoreOperations.subscribeToHelpConversations(
+        null, // null for admin to get all conversations
+        (updatedConversations) => {
+          setConversations(updatedConversations);
+          setConversationsLoading(false);
+          
+          // Don't update parent state here - it causes full re-render
+          // const totalUnread = updatedConversations.reduce((sum, conv) => sum + (conv.adminUnreadCount || 0), 0);
+          // setTotalUnreadHelpMessages(totalUnread);
+        }
+      );
+
+      return unsubscribe;
+    }, []); // Empty dependency array - subscription only created once
+
+    // Real-time messages subscription - copy user-side approach
+    useEffect(() => {
+      if (!selectedConversationId) return;
+
+      // Clear messages when switching conversations to prevent stale data
+      setMessages([]);
+      setMessagesLoading(true);
+      
+      // Immediately scroll to bottom to prevent any visual jumping
+      if (messagesContainerRef.current) {
+        messagesContainerRef.current.scrollTop = messagesContainerRef.current.scrollHeight;
+      }
+
+      const unsubscribe = firestoreOperations.subscribeToHelpMessages(
+        selectedConversationId,
+        (updatedMessages) => {
+          mergeMessages(updatedMessages);
+          setMessagesLoading(false);
+          // Smart merging prevents reload behavior
+        }
+      );
+
+      return unsubscribe;
+    }, [selectedConversationId, mergeMessages]); // Keep mergeMessages but it's now stable
+
+    // NO SCROLL LOGIC - CLEAN STATE
+
+    // NO AUTO SCROLL - NUKED
+
+    // Removed auto-marking timer that was causing conversation to close
+
+
+
+    // Select a conversation - copy user-side approach
+    const selectConversation = async (conversation) => {
+      const conversationId = conversation?.id || null;
+      setSelectedConversationId(conversationId);
+      setSelectedConversation(conversation);
+      
+      // Persist to localStorage to prevent closing on updates
+      if (conversationId) {
+        localStorage.setItem('adminSelectedConversationId', conversationId);
+      } else {
+        localStorage.removeItem('adminSelectedConversationId');
+      }
+      
+      // No automatic marking - only mark as read manually when admin explicitly views
+    };
+
+
+    const loadMessages = async (conversationId) => {
+      try {
+        setMessagesLoading(true);
+        const conversationMessages = await firestoreOperations.getHelpMessages(conversationId);
+        setMessages(conversationMessages);
+      } catch (error) {
+        console.error('Error loading messages:', error);
+        showStatusMessage('Failed to load messages', 'error');
+      } finally {
+        setMessagesLoading(false);
+      }
+    };
+
+    const sendMessage = async () => {
+      if (!newMessage.trim() || !selectedConversation) return;
+
+      try {
+        const messageData = {
+          conversationId: selectedConversationId,
+          message: newMessage.trim(),
+          sender: 'admin',
+          senderName: auth.currentUser?.displayName || 'Admin',
+          senderEmail: auth.currentUser?.email,
+          senderId: auth.currentUser?.uid,
+          timestamp: new Date().toISOString(),
+          read: false
+        };
+
+        // Add optimistic update for instant UI feedback
+        // Use a stable ID that won't change when the real message arrives
+        const timestamp = Date.now();
+        const optimisticId = `temp-${timestamp}-${messageData.senderId}`;
+        const optimisticMessage = {
+          id: optimisticId,
+          ...messageData,
+          isOptimistic: true,
+          _tempTimestamp: timestamp // For sorting if needed
+        };
+        setMessages(prev => [...prev, optimisticMessage]);
+        setNewMessage('');
+
+        await firestoreOperations.addHelpMessage(messageData);
+        // Real-time subscription will update the UI automatically
+      } catch (error) {
+        console.error('Error sending message:', error);
+        showStatusMessage('Failed to send message', 'error');
+      }
+    };
+
+    const updateConversationStatus = async (conversationId, status) => {
+      try {
+        await firestoreOperations.updateHelpConversation(conversationId, { status });
+        
+        // Don't update local state immediately - let real-time subscription handle it
+        // This prevents disrupting the currently open conversation
+        
+        showStatusMessage(`Conversation marked as ${status}`, 'success');
+      } catch (error) {
+        console.error('Error updating conversation status:', error);
+        showStatusMessage('Failed to update status', 'error');
+      }
+    };
+
+    const getStatusBadge = (status) => {
+      switch (status) {
+        case 'open':
+          return <span className="px-2 py-1 text-xs rounded-full bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200">Open</span>;
+        case 'in-progress':
+          return <span className="px-2 py-1 text-xs rounded-full bg-yellow-100 dark:bg-yellow-900 text-yellow-800 dark:text-yellow-200">In Progress</span>;
+        case 'resolved':
+          return <span className="px-2 py-1 text-xs rounded-full bg-green-100 dark:bg-green-900 text-green-800 dark:text-green-200">Resolved</span>;
+        default:
+          return null;
+      }
+    };
+
+    const getTypeBadge = (type) => {
+      switch (type) {
+        case 'bug':
+          return <span className="px-2 py-1 text-xs rounded-full bg-red-100 dark:bg-red-900 text-red-800 dark:text-red-200">Bug</span>;
+        case 'feature':
+          return <span className="px-2 py-1 text-xs rounded-full bg-purple-100 dark:bg-purple-900 text-purple-800 dark:text-purple-200">Feature</span>;
+        case 'help':
+          return <span className="px-2 py-1 text-xs rounded-full bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200">Help</span>;
+        default:
+          return <span className="px-2 py-1 text-xs rounded-full bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-200">General</span>;
+      }
+    };
+
+    // Cleanup effect for timeouts on unmount
+    useEffect(() => {
+      return () => {
+        // Clear auto-mark timeout
+        if (checkAutoMarkRef.current) {
+          clearTimeout(checkAutoMarkRef.current);
+        }
+        // Clear scroll timeout
+        if (scrollTimeoutRef.current) {
+          clearTimeout(scrollTimeoutRef.current);
+        }
+      };
+    }, []);
 
     return (
       <div className="space-y-6">
-        <div className={`${darkMode ? 'bg-gray-800' : 'bg-white'} rounded-lg shadow p-6`}>
-          <h2 className="text-xl font-semibold mb-4 text-gray-900 dark:text-white">
-            Help & Bug Reports ({helpReportsData.length})
-          </h2>
-          
-          {helpReportsData.length === 0 ? (
-            <div className="text-center py-8 text-gray-500 dark:text-gray-400">
-              <HelpCircle className="w-12 h-12 mx-auto mb-4 opacity-30" />
-              <p>No help reports submitted yet</p>
-            </div>
-          ) : (
-            <div className="space-y-4">
-              {helpReportsData.map(report => (
-                <div key={report.id} className={`border ${darkMode ? 'border-gray-700' : 'border-gray-200'} rounded-lg p-4`}>
-                  <div className="flex items-start justify-between">
-                    <div className="flex-1">
-                      <div className="flex items-center space-x-3 mb-2">
-                        <div className={`p-1 rounded ${getPriorityColor(report.priority)}`}>
-                          {getTypeIcon(report.type)}
-                        </div>
-                        <h3 className="font-medium text-gray-900 dark:text-white">
-                          {report.subject}
-                        </h3>
-                        <span className={`px-2 py-1 rounded-full text-xs ${getPriorityColor(report.priority)}`}>
-                          {report.priority}
-                        </span>
-                        <span className={`px-2 py-1 rounded-full text-xs ${getStatusColor(report.status)}`}>
-                          {report.status}
-                        </span>
-                      </div>
-                      
-                      <p className="text-gray-600 dark:text-gray-400 mb-2 line-clamp-2">
-                        {report.description}
-                      </p>
-                      
-                      <div className="text-sm text-gray-500 dark:text-gray-400 space-y-1">
-                        <p><strong>From:</strong> {report.submittedBy} ({report.submittedByEmail})</p>
-                        <p><strong>Page:</strong> {report.page}</p>
-                        <p><strong>Station:</strong> {report.station}</p>
-                        <p><strong>Date:</strong> {formatDateTimePST(new Date(report.submittedAt))}</p>
-                        {report.adminResponse && (
-                          <p><strong>Response:</strong> {report.adminResponse}</p>
+        <h2 className={`text-2xl font-bold ${darkMode ? 'text-white' : 'text-gray-900'}`}>Help Chat Management</h2>
+        
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          {/* Conversations List */}
+          <div className={`lg:col-span-1 ${darkMode ? 'bg-gray-800' : 'bg-white'} rounded-lg shadow p-4`}>
+            <h3 className={`text-lg font-semibold mb-4 ${darkMode ? 'text-white' : 'text-gray-900'}`}>Conversations</h3>
+            
+            {conversationsLoading ? (
+              <div className="flex justify-center py-8">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500"></div>
+              </div>
+            ) : conversations.length === 0 ? (
+              <p className={`text-center py-8 ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>
+                No conversations yet
+              </p>
+            ) : (
+              <div className="space-y-2 max-h-[600px] overflow-y-auto">
+                {conversations.map((conv) => (
+                  <button
+                    key={conv.id}
+                    onClick={() => selectConversation(conv)}
+                    className={`w-full text-left p-3 rounded-lg transition-colors border ${
+                      selectedConversationId === conv.id
+                        ? darkMode ? 'bg-blue-900 bg-opacity-50 border-blue-500' : 'bg-blue-50 border-blue-300'
+                        : (conv.adminUnreadCount || 0) > 0
+                        ? darkMode ? 'hover:bg-gray-700 border-red-600 bg-red-900 bg-opacity-10' : 'hover:bg-gray-50 border-red-300 bg-red-50'
+                        : darkMode ? 'hover:bg-gray-700 border-transparent' : 'hover:bg-gray-50 border-transparent'
+                    }`}
+                  >
+                    <div className="flex justify-between items-start mb-1">
+                      <div className="flex items-center gap-2 flex-1">
+                        <h4 className={`font-medium truncate ${darkMode ? 'text-white' : 'text-gray-900'}`}>
+                          {conv.subject}
+                        </h4>
+                        {(conv.adminUnreadCount || 0) > 0 && (
+                          <span className="bg-red-500 text-white text-xs font-bold rounded-full min-w-[18px] h-[18px] flex items-center justify-center px-1 shadow-sm">
+                            {conv.adminUnreadCount > 99 ? '99+' : conv.adminUnreadCount}
+                          </span>
                         )}
                       </div>
+                      {getStatusBadge(conv.status)}
                     </div>
-                    
-                    <div className="flex flex-col space-y-2 ml-4">
+                    <p className={`text-sm ${darkMode ? 'text-gray-400' : 'text-gray-600'} mb-1`}>
+                      {conv.userName} • {(() => {
+                        try {
+                          if (!conv.createdAt) return 'Recently';
+                          
+                          let date;
+                          if (conv.createdAt?.seconds) {
+                            // Firestore Timestamp with seconds
+                            date = new Date(conv.createdAt.seconds * 1000);
+                          } else if (conv.createdAt?.toDate) {
+                            // Firestore Timestamp with toDate method
+                            date = conv.createdAt.toDate();
+                          } else if (typeof conv.createdAt === 'string') {
+                            // ISO string
+                            date = new Date(conv.createdAt);
+                          } else if (conv.createdAt instanceof Date) {
+                            // Already a Date object
+                            date = conv.createdAt;
+                          } else if (typeof conv.createdAt === 'number') {
+                            // Unix timestamp
+                            date = new Date(conv.createdAt);
+                          } else {
+                            // Unknown format, try direct conversion
+                            date = new Date(conv.createdAt);
+                          }
+                          
+                          if (isNaN(date.getTime())) return 'Recently';
+                          return formatDatePST(date, { month: 'short', day: 'numeric' });
+                        } catch (e) {
+                          console.warn('Error formatting conversation date:', e, 'CreatedAt:', conv.createdAt);
+                          return 'Recently';
+                        }
+                      })()}
+                    </p>
+                    <div className="flex gap-2">
+                      {getTypeBadge(conv.type)}
+                      {conv.priority === 'urgent' && (
+                        <span className="px-2 py-1 text-xs rounded-full bg-red-100 dark:bg-red-900 text-red-800 dark:text-red-200">
+                          Urgent
+                        </span>
+                      )}
+                    </div>
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* Chat View */}
+          <div className={`lg:col-span-2 ${darkMode ? 'bg-gray-800' : 'bg-white'} rounded-lg shadow`}>
+            {selectedConversationId ? (
+              <div className="flex flex-col h-[600px]">
+                {/* Chat Header */}
+                <div className={`p-4 border-b ${darkMode ? 'border-gray-700' : 'border-gray-200'}`}>
+                  <div className="flex justify-between items-start">
+                    <div>
+                      <h3 className={`text-lg font-semibold ${darkMode ? 'text-white' : 'text-gray-900'}`}>
+                        {selectedConversation?.subject || 'Loading...'}
+                      </h3>
+                      <p className={`text-sm ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>
+                        {selectedConversation ? `${selectedConversation.userName} (${selectedConversation.userEmail})` : 'Loading...'}
+                      </p>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      {selectedConversation?.status !== 'resolved' && (
+                        <>
+                          <button
+                            onClick={() => updateConversationStatus(selectedConversation.id, 'in-progress')}
+                            className="px-3 py-1 text-sm bg-yellow-600 text-white rounded hover:bg-yellow-700"
+                          >
+                            Mark In Progress
+                          </button>
+                          <button
+                            onClick={() => updateConversationStatus(selectedConversation.id, 'resolved')}
+                            className="px-3 py-1 text-sm bg-green-600 text-white rounded hover:bg-green-700"
+                          >
+                            Mark Resolved
+                          </button>
+                        </>
+                      )}
+                      {/* Manual Mark Read Button with auto-mark feedback */}
+                      {(selectedConversation?.adminUnreadCount || 0) > 0 && (
+                        <button
+                          onClick={markCurrentConversationAsRead}
+                          className="px-3 py-1 text-sm rounded transition-colors bg-gray-600 text-white hover:bg-gray-700"
+                          title="Mark as read"
+                        >
+                          Mark Read
+                        </button>
+                      )}
+                      {/* Manual Close Button */}
                       <button
-                        onClick={() => setSelectedReport(report)}
-                        className="px-3 py-1 bg-blue-600 text-white rounded text-sm hover:bg-blue-700"
+                        onClick={() => {
+                          setSelectedConversationId(null);
+                          setSelectedConversation(null);
+                          setMessages([]);
+                          localStorage.removeItem('adminSelectedConversationId');
+                        }}
+                        className={`p-1 rounded hover:bg-gray-200 dark:hover:bg-gray-600 ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}
+                        aria-label="Close conversation"
                       >
-                        Respond
+                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                        </svg>
                       </button>
-                      
-                      {report.status === 'open' && (
-                        <button
-                          onClick={() => updateReportStatus(report.id, 'in-progress')}
-                          className="px-3 py-1 bg-yellow-600 text-white rounded text-sm hover:bg-yellow-700"
-                        >
-                          In Progress
-                        </button>
-                      )}
-                      
-                      {report.status !== 'resolved' && report.status !== 'closed' && (
-                        <button
-                          onClick={() => updateReportStatus(report.id, 'resolved')}
-                          className="px-3 py-1 bg-green-600 text-white rounded text-sm hover:bg-green-700"
-                        >
-                          Resolve
-                        </button>
-                      )}
                     </div>
                   </div>
                 </div>
-              ))}
-            </div>
-          )}
-        </div>
 
-        {/* Response Modal */}
-        {selectedReport && (
-          <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
-            <div className="bg-white dark:bg-gray-800 rounded-lg shadow-lg p-6 max-w-2xl w-full max-h-[90vh] overflow-y-auto">
-              <h3 className="text-lg font-semibold mb-4 text-gray-900 dark:text-white">
-                Respond to Report: {selectedReport.subject}
-              </h3>
-              
-              <div className="mb-4 p-4 bg-gray-50 dark:bg-gray-700 rounded">
-                <p className="text-sm text-gray-600 dark:text-gray-400 mb-2">
-                  <strong>Original Report:</strong>
+                {/* Messages */}
+                <div 
+                  ref={messagesContainerRef} 
+                  className="flex-1 overflow-y-auto p-4 relative flex flex-col"
+                  onScroll={handleScroll}
+                >
+                  {messagesLoading ? (
+                    <div className="flex justify-center items-center flex-1">
+                      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500"></div>
+                    </div>
+                  ) : (
+                    <>
+                      {/* Spacer to push messages to bottom when there are few messages */}
+                      <div className="flex-1 min-h-0"></div>
+                      <MessagesList messages={messages} darkMode={darkMode} />
+                      {/* Scroll anchor for auto-scroll to bottom */}
+                      <div ref={messagesEndRef} />
+                    </>
+                  )}
+                  
+                  {/* Scroll to bottom button - positioned relative to messages container */}
+                  {showScrollToBottom && (
+                    <button
+                      onClick={() => scrollToBottomSmooth()}
+                      className="absolute bottom-4 right-4 bg-blue-600 hover:bg-blue-700 text-white rounded-full p-2 shadow-lg transition-all duration-200 hover:scale-110"
+                      aria-label="Scroll to bottom"
+                    >
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 14l-7 7m0 0l-7-7m7 7V3" />
+                      </svg>
+                    </button>
+                  )}
+                </div>
+
+                {/* Message Input */}
+                {selectedConversation?.status !== 'resolved' && (
+                  <div className={`p-4 border-t ${darkMode ? 'border-gray-700' : 'border-gray-200'}`}>
+                    <div className="flex gap-2">
+                      <input
+                        type="text"
+                        value={newMessage}
+                        onChange={(e) => setNewMessage(e.target.value)}
+                        onKeyPress={(e) => e.key === 'Enter' && sendMessage()}
+                        placeholder="Type your message..."
+                        className={`flex-1 px-3 py-2 rounded-lg border ${
+                          darkMode
+                            ? 'bg-gray-700 border-gray-600 text-white placeholder-gray-400'
+                            : 'bg-white border-gray-300 text-gray-900 placeholder-gray-500'
+                        }`}
+                      />
+                      <button
+                        onClick={sendMessage}
+                        disabled={!newMessage.trim()}
+                        className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                      >
+                        <Send className="w-4 h-4" />
+                        Send
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            ) : (
+              <div className="flex items-center justify-center h-[600px]">
+                <p className={`text-lg ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>
+                  Select a conversation to view messages
                 </p>
-                <p className="text-gray-900 dark:text-white">{selectedReport.description}</p>
               </div>
-              
-              <div className="mb-4">
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                  Admin Response
-                </label>
-                <textarea
-                  className="w-full p-3 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
-                  rows="4"
-                  placeholder="Enter your response to the user..."
-                  value={responseText}
-                  onChange={(e) => setResponseText(e.target.value)}
-                />
-              </div>
-              
-              <div className="flex justify-end space-x-3">
-                <button
-                  onClick={() => {
-                    setSelectedReport(null);
-                    setResponseText('');
-                  }}
-                  className="px-4 py-2 border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-200 rounded-md bg-white dark:bg-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600"
-                >
-                  Cancel
-                </button>
-                <button
-                  onClick={() => updateReportStatus(selectedReport.id, 'resolved', responseText)}
-                  disabled={!responseText.trim()}
-                  className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  Send Response & Resolve
-                </button>
-                <button
-                  onClick={() => updateReportStatus(selectedReport.id, 'in-progress', responseText)}
-                  disabled={!responseText.trim()}
-                  className="px-4 py-2 bg-yellow-600 text-white rounded-md hover:bg-yellow-700 disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  Send Response & Mark In Progress
-                </button>
-              </div>
-            </div>
+            )}
           </div>
-        )}
+        </div>
       </div>
     );
-  };
+  }, (prevProps, nextProps) => {
+    // Only re-render if these specific props change
+    return (
+      prevProps.darkMode === nextProps.darkMode &&
+      prevProps.firestoreOperations === nextProps.firestoreOperations &&
+      prevProps.auth?.currentUser?.uid === nextProps.auth?.currentUser?.uid &&
+      prevProps.showStatusMessage === nextProps.showStatusMessage &&
+      prevProps.formatDateTimePST === nextProps.formatDateTimePST &&
+      prevProps.formatDatePST === nextProps.formatDatePST
+    );
+  });
   
   // Render admin content based on active section
   const renderAdminContent = () => {
@@ -2835,8 +3362,15 @@ const AdminPortal = ({ darkMode, setDarkMode, selectedStation, setSelectedStatio
         return <AnalyticsComponent />;
       case 'audit':
         return <AuditLogs />;
-      case 'help-reports':
-        return <HelpReports />;
+      case 'help-chats':
+        return <HelpChats 
+          darkMode={darkMode} 
+          firestoreOperations={firestoreOperations} 
+          auth={auth} 
+          showStatusMessage={showStatusMessage}
+          formatDateTimePST={formatDateTimePST}
+          formatDatePST={formatDatePST}
+        />;
       default:
         return <AdminOverview />;
     }
@@ -3079,4 +3613,4 @@ const AdminPortal = ({ darkMode, setDarkMode, selectedStation, setSelectedStatio
   );
 };
 
-export default AdminPortal;
+export default React.memo(AdminPortal);

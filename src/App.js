@@ -3,7 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate, useNavigate, useLocation } from 'react-router-dom';
 import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, deleteUser } from 'firebase/auth';
 import { initializeApp } from 'firebase/app';
-import { getFirestore, collection, getDocs, addDoc, updateDoc, doc, getDoc, query, where, orderBy, serverTimestamp, deleteDoc, setDoc, writeBatch, limit, startAfter, getCountFromServer } from 'firebase/firestore';
+import { getFirestore, collection, getDocs, addDoc, updateDoc, doc, getDoc, query, where, orderBy, serverTimestamp, deleteDoc, setDoc, writeBatch, limit, startAfter, getCountFromServer, onSnapshot } from 'firebase/firestore';
 import Dashboard from './components/Dashboard';
 import TodayLog from './components/TodayLog';
 import Reports from './components/Reports';
@@ -2195,6 +2195,283 @@ const App = () => {
         return true;
       } catch (error) {
         console.error("Error updating help report:", error);
+        return false;
+      }
+    },
+
+    // Help Chat System Operations
+    // Create a new help conversation
+    createHelpConversation: async (conversationData) => {
+      try {
+        const newConversation = {
+          ...conversationData,
+          createdAt: serverTimestamp(),
+          updatedAt: serverTimestamp()
+        };
+
+        const docRef = await addDoc(collection(db, "help_conversations"), newConversation);
+        
+        return {
+          id: docRef.id,
+          ...newConversation
+        };
+      } catch (error) {
+        console.error("Error creating help conversation:", error);
+        return null;
+      }
+    },
+
+    // Get user's help conversations
+    getUserHelpConversations: async (userId) => {
+      try {
+        const conversationsRef = collection(db, "help_conversations");
+        const q = query(conversationsRef, where("userId", "==", userId), orderBy("lastMessageAt", "desc"));
+        const snapshot = await getDocs(q);
+        const conversationsList = snapshot.docs.map(doc => ({
+          id: doc.id,
+          ...doc.data()
+        }));
+        return conversationsList;
+      } catch (error) {
+        console.error("Error getting user help conversations:", error);
+        return [];
+      }
+    },
+
+    // Get all help conversations (for admin)
+    getAllHelpConversations: async () => {
+      try {
+        const conversationsRef = collection(db, "help_conversations");
+        const q = query(conversationsRef, orderBy("lastMessageAt", "desc"));
+        const snapshot = await getDocs(q);
+        const conversationsList = snapshot.docs.map(doc => ({
+          id: doc.id,
+          ...doc.data()
+        }));
+        return conversationsList;
+      } catch (error) {
+        console.error("Error getting all help conversations:", error);
+        return [];
+      }
+    },
+
+    // Update help conversation
+    updateHelpConversation: async (conversationId, updateData) => {
+      try {
+        const conversationRef = doc(db, "help_conversations", conversationId);
+        await updateDoc(conversationRef, {
+          ...updateData,
+          updatedAt: serverTimestamp()
+        });
+        return true;
+      } catch (error) {
+        console.error("Error updating help conversation:", error);
+        return false;
+      }
+    },
+
+    // Add a message to a conversation
+    addHelpMessage: async (messageData) => {
+      try {
+        const newMessage = {
+          ...messageData,
+          createdAt: serverTimestamp(),
+          timestamp: serverTimestamp()
+        };
+
+        const docRef = await addDoc(collection(db, "help_messages"), newMessage);
+        
+        // Get current conversation data
+        const conversationRef = doc(db, "help_conversations", messageData.conversationId);
+        const conversationSnap = await getDoc(conversationRef);
+        
+        if (conversationSnap.exists()) {
+          const currentData = conversationSnap.data();
+          const updateData = {
+            lastMessageAt: serverTimestamp(),
+            lastMessage: messageData.message,
+            updatedAt: serverTimestamp()
+          };
+          
+          // Increment appropriate unread count based on sender
+          if (messageData.sender === 'admin') {
+            // Admin sent message - increment unread count for user
+            updateData.userUnreadCount = (currentData.userUnreadCount || 0) + 1;
+            // Don't touch adminUnreadCount
+            updateData.adminUnreadCount = currentData.adminUnreadCount || 0;
+          } else {
+            // User sent message - increment unread count for admin  
+            updateData.adminUnreadCount = (currentData.adminUnreadCount || 0) + 1;
+            // Don't touch userUnreadCount
+            updateData.userUnreadCount = currentData.userUnreadCount || 0;
+          }
+          
+          // Update legacy unreadCount for backward compatibility (use userUnreadCount)
+          updateData.unreadCount = updateData.userUnreadCount;
+          
+          await updateDoc(conversationRef, updateData);
+        }
+        
+        return {
+          id: docRef.id,
+          ...newMessage
+        };
+      } catch (error) {
+        console.error("Error adding help message:", error);
+        return null;
+      }
+    },
+
+    // Get messages for a conversation
+    getHelpMessages: async (conversationId) => {
+      try {
+        const messagesRef = collection(db, "help_messages");
+        const q = query(messagesRef, where("conversationId", "==", conversationId), orderBy("timestamp", "asc"));
+        const snapshot = await getDocs(q);
+        const messagesList = snapshot.docs.map(doc => ({
+          id: doc.id,
+          ...doc.data()
+        }));
+        return messagesList;
+      } catch (error) {
+        console.error("Error getting help messages:", error);
+        return [];
+      }
+    },
+
+    // Subscribe to messages for real-time updates
+    subscribeToHelpMessages: (conversationId, onMessagesUpdate) => {
+      try {
+        const messagesRef = collection(db, "help_messages");
+        const q = query(messagesRef, where("conversationId", "==", conversationId), orderBy("timestamp", "asc"));
+        
+        const unsubscribe = onSnapshot(q, (snapshot) => {
+          const messagesList = snapshot.docs.map(doc => ({
+            id: doc.id,
+            ...doc.data()
+          }));
+          onMessagesUpdate(messagesList);
+        });
+        
+        return unsubscribe;
+      } catch (error) {
+        console.error("Error subscribing to help messages:", error);
+        return () => {}; // Return empty function as fallback
+      }
+    },
+
+    // Subscribe to conversations for real-time updates
+    subscribeToHelpConversations: (userId, onConversationsUpdate) => {
+      try {
+        const conversationsRef = collection(db, "help_conversations");
+        let q;
+        
+        if (userId) {
+          // User-specific conversations
+          q = query(conversationsRef, where("userId", "==", userId), orderBy("lastMessageAt", "desc"));
+        } else {
+          // All conversations (for admin)
+          q = query(conversationsRef, orderBy("lastMessageAt", "desc"));
+        }
+        
+        const unsubscribe = onSnapshot(q, (snapshot) => {
+          const conversationsList = snapshot.docs.map(doc => ({
+            id: doc.id,
+            ...doc.data()
+          }));
+          onConversationsUpdate(conversationsList);
+        });
+        
+        return unsubscribe;
+      } catch (error) {
+        console.error("Error subscribing to help conversations:", error);
+        return () => {}; // Return empty function as fallback
+      }
+    },
+
+    // Mark messages as read
+    markHelpMessagesAsRead: async (conversationId, readerUserId, isAdmin = false) => {
+      try {
+        console.log('📧 markHelpMessagesAsRead called:', { conversationId, readerUserId, isAdmin });
+        
+        // Get conversation data to determine who is reading
+        const conversationRef = doc(db, "help_conversations", conversationId);
+        const conversationSnap = await getDoc(conversationRef);
+        
+        if (!conversationSnap.exists()) {
+          console.error('Conversation not found:', conversationId);
+          return false;
+        }
+        
+        const conversationData = conversationSnap.data();
+        const isUserReading = conversationData.userId === readerUserId;
+        const isAdminReading = isAdmin || (conversationData.userId !== readerUserId);
+        
+        console.log('📧 Mark as read logic:', { 
+          conversationId, 
+          readerUserId, 
+          isUserReading, 
+          isAdminReading,
+          currentAdminUnreadCount: conversationData.adminUnreadCount,
+          currentUserUnreadCount: conversationData.userUnreadCount
+        });
+        
+        const updateData = {};
+        
+        if (isUserReading) {
+          // User is reading - clear user unread count and mark admin messages as read
+          updateData.userUnreadCount = 0;
+          updateData.unreadCount = 0; // Legacy field
+          
+          // Mark admin messages as read
+          const messagesRef = collection(db, "help_messages");
+          const q = query(messagesRef, 
+            where("conversationId", "==", conversationId),
+            where("sender", "==", "admin"),
+            where("read", "==", false)
+          );
+          const snapshot = await getDocs(q);
+          
+          if (snapshot.docs.length > 0) {
+            const batch = writeBatch(db);
+            snapshot.docs.forEach(doc => {
+              batch.update(doc.ref, { read: true });
+            });
+            await batch.commit();
+          }
+        } else if (isAdminReading) {
+          // Admin is reading - clear admin unread count and mark user messages as read
+          updateData.adminUnreadCount = 0;
+          
+          // Mark user messages as read
+          const messagesRef = collection(db, "help_messages");
+          const q = query(messagesRef, 
+            where("conversationId", "==", conversationId),
+            where("sender", "==", "user"),
+            where("read", "==", false)
+          );
+          const snapshot = await getDocs(q);
+          
+          if (snapshot.docs.length > 0) {
+            const batch = writeBatch(db);
+            snapshot.docs.forEach(doc => {
+              batch.update(doc.ref, { read: true });
+            });
+            await batch.commit();
+          }
+        }
+        
+        if (Object.keys(updateData).length > 0) {
+          console.log('📧 Updating conversation with:', updateData);
+          await updateDoc(conversationRef, updateData);
+          console.log('📧 Successfully updated conversation');
+        } else {
+          console.log('📧 No updates needed');
+        }
+        
+        return true;
+      } catch (error) {
+        console.error("Error marking messages as read:", error);
         return false;
       }
     }

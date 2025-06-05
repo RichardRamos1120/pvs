@@ -21,7 +21,7 @@ const Signup = () => {
   const firestoreOperations = useContext(FirestoreContext);
   
   // Allowed email domains
-  const ALLOWED_DOMAINS = ['smfd.org', 'eirene.ai'];
+  const ALLOWED_DOMAINS = ['smfd.org', 'eirene.ai', 'fullboxhq.com'];
   
   // List of stations (this could be fetched from Firestore)
   const stations = ['Station 1', 'Station 4', 'Station 7', 'Station 10', 'Station 11', 'Station 14', 'Station 23'];

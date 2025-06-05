@@ -85,6 +85,30 @@ service cloud.firestore {
       allow delete: if hasRole('admin');
     }
     
+    // Help conversations collection - users can access their own, admins can access all
+    match /help_conversations/{conversationId} {
+      allow read: if isAuthenticated() && 
+        (resource.data.userId == request.auth.uid || hasRole('admin'));
+      allow create: if isAuthenticated();
+      allow update: if isAuthenticated() && 
+        (resource.data.userId == request.auth.uid || hasRole('admin'));
+      allow delete: if hasRole('admin');
+    }
+    
+    // Help messages collection - users can access messages in their conversations
+    match /help_messages/{messageId} {
+      allow read: if isAuthenticated() && 
+        (exists(/databases/$(database)/documents/help_conversations/$(resource.data.conversationId)) &&
+         (get(/databases/$(database)/documents/help_conversations/$(resource.data.conversationId)).data.userId == request.auth.uid || 
+          hasRole('admin')));
+      allow create: if isAuthenticated() && 
+        (exists(/databases/$(database)/documents/help_conversations/$(request.resource.data.conversationId)) &&
+         (get(/databases/$(database)/documents/help_conversations/$(request.resource.data.conversationId)).data.userId == request.auth.uid || 
+          hasRole('admin')));
+      allow update: if hasRole('admin');
+      allow delete: if hasRole('admin');
+    }
+    
     // Catch-all for any other collections during development
     // REMOVE THIS IN PRODUCTION
     match /{document=**} {

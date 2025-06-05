@@ -731,6 +731,12 @@ const TodayLog = () => {
       return;
     }
 
+    // Additional check: Only admins can complete logs
+    if (userRole !== 'admin') {
+      setError("Only administrators can complete logs");
+      return;
+    }
+
     if (!todayLog) return;
 
     try {
@@ -918,13 +924,23 @@ const TodayLog = () => {
                   </button>
 
                   {todayLog.activities && todayLog.activities.length > 0 && (
-                    <button
-                      onClick={() => setConfirmComplete(true)}
-                      className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-green-600 hover:bg-green-700"
-                    >
-                      <Check className="h-4 w-4 mr-1" />
-                      Mark Complete
-                    </button>
+                    userRole === 'admin' ? (
+                      <button
+                        onClick={() => setConfirmComplete(true)}
+                        className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-green-600 hover:bg-green-700"
+                      >
+                        <Check className="h-4 w-4 mr-1" />
+                        Mark Complete
+                      </button>
+                    ) : (
+                      <div 
+                        className="inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-500 bg-gray-100 cursor-not-allowed" 
+                        title="Only admins can complete logs"
+                      >
+                        <Lock className="h-4 w-4 mr-1" />
+                        Mark Complete (Admin Only)
+                      </div>
+                    )
                   )}
                 </>
               )}

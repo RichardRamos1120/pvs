@@ -18,9 +18,10 @@ const Login = () => {
   const firestoreOperations = useContext(FirestoreContext);
   
   // Allowed email domains
-  const ALLOWED_DOMAINS = ['smfd.org', 'eirene.ai'];
+  const ALLOWED_DOMAINS = ['smfd.org', 'eirene.ai', 'fullboxhq.com'];
   
   const from = location.state?.from?.pathname || '/dashboard';
+  
   
   const handleLogin = async (e) => {
     e.preventDefault();
@@ -102,9 +103,31 @@ const Login = () => {
     
     try {
       const provider = new GoogleAuthProvider();
+      provider.setCustomParameters({
+        prompt: 'select_account'
+      });
       
-      // First step: Get the credential but don't sign in yet
       const result = await signInWithPopup(auth, provider);
+      await handleGoogleAuthResult(result);
+    } catch (error) {
+      console.error('Google login error:', error);
+      let errorMessage = 'Failed to sign in with Google. Please try again.';
+      
+      if (error.code === 'auth/popup-blocked') {
+        errorMessage = 'Popup was blocked. Please allow popups for this site.';
+      } else if (error.code === 'auth/popup-closed-by-user') {
+        errorMessage = 'Sign-in was cancelled. Please try again.';
+      } else if (error.code === 'auth/unauthorized-domain') {
+        errorMessage = 'This domain is not authorized for Google sign-in.';
+      }
+      
+      setError(errorMessage);
+      setLoading(false);
+    }
+  };
+
+  const handleGoogleAuthResult = async (result) => {
+    try {
       const user = result.user;
       
       // Check if the email domain is allowed
@@ -272,6 +295,7 @@ const Login = () => {
               Sign in with Google
             </button>
           </div>
+          
           
           <div className="flex items-center justify-end">
             {/* Signup link removed - app is invite-only */}
