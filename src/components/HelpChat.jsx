@@ -557,7 +557,7 @@ const HelpChat = ({ darkMode }) => {
             <div className="flex-1 flex flex-col overflow-hidden">
               {/* Conversations List */}
               {currentView === 'conversations' && (
-                <div className="flex-1 flex flex-col">
+                <div className="flex-1 flex flex-col relative">
                   <div className="flex-1 overflow-y-auto">
                     {loading ? (
                       <div className="flex items-center justify-center h-full">
@@ -567,6 +567,13 @@ const HelpChat = ({ darkMode }) => {
                       <div className="flex flex-col items-center justify-center h-full p-6 text-gray-500">
                         <MessageCircle className="w-12 h-12 mb-4 opacity-20" />
                         <p className="text-center">No conversations yet. Start a new one!</p>
+                        <button
+                          onClick={() => setCurrentView('new')}
+                          className="mt-4 bg-blue-600 hover:bg-blue-700 text-white rounded-lg py-2 px-4 flex items-center space-x-2 transition-colors"
+                        >
+                          <Plus className="w-4 h-4" />
+                          <span>Start New Conversation</span>
+                        </button>
                       </div>
                     ) : (
                       <div className="divide-y dark:divide-gray-700">
@@ -632,16 +639,18 @@ const HelpChat = ({ darkMode }) => {
                     )}
                   </div>
                   
-                  {/* New Conversation Button - Bottom */}
-                  <div className="p-4 border-t dark:border-gray-700">
-                    <button
-                      onClick={() => setCurrentView('new')}
-                      className="w-full bg-blue-600 hover:bg-blue-700 text-white rounded-lg py-2 px-4 flex items-center justify-center space-x-2 transition-colors"
-                    >
-                      <Plus className="w-4 h-4" />
-                      <span>New Conversation</span>
-                    </button>
-                  </div>
+                  {/* Floating New Conversation Button */}
+                  {conversations.length > 0 && (
+                    <div className="absolute bottom-6 left-1/2 transform -translate-x-1/2">
+                      <button
+                        onClick={() => setCurrentView('new')}
+                        className="bg-blue-600 hover:bg-blue-700 text-white rounded-full py-3 px-6 flex items-center space-x-2 transition-all shadow-lg hover:shadow-xl"
+                      >
+                        <Plus className="w-5 h-5" />
+                        <span>New Conversation</span>
+                      </button>
+                    </div>
+                  )}
                 </div>
               )}
 

@@ -91,6 +91,28 @@ const ProtectedRoute = ({ children }) => {
   return children;
 };
 
+// Auth Redirect Component - Redirects to dashboard if logged in, login if not
+const AuthRedirect = () => {
+  const [currentUser, setCurrentUser] = useState(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, (user) => {
+      setCurrentUser(user);
+      setLoading(false);
+    });
+
+    return unsubscribe;
+  }, []);
+
+  if (loading) {
+    return <div className="loading">Loading...</div>;
+  }
+
+  // If user is logged in, go to dashboard; otherwise go to login
+  return currentUser ? <Navigate to="/dashboard" replace /> : <Navigate to="/login" replace />;
+};
+
 // FirestoreContext for database operations
 export const FirestoreContext = React.createContext();
 
@@ -2517,7 +2539,9 @@ const App = () => {
                   />
                 </ProtectedRoute>
               } />
-              <Route path="/" element={<Navigate to="/login" replace />} />
+              <Route path="/" element={
+                <AuthRedirect />
+              } />
             </Routes>
           </div>
         </FirestoreContext.Provider>
