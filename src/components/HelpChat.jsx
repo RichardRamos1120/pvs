@@ -20,6 +20,7 @@ const HelpChat = ({ darkMode }) => {
   const [isOpen, setIsOpen] = useState(false);
   const [isMinimized, setIsMinimized] = useState(false);
   const [currentView, setCurrentView] = useState('conversations'); // 'conversations', 'chat', 'new'
+  const [isMobile, setIsMobile] = useState(false);
   const [conversations, setConversations] = useState([]);
   const [currentConversation, setCurrentConversation] = useState(null);
   const [messages, setMessages] = useState([]);
@@ -35,6 +36,18 @@ const HelpChat = ({ darkMode }) => {
 
   const auth = getAuth();
   const firestoreOperations = useContext(FirestoreContext);
+
+  // Mobile detection
+  useEffect(() => {
+    const checkMobile = () => {
+      setIsMobile(window.innerWidth < 768); // Tailwind's md breakpoint
+    };
+    
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+    
+    return () => window.removeEventListener('resize', checkMobile);
+  }, []);
 
   // New conversation form state
   const [newConversationData, setNewConversationData] = useState({
@@ -527,21 +540,27 @@ const HelpChat = ({ darkMode }) => {
 
       {/* Chat Window */}
       {isOpen && (
-        <div className={`fixed bottom-6 right-6 w-96 ${isMinimized ? 'h-14' : 'h-[600px]'} bg-white dark:bg-gray-800 rounded-lg shadow-2xl flex flex-col transition-all duration-300 z-50`}>
+        <div className={`fixed ${
+          isMobile 
+            ? 'inset-0 w-full h-full rounded-none' 
+            : `bottom-6 right-6 w-96 ${isMinimized ? 'h-14' : 'h-[600px]'} rounded-lg`
+        } bg-white dark:bg-gray-800 shadow-2xl flex flex-col transition-all duration-300 z-50`}>
           {/* Header */}
-          <div className="bg-blue-600 text-white p-4 rounded-t-lg flex items-center justify-between">
+          <div className={`bg-blue-600 text-white p-4 ${isMobile ? '' : 'rounded-t-lg'} flex items-center justify-between`}>
             <div className="flex items-center space-x-2">
               <MessageCircle className="w-5 h-5" />
               <span className="font-semibold">Help & Support</span>
             </div>
             <div className="flex items-center space-x-2">
-              <button
-                onClick={() => setIsMinimized(!isMinimized)}
-                className="p-1 hover:bg-blue-700 rounded transition-colors"
-                aria-label="Minimize"
-              >
-                <Minimize2 className="w-4 h-4" />
-              </button>
+              {!isMobile && (
+                <button
+                  onClick={() => setIsMinimized(!isMinimized)}
+                  className="p-1 hover:bg-blue-700 rounded transition-colors"
+                  aria-label="Minimize"
+                >
+                  <Minimize2 className="w-4 h-4" />
+                </button>
+              )}
               <button
                 onClick={() => setIsOpen(false)}
                 className="p-1 hover:bg-blue-700 rounded transition-colors"
@@ -553,7 +572,7 @@ const HelpChat = ({ darkMode }) => {
           </div>
 
           {/* Content */}
-          {!isMinimized && (
+          {(!isMinimized || isMobile) && (
             <div className="flex-1 flex flex-col overflow-hidden">
               {/* Conversations List */}
               {currentView === 'conversations' && (
@@ -569,9 +588,11 @@ const HelpChat = ({ darkMode }) => {
                         <p className="text-center">No conversations yet. Start a new one!</p>
                         <button
                           onClick={() => setCurrentView('new')}
-                          className="mt-4 bg-blue-600 hover:bg-blue-700 text-white rounded-lg py-2 px-4 flex items-center space-x-2 transition-colors"
+                          className={`mt-4 bg-blue-600 hover:bg-blue-700 text-white rounded-lg ${
+                            isMobile ? 'py-4 px-6' : 'py-2 px-4'
+                          } flex items-center space-x-2 transition-colors`}
                         >
-                          <Plus className="w-4 h-4" />
+                          <Plus className={`${isMobile ? 'w-5 h-5' : 'w-4 h-4'}`} />
                           <span>Start New Conversation</span>
                         </button>
                       </div>
@@ -641,10 +662,12 @@ const HelpChat = ({ darkMode }) => {
                   
                   {/* Floating New Conversation Button */}
                   {conversations.length > 0 && (
-                    <div className="absolute bottom-6 left-1/2 transform -translate-x-1/2">
+                    <div className={`absolute ${isMobile ? 'bottom-8' : 'bottom-6'} left-1/2 transform -translate-x-1/2`}>
                       <button
                         onClick={() => setCurrentView('new')}
-                        className="bg-blue-600 hover:bg-blue-700 text-white rounded-full py-3 px-6 flex items-center space-x-2 transition-all shadow-lg hover:shadow-xl"
+                        className={`bg-blue-600 hover:bg-blue-700 text-white rounded-full ${
+                          isMobile ? 'py-4 px-8' : 'py-3 px-6'
+                        } flex items-center space-x-2 transition-all shadow-lg hover:shadow-xl`}
                       >
                         <Plus className="w-5 h-5" />
                         <span>New Conversation</span>
@@ -675,7 +698,7 @@ const HelpChat = ({ darkMode }) => {
                       <select
                         value={newConversationData.type}
                         onChange={(e) => setNewConversationData(prev => ({ ...prev, type: e.target.value }))}
-                        className="w-full p-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                        className={`w-full ${isMobile ? 'p-3 text-base' : 'p-2'} border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white`}
                       >
                         <option value="general">General Question</option>
                         <option value="bug">Bug Report</option>
@@ -691,7 +714,7 @@ const HelpChat = ({ darkMode }) => {
                       <select
                         value={newConversationData.priority}
                         onChange={(e) => setNewConversationData(prev => ({ ...prev, priority: e.target.value }))}
-                        className="w-full p-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                        className={`w-full ${isMobile ? 'p-3 text-base' : 'p-2'} border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white`}
                       >
                         <option value="low">Low</option>
                         <option value="medium">Medium</option>
@@ -708,7 +731,7 @@ const HelpChat = ({ darkMode }) => {
                         type="text"
                         value={newConversationData.subject}
                         onChange={(e) => setNewConversationData(prev => ({ ...prev, subject: e.target.value }))}
-                        className="w-full p-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                        className={`w-full ${isMobile ? 'p-3 text-base' : 'p-2'} border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white`}
                         placeholder="Brief description..."
                         required
                       />
@@ -721,7 +744,7 @@ const HelpChat = ({ darkMode }) => {
                       <textarea
                         value={newConversationData.initialMessage}
                         onChange={(e) => setNewConversationData(prev => ({ ...prev, initialMessage: e.target.value }))}
-                        className="w-full h-32 p-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white resize-none"
+                        className={`w-full ${isMobile ? 'h-40 p-3 text-base' : 'h-32 p-2'} border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white resize-none`}
                         placeholder="Describe your issue or question in detail..."
                         required
                       />
@@ -730,7 +753,9 @@ const HelpChat = ({ darkMode }) => {
                     <button
                       type="submit"
                       disabled={loading || !newConversationData.subject.trim() || !newConversationData.initialMessage.trim()}
-                      className="bg-blue-600 hover:bg-blue-700 text-white rounded-lg py-2 px-4 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                      className={`bg-blue-600 hover:bg-blue-700 text-white rounded-lg ${
+                        isMobile ? 'py-4 px-6 text-base' : 'py-2 px-4'
+                      } disabled:opacity-50 disabled:cursor-not-allowed transition-colors`}
                     >
                       Start Conversation
                     </button>
@@ -780,7 +805,9 @@ const HelpChat = ({ darkMode }) => {
                   <div 
                     className="relative overflow-hidden"
                     style={{ 
-                      height: currentConversation.status !== 'resolved' ? 'calc(100% - 160px)' : 'calc(100% - 140px)',
+                      height: currentConversation.status !== 'resolved' 
+                        ? isMobile ? 'calc(100% - 176px)' : 'calc(100% - 160px)'  // Mobile: 80px header + 96px input = 176px
+                        : isMobile ? 'calc(100% - 156px)' : 'calc(100% - 140px)', // Mobile: 80px header + 76px resolved = 156px
                       flexShrink: 0
                     }}
                   >
@@ -832,7 +859,7 @@ const HelpChat = ({ darkMode }) => {
                   {/* Message Input - Fixed height */}
                   {currentConversation.status !== 'resolved' && (
                     <div 
-                      className="h-20 p-4 border-t dark:border-gray-700 bg-white dark:bg-gray-800"
+                      className={`${isMobile ? 'h-24' : 'h-20'} p-4 border-t dark:border-gray-700 bg-white dark:bg-gray-800`}
                       style={{ flexShrink: 0 }}
                     >
                       <form onSubmit={sendMessage} className="h-full">
@@ -843,14 +870,14 @@ const HelpChat = ({ darkMode }) => {
                             value={newMessage}
                             onChange={(e) => setNewMessage(e.target.value)}
                             placeholder="Type your message..."
-                            className="flex-1 h-10 px-3 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                            className={`flex-1 ${isMobile ? 'h-12 px-4 text-base' : 'h-10 px-3'} border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent`}
                           />
                           <button
                             type="submit"
                             disabled={!newMessage.trim()}
-                            className="h-10 w-10 bg-blue-600 hover:bg-blue-700 text-white rounded-lg disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center"
+                            className={`${isMobile ? 'h-12 w-12' : 'h-10 w-10'} bg-blue-600 hover:bg-blue-700 text-white rounded-lg disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center`}
                           >
-                            <Send className="w-4 h-4" />
+                            <Send className={`${isMobile ? 'w-5 h-5' : 'w-4 h-4'}`} />
                           </button>
                         </div>
                       </form>
