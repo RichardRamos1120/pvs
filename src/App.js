@@ -1359,31 +1359,11 @@ const App = () => {
         
         const assessmentData = assessmentSnap.data();
         
-        // Create audit log entry with proper station handling based on assessment type
-        let stationValue = 'Unknown';
+        // Simply use the station value from the assessment data
+        const stationValue = assessmentData.station || 'Unknown';
         
-        console.log('[AUDIT DEBUG] Assessment data:', {
-          assessmentType: assessmentData.assessmentType,
-          station: assessmentData.station
-        });
-        
-        if (!assessmentData.assessmentType || assessmentData.assessmentType === '') {
-          // No assessment type selected = Unknown Station
-          stationValue = 'Unknown';
-        } else if (assessmentData.assessmentType === 'department' || assessmentData.station === 'All Stations') {
-          // Department-wide assessments should show "All Stations"
-          stationValue = 'All Stations';
-        } else if (assessmentData.assessmentType === 'mission' && assessmentData.station && 
-                   assessmentData.station !== 'No Stations Available' && 
-                   assessmentData.station !== 'Error Loading Stations' &&
-                   assessmentData.station.trim() !== '' &&
-                   assessmentData.station !== 'Select station') {
-          // Mission-specific with valid station - use the ACTUAL selected station
-          stationValue = assessmentData.station;
-        }
-        // Otherwise leave as 'Unknown' for truly empty or invalid stations
-        
-        console.log('[AUDIT DEBUG] Final station value for audit log:', stationValue);
+        console.log('[AUDIT DEBUG] Assessment station from data:', assessmentData.station);
+        console.log('[AUDIT DEBUG] Final station value being saved:', stationValue);
         
         const auditData = {
           deletedBy: userInfo.userEmail || auth.currentUser?.email || 'Unknown',

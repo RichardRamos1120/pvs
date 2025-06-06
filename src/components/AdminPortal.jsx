@@ -2014,6 +2014,12 @@ const AdminPortal = ({ darkMode, setDarkMode, selectedStation, setSelectedStatio
           console.log('Number of logs returned:', result.logs?.length || 0);
           if (result.logs && result.logs.length > 0) {
             console.log('Sample log station field:', result.logs[0].station);
+            // Debug GAR assessment logs specifically
+            const garLogs = result.logs.filter(log => log.itemType === 'gar_assessment');
+            if (garLogs.length > 0) {
+              console.log('GAR assessment log station:', garLogs[0].station);
+              console.log('Full GAR log:', garLogs[0]);
+            }
           }
           
           setAuditLogs(result.logs || []);
@@ -2079,8 +2085,6 @@ const AdminPortal = ({ darkMode, setDarkMode, selectedStation, setSelectedStatio
           return 'Daily Log';
         case 'gar_assessment':
           return 'GAR Assessment';
-        case 'user':
-          return 'User';
         default:
           return itemType.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
       }
@@ -2116,9 +2120,7 @@ const AdminPortal = ({ darkMode, setDarkMode, selectedStation, setSelectedStatio
               >
                 <option value="all">All Types</option>
                 <option value="daily_log">Daily Log</option>
-                <option value="assessment">Assessment</option>
                 <option value="gar_assessment">GAR Assessment</option>
-                <option value="user">User</option>
               </select>
             </div>
 
@@ -2226,6 +2228,17 @@ const AdminPortal = ({ darkMode, setDarkMode, selectedStation, setSelectedStatio
                                 <p>Status: {log.deletedItem.status}</p>
                               </div>
                             )}
+                            {log.itemType === 'gar_assessment' && log.deletedItem && (
+                              <div>
+                                <p>Date: {log.deletedItem.date}</p>
+                                <p>Type: {log.deletedItem.type}</p>
+                                {log.deletedItem.riskFactors && (
+                                  <p>Risk Score: {
+                                    Object.values(log.deletedItem.riskFactors).reduce((a, b) => a + b, 0)
+                                  }</p>
+                                )}
+                              </div>
+                            )}
                           </div>
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap">
@@ -2304,6 +2317,19 @@ const AdminPortal = ({ darkMode, setDarkMode, selectedStation, setSelectedStatio
                           <p><span className="font-medium">Status:</span> {log.deletedItem.status}</p>
                         </div>
                       )}
+                      
+                      {log.itemType === 'gar_assessment' && log.deletedItem && (
+                        <div className={`text-sm mb-3 p-2 rounded ${darkMode ? 'bg-gray-800' : 'bg-gray-100'}`}>
+                          <p><span className="font-medium">Date:</span> {log.deletedItem.date}</p>
+                          <p><span className="font-medium">Type:</span> {log.deletedItem.type}</p>
+                          <p><span className="font-medium">Status:</span> {log.deletedItem.status}</p>
+                          {log.deletedItem.riskFactors && (
+                            <p><span className="font-medium">Risk Score:</span> {
+                              Object.values(log.deletedItem.riskFactors).reduce((a, b) => a + b, 0)
+                            }</p>
+                          )}
+                        </div>
+                      )}
 
                       {/* Action Button */}
                       <button
@@ -2357,7 +2383,11 @@ const AdminPortal = ({ darkMode, setDarkMode, selectedStation, setSelectedStatio
             <div className={`${darkMode ? 'bg-gray-800' : 'bg-white'} rounded-lg shadow-xl w-full max-w-4xl max-h-[90vh] overflow-hidden flex flex-col lg:max-w-4xl`}>
               {/* Modal Header */}
               <div className={`px-6 py-4 border-b ${darkMode ? 'border-gray-700' : 'border-gray-200'} flex justify-between items-center`}>
-                <h3 className="text-lg font-semibold">Deleted Log Details</h3>
+                <h3 className="text-lg font-semibold">
+                  {selectedDeletedItem.itemType === 'daily_log' ? 'Deleted Log Details' : 
+                   selectedDeletedItem.itemType === 'gar_assessment' ? 'Deleted GAR Assessment Details' :
+                   'Deleted Item Details'}
+                </h3>
                 <button
                   onClick={() => {
                     setShowDeletedItemModal(false);
@@ -2397,7 +2427,7 @@ const AdminPortal = ({ darkMode, setDarkMode, selectedStation, setSelectedStatio
                 </div>
 
                 {/* Log Details */}
-                {selectedDeletedItem.deletedItem && (
+                {selectedDeletedItem.deletedItem && selectedDeletedItem.itemType === 'daily_log' && (
                   <div className="space-y-6">
                     {/* Log Header Info */}
                     <div className={`p-4 rounded-lg border ${darkMode ? 'border-gray-700 bg-gray-750' : 'border-gray-200 bg-gray-50'}`}>
@@ -2541,6 +2571,142 @@ const AdminPortal = ({ darkMode, setDarkMode, selectedStation, setSelectedStatio
                       </div>
                     )}
 
+                    {/* Raw JSON (Collapsible) */}
+                    <details className={`border rounded-lg ${darkMode ? 'border-gray-700' : 'border-gray-200'}`}>
+                      <summary className={`cursor-pointer p-4 font-medium ${darkMode ? 'hover:bg-gray-750' : 'hover:bg-gray-50'}`}>
+                        Show Raw Data (JSON)
+                      </summary>
+                      <div className="p-4">
+                        <pre className={`text-xs overflow-x-auto p-4 rounded ${darkMode ? 'bg-gray-900' : 'bg-gray-100'}`}>
+                          {JSON.stringify(selectedDeletedItem.deletedItem, null, 2)}
+                        </pre>
+                      </div>
+                    </details>
+                  </div>
+                )}
+                
+                {/* GAR Assessment Details */}
+                {selectedDeletedItem.deletedItem && selectedDeletedItem.itemType === 'gar_assessment' && (
+                  <div className="space-y-6">
+                    {/* Assessment Header Info */}
+                    <div className={`p-4 rounded-lg border ${darkMode ? 'border-gray-700 bg-gray-750' : 'border-gray-200 bg-gray-50'}`}>
+                      <h4 className="font-semibold mb-3">Assessment Information</h4>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
+                        <div>
+                          <span className="text-gray-500 dark:text-gray-400">Station:</span>
+                          <p className="font-medium">{selectedDeletedItem.deletedItem.station || 'N/A'}</p>
+                        </div>
+                        <div>
+                          <span className="text-gray-500 dark:text-gray-400">Date:</span>
+                          <p className="font-medium">{selectedDeletedItem.deletedItem.date || 'N/A'}</p>
+                        </div>
+                        <div>
+                          <span className="text-gray-500 dark:text-gray-400">Time:</span>
+                          <p className="font-medium">{selectedDeletedItem.deletedItem.time || 'N/A'}</p>
+                        </div>
+                        <div>
+                          <span className="text-gray-500 dark:text-gray-400">Type:</span>
+                          <p className="font-medium">{selectedDeletedItem.deletedItem.type || 'N/A'}</p>
+                        </div>
+                        <div>
+                          <span className="text-gray-500 dark:text-gray-400">Status:</span>
+                          <p className="font-medium capitalize">{selectedDeletedItem.deletedItem.status || 'N/A'}</p>
+                        </div>
+                        <div>
+                          <span className="text-gray-500 dark:text-gray-400">Captain:</span>
+                          <p className="font-medium">{selectedDeletedItem.deletedItem.captain || 'N/A'}</p>
+                        </div>
+                      </div>
+                    </div>
+                    
+                    {/* Risk Factors */}
+                    {selectedDeletedItem.deletedItem.riskFactors && (
+                      <div className={`p-4 rounded-lg border ${darkMode ? 'border-gray-700 bg-gray-750' : 'border-gray-200 bg-gray-50'}`}>
+                        <h4 className="font-semibold mb-3">Risk Factors</h4>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
+                          <div>
+                            <span className="text-gray-500 dark:text-gray-400">Supervision:</span>
+                            <p className="font-medium">{selectedDeletedItem.deletedItem.riskFactors.supervision}</p>
+                          </div>
+                          <div>
+                            <span className="text-gray-500 dark:text-gray-400">Planning:</span>
+                            <p className="font-medium">{selectedDeletedItem.deletedItem.riskFactors.planning}</p>
+                          </div>
+                          <div>
+                            <span className="text-gray-500 dark:text-gray-400">Team Selection:</span>
+                            <p className="font-medium">{selectedDeletedItem.deletedItem.riskFactors.teamSelection}</p>
+                          </div>
+                          <div>
+                            <span className="text-gray-500 dark:text-gray-400">Team Fitness:</span>
+                            <p className="font-medium">{selectedDeletedItem.deletedItem.riskFactors.teamFitness}</p>
+                          </div>
+                          <div>
+                            <span className="text-gray-500 dark:text-gray-400">Environment:</span>
+                            <p className="font-medium">{selectedDeletedItem.deletedItem.riskFactors.environment}</p>
+                          </div>
+                          <div>
+                            <span className="text-gray-500 dark:text-gray-400">Complexity:</span>
+                            <p className="font-medium">{selectedDeletedItem.deletedItem.riskFactors.complexity}</p>
+                          </div>
+                          <div className="col-span-2">
+                            <span className="text-gray-500 dark:text-gray-400">Total Risk Score:</span>
+                            <p className="font-bold text-lg">{
+                              Object.values(selectedDeletedItem.deletedItem.riskFactors).reduce((a, b) => a + b, 0)
+                            }</p>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                    
+                    {/* Weather Conditions */}
+                    {selectedDeletedItem.deletedItem.weather && (
+                      <div className={`p-4 rounded-lg border ${darkMode ? 'border-gray-700 bg-gray-750' : 'border-gray-200 bg-gray-50'}`}>
+                        <h4 className="font-semibold mb-3">Weather Conditions</h4>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
+                          <div>
+                            <span className="text-gray-500 dark:text-gray-400">Temperature:</span>
+                            <p className="font-medium">{selectedDeletedItem.deletedItem.weather.temperature}{selectedDeletedItem.deletedItem.weather.temperatureUnit}</p>
+                          </div>
+                          <div>
+                            <span className="text-gray-500 dark:text-gray-400">Wind:</span>
+                            <p className="font-medium">{selectedDeletedItem.deletedItem.weather.wind} mph {selectedDeletedItem.deletedItem.weather.windDirection}</p>
+                          </div>
+                          <div>
+                            <span className="text-gray-500 dark:text-gray-400">Humidity:</span>
+                            <p className="font-medium">{selectedDeletedItem.deletedItem.weather.humidity}%</p>
+                          </div>
+                          <div>
+                            <span className="text-gray-500 dark:text-gray-400">Precipitation:</span>
+                            <p className="font-medium">{selectedDeletedItem.deletedItem.weather.precipitation}</p>
+                          </div>
+                          {selectedDeletedItem.deletedItem.weather.alerts && (
+                            <div className="col-span-2">
+                              <span className="text-gray-500 dark:text-gray-400">Alerts:</span>
+                              <p className="font-medium text-amber-600 dark:text-amber-400">{selectedDeletedItem.deletedItem.weather.alerts}</p>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    )}
+                    
+                    {/* Mitigation Strategies */}
+                    {selectedDeletedItem.deletedItem.mitigations && Object.values(selectedDeletedItem.deletedItem.mitigations).some(m => m && m.trim()) && (
+                      <div>
+                        <h4 className="font-semibold mb-3">Mitigation Strategies</h4>
+                        <div className="space-y-2">
+                          {Object.entries(selectedDeletedItem.deletedItem.mitigations).map(([factor, mitigation]) => {
+                            if (!mitigation || !mitigation.trim()) return null;
+                            return (
+                              <div key={factor} className={`p-3 rounded-lg ${darkMode ? 'bg-gray-750' : 'bg-gray-100'}`}>
+                                <p className="font-medium text-sm capitalize mb-1">{factor.replace(/([A-Z])/g, ' $1').trim()}:</p>
+                                <p className="text-sm">{mitigation}</p>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    )}
+                    
                     {/* Raw JSON (Collapsible) */}
                     <details className={`border rounded-lg ${darkMode ? 'border-gray-700' : 'border-gray-200'}`}>
                       <summary className={`cursor-pointer p-4 font-medium ${darkMode ? 'hover:bg-gray-750' : 'hover:bg-gray-50'}`}>

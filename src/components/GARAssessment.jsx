@@ -1,9 +1,10 @@
 import React, { useState, useContext, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { getAuth } from 'firebase/auth';
-import { Calendar, Clock, ChevronRight, ChevronLeft, Edit, AlertTriangle, CheckCircle, FileText, Home, Trash2, Save } from 'lucide-react';
+import { Calendar, Clock, ChevronRight, ChevronLeft, AlertTriangle, CheckCircle, FileText, Home, Trash2 } from 'lucide-react';
 import Layout from './Layout';
 import { FirestoreContext } from '../App';
+import ReadOnlyAssessmentView from './ReadOnlyAssessmentView';
 
 // Main component
 const GARAssessment = () => {
@@ -88,6 +89,8 @@ const GARAssessment = () => {
   const [confirmDelete, setConfirmDelete] = useState(null);
   const [hasChanges, setHasChanges] = useState(false);
   const [currentDraftId, setCurrentDraftId] = useState(null);
+  const [viewingAssessment, setViewingAssessment] = useState(null);
+  const [showReadOnlyView, setShowReadOnlyView] = useState(false);
 
   // Local state to avoid saving on every keystroke - SIMPLE VERSION
   const [localMitigations, setLocalMitigations] = useState({});
@@ -764,6 +767,11 @@ const GARAssessment = () => {
     setCurrentDraftId(null);
   };
 
+  const closeReadOnlyView = () => {
+    setShowReadOnlyView(false);
+    setViewingAssessment(null);
+  };
+
   // Fixed viewAssessment function that properly handles errors and logging
   const viewAssessment = async (assessmentId) => {
     try {
@@ -787,41 +795,9 @@ const GARAssessment = () => {
       if (assessment && assessment.id) {
         console.log("Successfully loaded assessment with ID:", assessment.id);
         
-        // Store assessment data in state
-        setAssessmentData(assessment);
-        setCurrentAssessmentId(assessmentId);
-        // Set draft ID for auto-updates (if it's a draft, allow auto-updates)
-        if (assessment.status === "draft") {
-          setCurrentDraftId(assessmentId);
-        }
-
-        // IMPORTANT: Initialize local state copies to match the loaded assessment
-        // For Step 3: Mitigation strategies
-        const mitigations = assessment.mitigations || {};
-        setLocalMitigations({...mitigations});
-        
-        // For Step 1: Form data
-        setLocalFormData({
-          date: assessment.date || new Date().toISOString().split('T')[0],
-          time: assessment.time || new Date().toTimeString().substring(0, 5),
-          type: assessment.type || "Department-wide",
-          station: assessment.station || selectedStation,
-          weather: assessment.weather ? {...assessment.weather} : {
-            temperature: "37",
-            temperatureUnit: "°F",
-            wind: "18",
-            windDirection: "NW",
-            humidity: "85",
-            precipitation: "Heavy Rain",
-            precipitationRate: "1.2",
-            alerts: "Flash Flood Warning until 5:00 PM"
-          }
-        });
-
-        // Reset state flags
-        setHasChanges(false);
-        setShowAssessment(true);
-        setCurrentStep(1);
+        // Store assessment data for viewing
+        setViewingAssessment(assessment);
+        setShowReadOnlyView(true);
       } else {
         console.error("Failed to load assessment - null or missing ID");
         setError("Assessment not found. Please try again or create a new assessment.");
@@ -837,7 +813,12 @@ const GARAssessment = () => {
   const deleteAssessment = async (assessmentId) => {
     try {
       setLoading(true);
-      await firestoreOperations.deleteAssessment(assessmentId);
+      // Pass user info to the delete function for audit logging
+      await firestoreOperations.deleteAssessment(assessmentId, {
+        userEmail: auth.currentUser?.email,
+        userDisplayName: userProfile?.displayName || auth.currentUser?.displayName || 'Unknown User',
+        userId: auth.currentUser?.uid
+      });
       
       // Refresh assessments list
       await fetchAssessments();
@@ -1572,7 +1553,18 @@ const GARAssessment = () => {
   // Main application rendering
   return (
     <Layout darkMode={darkMode} setDarkMode={handleDarkModeChange} selectedStation={selectedStation} setSelectedStation={handleStationChange}>
-      {!showAssessment ? (
+      {showReadOnlyView && viewingAssessment ? (
+        <ReadOnlyAssessmentView
+          assessment={viewingAssessment}
+          getFactorRiskColor={getFactorRiskColor}
+          calculateRiskScore={() => {
+            const { supervision, planning, teamSelection, teamFitness, environment, complexity } = viewingAssessment.riskFactors;
+            return supervision + planning + teamSelection + teamFitness + environment + complexity;
+          }}
+          getRiskLevel={getRiskLevel}
+          onClose={closeReadOnlyView}
+        />
+      ) : !showAssessment ? (
         <div>
           <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6 mb-6">
             <div className="mb-6">

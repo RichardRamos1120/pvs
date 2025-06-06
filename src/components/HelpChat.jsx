@@ -558,16 +558,6 @@ const HelpChat = ({ darkMode }) => {
               {/* Conversations List */}
               {currentView === 'conversations' && (
                 <div className="flex-1 flex flex-col">
-                  <div className="p-4 border-b dark:border-gray-700">
-                    <button
-                      onClick={() => setCurrentView('new')}
-                      className="w-full bg-blue-600 hover:bg-blue-700 text-white rounded-lg py-2 px-4 flex items-center justify-center space-x-2 transition-colors"
-                    >
-                      <Plus className="w-4 h-4" />
-                      <span>New Conversation</span>
-                    </button>
-                  </div>
-
                   <div className="flex-1 overflow-y-auto">
                     {loading ? (
                       <div className="flex items-center justify-center h-full">
@@ -641,6 +631,17 @@ const HelpChat = ({ darkMode }) => {
                       </div>
                     )}
                   </div>
+                  
+                  {/* New Conversation Button - Bottom */}
+                  <div className="p-4 border-t dark:border-gray-700">
+                    <button
+                      onClick={() => setCurrentView('new')}
+                      className="w-full bg-blue-600 hover:bg-blue-700 text-white rounded-lg py-2 px-4 flex items-center justify-center space-x-2 transition-colors"
+                    >
+                      <Plus className="w-4 h-4" />
+                      <span>New Conversation</span>
+                    </button>
+                  </div>
                 </div>
               )}
 
@@ -704,14 +705,14 @@ const HelpChat = ({ darkMode }) => {
                       />
                     </div>
 
-                    <div className="flex-1">
+                    <div className="flex-1 min-h-0">
                       <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                         Message
                       </label>
                       <textarea
                         value={newConversationData.initialMessage}
                         onChange={(e) => setNewConversationData(prev => ({ ...prev, initialMessage: e.target.value }))}
-                        className="w-full h-full p-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white resize-none"
+                        className="w-full h-32 p-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white resize-none"
                         placeholder="Describe your issue or question in detail..."
                         required
                       />
