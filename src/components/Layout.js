@@ -52,7 +52,6 @@ const Layout = ({ children, darkMode, setDarkMode, selectedStation, setSelectedS
           );
           
           setStations(stationNames);
-          console.log("Fetched stations:", stationNames);
           
           // Check if the current selected station exists in our new list
           const currentStation = localStorage.getItem('selectedStation');
@@ -68,7 +67,6 @@ const Layout = ({ children, darkMode, setDarkMode, selectedStation, setSelectedS
           }
         } else {
           // Clear stations if none found in Firestore
-          console.log("No stations found in Firestore");
           setStations([]);
           const noStationMessage = 'No Stations Available';
           

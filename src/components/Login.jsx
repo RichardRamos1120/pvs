@@ -40,7 +40,6 @@ const Login = () => {
       
       // Update lastLogin timestamp and track activity
       try {
-        console.log('Updating lastLogin for user:', userCredential.user.uid);
         await firestoreOperations.setUserProfile(userCredential.user.uid, {
           lastLogin: serverTimestamp(),
           updatedAt: serverTimestamp()
@@ -53,13 +52,11 @@ const Login = () => {
           userCredential.user.displayName || 'User'
         );
         
-        console.log('Successfully updated lastLogin timestamp and tracked activity');
       } catch (profileError) {
         console.error('Failed to update login timestamp:', profileError);
       }
       
       // Successfully logged in
-      console.log('Logged in:', userCredential.user);
       navigate(from, { replace: true });
     } catch (error) {
       console.error('Login error:', error);
@@ -153,16 +150,12 @@ const Login = () => {
           lastLogin: serverTimestamp(),
           authProvider: 'google'
         });
-        console.log('Created new user profile for Google user:', user.email);
       } else {
         // Update lastLogin for existing users
-        console.log('Updating lastLogin for existing Google user:', user.uid);
         await firestoreOperations.setUserProfile(user.uid, {
           lastLogin: serverTimestamp(),
           updatedAt: serverTimestamp()
         });
-        console.log('Successfully updated lastLogin for Google user');
-        console.log('Google user already has a profile:', existingProfile);
       }
       
       // Track user login activity for Google users
@@ -173,7 +166,6 @@ const Login = () => {
       );
       
       // Successfully logged in
-      console.log('Logged in with Google:', user);
       navigate(from, { replace: true });
     } catch (error) {
       console.error('Google login error:', error);

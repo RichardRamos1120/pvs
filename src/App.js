@@ -128,7 +128,6 @@ const App = () => {
         if (userSnap.exists()) {
           return userSnap.data();
         } else {
-          console.log("No user profile found with UID, trying email lookup");
           // Fallback: try to find user by email
           const auth = getAuth();
           const currentUser = auth.currentUser;
@@ -138,7 +137,6 @@ const App = () => {
             const querySnapshot = await getDocs(q);
             
             if (!querySnapshot.empty) {
-              console.log("Found user profile by email");
               return querySnapshot.docs[0].data();
             }
           }
@@ -240,7 +238,6 @@ const App = () => {
     // Get logs for a station by date range
     getLogsByDateAndStation: async (stationId, startDate, endDate) => {
       try {
-        console.log(`Searching logs for ${stationId} between ${startDate} and ${endDate}`);
         const logsRef = collection(db, "logs");
         
         // Query for logs in the date range for the station
@@ -258,7 +255,6 @@ const App = () => {
           ...doc.data()
         }));
         
-        console.log(`Found ${logsList.length} logs`);
         return logsList;
       } catch (error) {
         console.error("Error getting logs by date and station:", error);
@@ -352,7 +348,6 @@ const App = () => {
     // Get paginated users  
     getPaginatedUsers: async (page = 1, usersPerPage = 20, roleFilter = null, stationFilter = null, statusFilter = null, rankFilter = null) => {
       try {
-        console.log('API getPaginatedUsers called with:', { page, usersPerPage, roleFilter, stationFilter, statusFilter, rankFilter });
         
         const usersRef = collection(db, "users");
         
@@ -362,26 +357,20 @@ const App = () => {
           const conditions = [orderBy("createdAt", "desc")];
           
           if (roleFilter && roleFilter !== 'all') {
-            console.log('Adding role filter:', roleFilter);
             conditions.unshift(where("role", "==", roleFilter));
           }
           
           if (stationFilter && stationFilter !== 'all') {
-            console.log('Adding station filter:', stationFilter);
             conditions.unshift(where("station", "==", stationFilter));
           }
           
           if (statusFilter && statusFilter !== 'all') {
-            console.log('Adding status filter:', statusFilter);
             conditions.unshift(where("status", "==", statusFilter));
           }
           
           if (rankFilter && rankFilter !== 'all') {
-            console.log('Adding rank filter:', rankFilter);
             conditions.unshift(where("rank", "==", rankFilter));
           }
-
-          console.log('Trying server-side filtering with', conditions.length, 'conditions');
 
           // Get total count
           const countQuery = query(usersRef, ...conditions.filter(c => c.type !== 'orderBy'));
@@ -409,7 +398,6 @@ const App = () => {
             ...doc.data()
           }));
 
-          console.log('Server-side filtering successful:', usersList.length, 'users returned');
 
           return {
             users: usersList,
@@ -424,7 +412,6 @@ const App = () => {
           console.warn('Server-side filtering failed, falling back to client-side:', serverError.message);
           
           // Fall back to client-side filtering
-          console.log('Falling back to client-side filtering...');
           const allUsersSnapshot = await getDocs(query(usersRef, orderBy("createdAt", "desc")));
           let allUsers = allUsersSnapshot.docs.map(doc => ({
             id: doc.id,
@@ -446,7 +433,6 @@ const App = () => {
             return matchesRole && matchesStatus && matchesRank && matchesStation;
           });
 
-          console.log('Client-side filtering complete:', filteredUsers.length, 'users match filters');
 
           // Apply pagination client-side
           const totalUsers = filteredUsers.length;
@@ -532,29 +518,19 @@ const App = () => {
 
     getPaginatedAssessments: async (page = 1, assessmentsPerPage = 5, stationFilter = null) => {
       try {
-        console.log(`[ASSESSMENT DEBUG] getPaginatedAssessments called with: page=${page}, assessmentsPerPage=${assessmentsPerPage}, stationFilter=${stationFilter}`);
-        
         const assessmentsRef = collection(db, "assessments");
         
         // Build query conditions (without orderBy to include old assessments)
         const conditions = [];
         
-        // TEMPORARILY DISABLE STATION FILTERING TO DEBUG
-        console.log(`[ASSESSMENT DEBUG] Temporarily fetching ALL assessments to debug station names`);
-        console.log(`[ASSESSMENT DEBUG] Original stationFilter was: ${stationFilter}`);
-        
         // Comment out station filtering temporarily
         // if (stationFilter && stationFilter !== 'all') {
         //   conditions.push(where("station", "==", stationFilter));
-        //   console.log(`[ASSESSMENT DEBUG] Adding station filter: ${stationFilter}`);
         // }
 
         // Get all assessments first, then sort and paginate client-side
         const baseQuery = conditions.length > 0 ? query(assessmentsRef, ...conditions) : assessmentsRef;
-        console.log(`[ASSESSMENT DEBUG] Executing query with ${conditions.length} conditions`);
-        
         const snapshot = await getDocs(baseQuery);
-        console.log(`[ASSESSMENT DEBUG] Raw snapshot returned ${snapshot.docs.length} documents`);
         
         // Convert to array and sort by date
         const allAssessments = snapshot.docs.map(doc => ({
@@ -597,12 +573,8 @@ const App = () => {
           return dateB - dateA; // Descending order (newest first)
         });
 
-        console.log(`[ASSESSMENT DEBUG] After conversion and sorting: ${allAssessments.length} assessments`);
-        console.log(`[ASSESSMENT DEBUG] Assessment dates:`, allAssessments.map(a => ({ id: a.id, date: a.date, rawDate: a.rawDate, station: a.station })));
-        
         // Debug: Show unique station names in all assessments
         const uniqueStations = [...new Set(allAssessments.map(a => a.station))];
-        console.log(`[ASSESSMENT DEBUG] Unique station names in database:`, uniqueStations);
 
         const totalAssessments = allAssessments.length;
 
@@ -610,7 +582,6 @@ const App = () => {
         const offset = (page - 1) * assessmentsPerPage;
         const paginatedAssessments = allAssessments.slice(offset, offset + assessmentsPerPage);
 
-        console.log(`[ASSESSMENT DEBUG] Pagination: offset=${offset}, returning ${paginatedAssessments.length} assessments`);
 
         return {
           assessments: paginatedAssessments,
@@ -645,7 +616,6 @@ const App = () => {
             ...logSnap.data()
           };
         } else {
-          console.log("No log found");
           return null;
         }
       } catch (error) {
@@ -720,7 +690,7 @@ const App = () => {
         // Create audit log entry with enhanced user information
         const auditData = {
           deletedBy: userInfo.userEmail || auth.currentUser?.email || 'Unknown',
-          deletedByName: userInfo.userDisplayName || 'Unknown User',
+          deletedByName: userInfo.userDisplayName || auth.currentUser?.displayName || auth.currentUser?.email || 'Unknown User',
           deletedByUid: userInfo.userId || auth.currentUser?.uid || 'Unknown',
           deletedAt: serverTimestamp(),
           deletedItem: {
@@ -734,7 +704,6 @@ const App = () => {
         
         // Add to audit_logs collection
         await addDoc(collection(db, "audit_logs"), auditData);
-        console.log("Audit log created for deletion of log:", logId);
         
         // Now delete the actual log
         await deleteDoc(logRef);
@@ -817,14 +786,12 @@ const App = () => {
     // Get all users
     getAllUsers: async () => {
       try {
-        console.log("Fetching all users from the 'users' collection");
         const usersRef = collection(db, "users");
         const snapshot = await getDocs(usersRef);
         const usersList = snapshot.docs.map(doc => ({
           id: doc.id,
           ...doc.data()
         }));
-        console.log(`Found ${usersList.length} users`);
         return usersList;
       } catch (error) {
         console.error("Error getting all users:", error);
@@ -835,7 +802,6 @@ const App = () => {
     // Fix users missing required fields for filtering
     fixUserFieldsForFiltering: async () => {
       try {
-        console.log("Checking and fixing user fields for filtering...");
         const usersRef = collection(db, "users");
         const snapshot = await getDocs(usersRef);
         
@@ -853,28 +819,24 @@ const App = () => {
           if (!userData.role) {
             updates.role = 'firefighter';
             needsUpdate = true;
-            console.log(`Adding missing role for user ${userId}`);
           }
           
           // Ensure status field exists
           if (!userData.status) {
             updates.status = 'active';
             needsUpdate = true;
-            console.log(`Adding missing status for user ${userId}`);
           }
           
           // Ensure rank field exists
           if (!userData.rank) {
             updates.rank = 'Firefighter';
             needsUpdate = true;
-            console.log(`Adding missing rank for user ${userId}`);
           }
           
           // Ensure createdAt field exists
           if (!userData.createdAt) {
             updates.createdAt = serverTimestamp();
             needsUpdate = true;
-            console.log(`Adding missing createdAt for user ${userId}`);
           }
           
           if (needsUpdate) {
@@ -884,7 +846,6 @@ const App = () => {
           }
         }
         
-        console.log(`Fixed ${fixedCount} users with missing fields`);
         return { success: true, fixedCount };
       } catch (error) {
         console.error("Error fixing user fields:", error);
@@ -895,7 +856,6 @@ const App = () => {
     // Get all deleted users
     getDeletedUsers: async () => {
       try {
-        console.log("Fetching users from the 'deletedUsers' collection");
         const deletedUsersRef = collection(db, "deletedUsers");
         // Order by deletedAt timestamp descending (newest first)
         const q = query(deletedUsersRef, orderBy("deletedAt", "desc"));
@@ -916,7 +876,6 @@ const App = () => {
           };
         });
         
-        console.log(`Found ${deletedUsersList.length} deleted users`);
         return deletedUsersList;
       } catch (error) {
         console.error("Error getting deleted users:", error);
@@ -946,11 +905,9 @@ const App = () => {
         };
         
         await setDoc(doc(db, "deletedUsers", userId), deletedUserData);
-        console.log(`User ${userId} moved to deletedUsers collection`);
         
         // 3. Delete from users collection
         await deleteDoc(userRef);
-        console.log(`User ${userId} removed from users collection`);
         
         return { 
           success: true, 
@@ -968,7 +925,6 @@ const App = () => {
     deleteUser: async (userId) => {
       try {
         await deleteDoc(doc(db, "users", userId));
-        console.log(`User ${userId} deleted successfully from Firestore`);
         return true;
       } catch (error) {
         console.error("Error deleting user from Firestore:", error);
@@ -980,10 +936,6 @@ const App = () => {
     // Delete a user from Firebase Authentication
     deleteUserAuth: async (userEmail) => {
       try {
-        console.log(`To delete this user from Firebase Authentication, 
-          please go to the Firebase Console > Authentication > Users 
-          and delete the user with email: ${userEmail}`);
-          
         return {
           success: false,
           message: "Cannot delete users from Authentication via client SDK. Please use Firebase Console."
@@ -1160,7 +1112,6 @@ const App = () => {
         // 7. Commit all changes in one atomic operation
         await batch.commit();
         
-        console.log(`Station ${stationId} deleted successfully with cleanup:`, affectedItems);
         return { 
           success: true, 
           message: "Station deleted successfully", 
@@ -1179,7 +1130,6 @@ const App = () => {
     // Create a new GAR assessment
     createAssessment: async (assessmentData) => {
       try {
-        console.log('📝 Creating assessment with station:', assessmentData.station);
         
         const newAssessment = {
           ...assessmentData,
@@ -1213,7 +1163,6 @@ const App = () => {
     // Get a specific assessment
     getAssessment: async (assessmentId) => {
       try {
-        console.log(`[FIREBASE DEBUG] Getting assessment with ID: ${assessmentId}`);
 
         if (!assessmentId) {
           console.error("[FIREBASE DEBUG] Invalid assessment ID provided");
@@ -1221,17 +1170,13 @@ const App = () => {
         }
 
         // Try to get all assessments first to debug
-        console.log("[FIREBASE DEBUG] Fetching all assessments to check if ID exists");
         try {
           const assessmentsRef = collection(db, "assessments");
           const snapshot = await getDocs(assessmentsRef);
           const allIds = snapshot.docs.map(doc => doc.id);
-          console.log("[FIREBASE DEBUG] All assessment IDs:", allIds);
-          console.log("[FIREBASE DEBUG] Checking if ID exists:", allIds.includes(assessmentId));
 
           // If ID doesn't exist in collection, try to find an assessment with this ID as a field
           if (!allIds.includes(assessmentId)) {
-            console.log("[FIREBASE DEBUG] ID not found in document IDs, checking if exists as field");
             const q = query(assessmentsRef);
             const allDocs = await getDocs(q);
             const matchingDocs = [];
@@ -1239,13 +1184,11 @@ const App = () => {
             allDocs.forEach(doc => {
               const data = doc.data();
               if (data.id === assessmentId) {
-                console.log("[FIREBASE DEBUG] Found document with matching field ID:", doc.id);
                 matchingDocs.push({...data, id: doc.id});
               }
             });
 
             if (matchingDocs.length > 0) {
-              console.log("[FIREBASE DEBUG] Returning first matching document");
               return matchingDocs[0];
             }
           }
@@ -1254,14 +1197,11 @@ const App = () => {
         }
 
         const assessmentRef = doc(db, "assessments", assessmentId);
-        console.log("[FIREBASE DEBUG] Created doc reference:", assessmentRef.path);
 
         const assessmentSnap = await getDoc(assessmentRef);
-        console.log("[FIREBASE DEBUG] Document exists?", assessmentSnap.exists());
 
         if (assessmentSnap.exists()) {
           const data = assessmentSnap.data();
-          console.log("[FIREBASE DEBUG] Assessment data retrieved successfully", data);
 
           // Ensure we always have an ID in the assessment object
           const assessment = {
@@ -1269,10 +1209,8 @@ const App = () => {
             ...data
           };
 
-          console.log("[FIREBASE DEBUG] Returning assessment with ID:", assessment.id);
           return assessment;
         } else {
-          console.log(`[FIREBASE DEBUG] No assessment found with ID ${assessmentId}`);
           return null;
         }
       } catch (error) {
@@ -1305,7 +1243,6 @@ const App = () => {
     // Get assessments for a station
     getAssessmentsByStation: async (stationId, status = null) => {
       try {
-        console.log(`Fetching assessments for station: ${stationId}, status: ${status || 'any'}`);
         const assessmentsRef = collection(db, "assessments");
         let q;
 
@@ -1321,7 +1258,6 @@ const App = () => {
         }
 
         const snapshot = await getDocs(q);
-        console.log(`Found ${snapshot.docs.length} assessments`);
 
         const assessmentsList = snapshot.docs.map(doc => {
           const data = doc.data();
@@ -1384,8 +1320,6 @@ const App = () => {
         // Simply use the station value from the assessment data
         const stationValue = assessmentData.station || 'Unknown';
         
-        console.log('[AUDIT DEBUG] Assessment station from data:', assessmentData.station);
-        console.log('[AUDIT DEBUG] Final station value being saved:', stationValue);
         
         const auditData = {
           deletedBy: userInfo.userEmail || auth.currentUser?.email || 'Unknown',
@@ -1403,7 +1337,6 @@ const App = () => {
         
         // Add to audit_logs collection
         await addDoc(collection(db, "audit_logs"), auditData);
-        console.log("Audit log created for deletion of assessment:", assessmentId);
         
         // Now delete the actual assessment
         await deleteDoc(assessmentRef);
@@ -1420,27 +1353,22 @@ const App = () => {
         const activities = [];
         
         // Get recent logs
-        console.log("Querying logs collection...");
         const logsRef = collection(db, "logs");
         
         // First check if any logs exist at all
         const allLogsSnapshot = await getDocs(logsRef);
-        console.log(`Total logs in database: ${allLogsSnapshot.docs.length}`);
         
         if (allLogsSnapshot.docs.length > 0) {
           // Show sample log data
           const sampleLog = allLogsSnapshot.docs[0].data();
-          console.log("Sample log data:", sampleLog);
           
           // Try ordered query
           try {
             const recentLogsQuery = query(logsRef, orderBy("createdAt", "desc"), limit(3));
             const logsSnapshot = await getDocs(recentLogsQuery);
             
-            console.log(`Found ${logsSnapshot.docs.length} recent logs with createdAt ordering`);
             logsSnapshot.forEach(doc => {
               const data = doc.data();
-              console.log(`Log ${doc.id}:`, data);
               activities.push({
                 id: doc.id,
                 type: 'log',
@@ -1464,27 +1392,22 @@ const App = () => {
             });
           }
         } else {
-          console.log("No logs found in database");
         }
 
         // Get recent assessments
-        console.log("Querying assessments collection...");
         const assessmentsRef = collection(db, "assessments");
         
         // Check if any assessments exist
         const allAssessmentsSnapshot = await getDocs(assessmentsRef);
-        console.log(`Total assessments in database: ${allAssessmentsSnapshot.docs.length}`);
         
         if (allAssessmentsSnapshot.docs.length > 0) {
           // Show sample assessment data
           const sampleAssessment = allAssessmentsSnapshot.docs[0].data();
-          console.log("Sample assessment data:", sampleAssessment);
           
           try {
             const recentAssessmentsQuery = query(assessmentsRef, orderBy("createdAt", "desc"), limit(3));
             const assessmentsSnapshot = await getDocs(recentAssessmentsQuery);
             
-            console.log(`Found ${assessmentsSnapshot.docs.length} recent assessments with createdAt ordering`);
             assessmentsSnapshot.forEach(doc => {
               const data = doc.data();
               const riskColor = data.overallRisk?.toLowerCase() || 'unknown';
@@ -1514,7 +1437,6 @@ const App = () => {
             });
           }
         } else {
-          console.log("No assessments found in database");
         }
 
         // Get recent user logins (users with recent lastLogin timestamps)
@@ -1525,16 +1447,13 @@ const App = () => {
           const recentUsersQuery = query(usersRef, orderBy("lastLogin", "desc"), limit(10));
           const usersSnapshot = await getDocs(recentUsersQuery);
           
-          console.log(`Found ${usersSnapshot.docs.length} users with login data via orderBy`);
           usersSnapshot.forEach(doc => {
             const data = doc.data();
-            console.log(`User ${doc.id} lastLogin:`, data.lastLogin);
             if (data.lastLogin) {
               // Only include logins from the last 7 days to keep it relevant
               const loginDate = data.lastLogin.seconds ? new Date(data.lastLogin.seconds * 1000) : new Date(data.lastLogin);
               const daysSinceLogin = (new Date() - loginDate) / (1000 * 60 * 60 * 24);
               
-              console.log(`User ${data.firstName || data.displayName} login was ${daysSinceLogin.toFixed(1)} days ago`);
               
               if (daysSinceLogin <= 7) {
                 activities.push({
@@ -1582,7 +1501,6 @@ const App = () => {
             });
           });
           
-          console.log(`Found ${usersWithLogin.length} users with recent logins via fallback method`);
         }
 
         // Sort all activities by timestamp (newest first)
@@ -1613,7 +1531,6 @@ const App = () => {
           return bTime - aTime;
         });
 
-        console.log(`Returning ${activities.length} total activities`);
         return activities.slice(0, maxItems);
       } catch (error) {
         console.error("Error getting recent activity:", error);
@@ -1774,7 +1691,6 @@ const App = () => {
           loginCount: serverTimestamp() // We'll increment this in a moment
         });
 
-        console.log(`Login tracked for user ${displayName}`);
         return true;
       } catch (error) {
         console.error("Error tracking user login:", error);
@@ -1829,7 +1745,6 @@ const App = () => {
               ...doc.data()
             }));
           } catch (indexError) {
-            console.log("Composite index not available, falling back to simple query");
             // Fallback: get all activities and filter client-side
             const allSnapshot = await getDocs(activityRef);
             activities = allSnapshot.docs
@@ -1848,7 +1763,6 @@ const App = () => {
               });
           }
         } catch (collectionError) {
-          console.log("User activity collection doesn't exist yet, returning empty analytics");
           activities = [];
         }
 
@@ -2021,7 +1935,6 @@ const App = () => {
           stats.logsCreatedToday = todayActivities.filter(a => a.action === 'log_created').length;
           stats.assessmentsToday = todayActivities.filter(a => a.action === 'gar_created').length;
         } catch (error) {
-          console.log("Error fetching today's activity, using defaults:", error);
           // Default values if activity collection doesn't exist
           stats.activeUsersToday = 0;
           stats.logsCreatedToday = 0;
@@ -2394,7 +2307,6 @@ const App = () => {
     // Mark messages as read
     markHelpMessagesAsRead: async (conversationId, readerUserId, isAdmin = false) => {
       try {
-        console.log('📧 markHelpMessagesAsRead called:', { conversationId, readerUserId, isAdmin });
         
         // Get conversation data to determine who is reading
         const conversationRef = doc(db, "help_conversations", conversationId);
@@ -2409,14 +2321,6 @@ const App = () => {
         const isUserReading = conversationData.userId === readerUserId;
         const isAdminReading = isAdmin || (conversationData.userId !== readerUserId);
         
-        console.log('📧 Mark as read logic:', { 
-          conversationId, 
-          readerUserId, 
-          isUserReading, 
-          isAdminReading,
-          currentAdminUnreadCount: conversationData.adminUnreadCount,
-          currentUserUnreadCount: conversationData.userUnreadCount
-        });
         
         const updateData = {};
         
@@ -2464,11 +2368,7 @@ const App = () => {
         }
         
         if (Object.keys(updateData).length > 0) {
-          console.log('📧 Updating conversation with:', updateData);
           await updateDoc(conversationRef, updateData);
-          console.log('📧 Successfully updated conversation');
-        } else {
-          console.log('📧 No updates needed');
         }
         
         return true;

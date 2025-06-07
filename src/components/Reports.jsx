@@ -169,7 +169,6 @@ const Reports = () => {
         const stationToFilter = profile && profile.role === 'admin' && stationFilter === 'all' ? null : stationFilter;
         const statusToFilter = activeTab === 'all' ? null : activeTab;
         
-        console.log(`Fetching paginated logs - Page: ${currentPage}, Station: ${stationToFilter}, Status: ${statusToFilter}`);
         
         const paginatedResult = await firestoreOperations.getPaginatedLogs(
           currentPage, 
@@ -193,7 +192,6 @@ const Reports = () => {
   
   // Handle station filter change
   const handleStationFilterChange = (stationName) => {
-    console.log(`Changing station filter to: ${stationName}`);
     setStationFilter(stationName);
     setCurrentPage(1); // Reset to first page when filter changes
 
@@ -236,7 +234,6 @@ const Reports = () => {
 
       // If a log for today already exists, navigate to it
       if (todayLog) {
-        console.log("Log for today already exists, navigating to it:", todayLog.id);
         navigate('/today', { state: { logId: todayLog.id } });
         return;
       }
@@ -310,7 +307,9 @@ const Reports = () => {
       // Pass user info to the delete function for audit logging
       const deleteSuccess = await firestoreOperations.deleteLog(logToDelete.id, {
         userEmail: auth.currentUser?.email,
-        userDisplayName: userProfile?.displayName || auth.currentUser?.displayName || 'Unknown User',
+        userDisplayName: userProfile?.firstName && userProfile?.lastName 
+          ? `${userProfile.firstName} ${userProfile.lastName}`
+          : userProfile?.displayName || auth.currentUser?.displayName || auth.currentUser?.email || 'Unknown User',
         userId: auth.currentUser?.uid
       });
 
@@ -611,7 +610,6 @@ const Reports = () => {
                 <button
                   onClick={async () => {
                     try {
-                      console.log('Starting export all logs');
                       
                       // Fetch all logs for export
                       let allLogs;

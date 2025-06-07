@@ -176,11 +176,9 @@ const TodayLog = () => {
         createdByName: auth.currentUser?.displayName || "Unknown"
       };
 
-      console.log("Creating new log with data:", newLog);
       const createdLog = await firestoreOperations.createLog(newLog);
 
       if (createdLog) {
-        console.log("Log created successfully:", createdLog);
         setTodayLog(createdLog);
         setNoLogExists(false);
       } else {
@@ -199,13 +197,11 @@ const TodayLog = () => {
     const checkAuthorization = async () => {
       try {
         if (!auth.currentUser) {
-          console.log("No user logged in");
           setUserChecked(true);
           return;
         }
 
         const userEmail = auth.currentUser.email;
-        console.log("Checking authorization for user email:", userEmail);
 
         // Get users from collection where email matches
         const usersRef = collection(db, "users");
@@ -216,17 +212,14 @@ const TodayLog = () => {
           // User found by email
           const userDoc = querySnapshot.docs[0];
           const userData = userDoc.data();
-          console.log("User found by email:", userData);
 
           if (userData.role) {
             setUserRole(userData.role);
 
             // Determine permissions based on role
             if (userData.role === 'admin' || userData.role === 'firefighter') {
-              console.log("User has edit permission with role:", userData.role);
               setReadOnlyMode(false);
             } else {
-              console.log("User has unknown role:", userData.role);
               setReadOnlyMode(true);
             }
 
@@ -236,13 +229,11 @@ const TodayLog = () => {
               handleStationChange(userData.station);
             }
           } else {
-            console.log("No role found in user profile");
             setError("Access denied. Your account does not have a valid role assigned.");
             setUserChecked(true);
             return;
           }
         } else {
-          console.log("No user found with email:", userEmail);
           setError("Access denied. Your account is not registered in the system.");
           setUserChecked(true);
           return;
@@ -368,14 +359,12 @@ const TodayLog = () => {
 
     // If we have already handled this specific log ID, don't fetch it again
     if (logId && handledLogId === logId && todayLog) {
-      console.log("Already handled this specific log ID:", logId);
       return;
     }
 
     // If we're just checking for today's logs (no specific logId)
     // and we've already checked this station/date combination, don't check again
     if (!logId && logChecked[stationDateKey] && (todayLog || noLogExists)) {
-      console.log("Already checked for logs for this station and date:", stationDateKey);
       return;
     }
 
@@ -392,12 +381,10 @@ const TodayLog = () => {
         // Use the logId we defined earlier
         if (logId) {
           // If we have a specific log ID, load that log directly
-          console.log("Fetching specific log with ID:", logId);
 
           const specificLog = await firestoreOperations.getLog(logId);
 
           if (specificLog) {
-            console.log("Found specific log:", specificLog);
 
             // Set the log
             setTodayLog(specificLog);
@@ -422,7 +409,6 @@ const TodayLog = () => {
             setLoading(false);
             return; // Exit early since we found the specific log
           } else {
-            console.log("Specific log not found, will try to find today's log");
             // If the specific log is not found, continue with normal flow
           }
         }
@@ -435,8 +421,6 @@ const TodayLog = () => {
         const endOfDay = new Date(today);
         endOfDay.setHours(23, 59, 59, 999);
 
-        console.log("Searching for logs between:", startOfDay, "and", endOfDay);
-        console.log("For station:", selectedStation);
 
         // Query for today's log for the selected station
         const logs = await firestoreOperations.getLogsByDateAndStation(
@@ -445,7 +429,6 @@ const TodayLog = () => {
           endOfDay.toISOString()
         );
 
-        console.log("Logs found:", logs);
 
         // Mark that we've checked for logs for this station-date combination
         setLogChecked(prev => ({...prev, [stationDateKey]: true}));
@@ -453,15 +436,12 @@ const TodayLog = () => {
         if (logs && logs.length > 0) {
           // Use the first log found (should usually be only one per day per station)
           setTodayLog(logs[0]);
-          console.log("Found existing log:", logs[0]);
         } else {
           // Instead of automatically creating a log, we'll set the state to show a create button
-          console.log("No log found for today");
           setTodayLog(null);
           setNoLogExists(true);
 
           if (!hasEditPermission) {
-            console.log("User doesn't have permission to create a log");
             setError("No activity log exists for today. Please contact a Captain or administrator to create a new log.");
           }
         }
@@ -568,7 +548,6 @@ const TodayLog = () => {
     if (!todayLog) return;
 
     try {
-      console.log("Adding new activity:", activity);
 
       // Add user information to the activity
       const activityWithUser = {
@@ -599,14 +578,12 @@ const TodayLog = () => {
         totalHours
       };
 
-      console.log("Updating log with new activities:", updatedLog);
 
       // Update in Firestore
       await firestoreOperations.updateLog(todayLog.id, updatedLog);
 
       // Update local state
       setTodayLog(updatedLog);
-      console.log("Activity added successfully");
     } catch (error) {
       console.error("Error adding activity:", error);
       setError("Failed to add activity: " + error.message);
@@ -624,7 +601,6 @@ const TodayLog = () => {
     if (!todayLog) return;
 
     try {
-      console.log("Deleting activity with ID:", activityId);
       const updatedActivities = todayLog.activities.filter(a => a.id !== activityId);
       const totalHours = updatedActivities.reduce((sum, a) => sum + parseFloat(a.hours || 0), 0).toFixed(1);
 
@@ -634,14 +610,12 @@ const TodayLog = () => {
         totalHours
       };
 
-      console.log("Updating log after activity deletion:", updatedLog);
 
       // Update in Firestore
       await firestoreOperations.updateLog(todayLog.id, updatedLog);
 
       // Update local state
       setTodayLog(updatedLog);
-      console.log("Activity deleted successfully");
     } catch (error) {
       console.error("Error deleting activity:", error);
       setError("Failed to delete activity: " + error.message);
@@ -659,7 +633,6 @@ const TodayLog = () => {
     if (!todayLog) return;
 
     try {
-      console.log("Updating log notes");
       const updatedLog = {
         ...todayLog,
         notes
@@ -670,7 +643,6 @@ const TodayLog = () => {
 
       // Update local state
       setTodayLog(updatedLog);
-      console.log("Notes updated successfully");
     } catch (error) {
       console.error("Error updating notes:", error);
       setError("Failed to update notes: " + error.message);
@@ -688,7 +660,6 @@ const TodayLog = () => {
     if (!todayLog) return;
 
     try {
-      console.log("Updating crew members");
       
       // Convert crew IDs to names for display
       const crewNames = crewIds.map(id => {
@@ -710,7 +681,6 @@ const TodayLog = () => {
 
       // Update local state
       setTodayLog(updatedLog);
-      console.log("Crew updated successfully");
 
       // Close the modal
       setShowCrewModal(false);
@@ -745,7 +715,6 @@ const TodayLog = () => {
         await updateNotes(localNotes);
       }
       
-      console.log("Marking log as complete");
       const updatedLog = {
         ...todayLog,
         status: 'complete',
@@ -760,7 +729,6 @@ const TodayLog = () => {
       setTodayLog(updatedLog);
       setConfirmComplete(false);
       setUnsavedChanges(false);
-      console.log("Log marked as complete");
 
       // Navigate to report detail
       navigate(`/report/${todayLog.id}`);

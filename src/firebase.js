@@ -47,7 +47,6 @@ if (process.env.NODE_ENV === 'development' && process.env.REACT_APP_USE_EMULATOR
     connectAuthEmulator(auth, 'http://localhost:9099', { disableWarnings: true });
     connectFirestoreEmulator(db, 'localhost', 8080);
     connectStorageEmulator(storage, 'localhost', 9199);
-    console.log('Connected to Firebase emulators');
   } catch (error) {
     console.warn('Firebase emulators connection error:', error);
   }

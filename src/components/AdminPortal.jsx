@@ -123,7 +123,6 @@ const AdminPortal = ({ darkMode, setDarkMode, selectedStation, setSelectedStatio
         try {
           const fixResult = await firestoreOperations.fixUserFieldsForFiltering();
           if (fixResult.success && fixResult.fixedCount > 0) {
-            console.log(`Fixed ${fixResult.fixedCount} users with missing fields`);
           }
         } catch (error) {
           console.error('Error fixing user fields:', error);
@@ -819,7 +818,6 @@ const AdminPortal = ({ darkMode, setDarkMode, selectedStation, setSelectedStatio
                       
                       const performExport = () => {
                         try {
-                          console.log('Starting current page export:', filteredUsers.length);
                           
                           const formattedData = formatUserDataForExport(filteredUsers);
                           const filename = `users_page_${currentUserPage}_export_${new Date().toISOString().split('T')[0]}.csv`;
@@ -856,7 +854,6 @@ const AdminPortal = ({ darkMode, setDarkMode, selectedStation, setSelectedStatio
                       
                       const performExportAll = async () => {
                         try {
-                          console.log('Starting export all users');
                           setStatusMessage({ text: "Fetching all users for export...", type: "info", visible: true });
                           
                           // Fetch all users for export
@@ -2001,8 +1998,6 @@ const AdminPortal = ({ darkMode, setDarkMode, selectedStation, setSelectedStatio
           if (filterType !== 'all') filters.itemType = filterType;
           if (filterStation !== 'all') filters.station = filterStation;
           
-          console.log('Fetching audit logs with filters:', filters);
-          console.log('FilterStation value:', filterStation);
           
           const result = await firestoreOperations.getPaginatedAuditLogs(
             currentPage,
@@ -2010,15 +2005,10 @@ const AdminPortal = ({ darkMode, setDarkMode, selectedStation, setSelectedStatio
             filters
           );
           
-          console.log('Audit logs result:', result);
-          console.log('Number of logs returned:', result.logs?.length || 0);
           if (result.logs && result.logs.length > 0) {
-            console.log('Sample log station field:', result.logs[0].station);
             // Debug GAR assessment logs specifically
             const garLogs = result.logs.filter(log => log.itemType === 'gar_assessment');
             if (garLogs.length > 0) {
-              console.log('GAR assessment log station:', garLogs[0].station);
-              console.log('Full GAR log:', garLogs[0]);
             }
           }
           
@@ -2731,7 +2721,6 @@ const AdminPortal = ({ darkMode, setDarkMode, selectedStation, setSelectedStatio
   // Help Chats Component - Memoized to prevent recreation
   const HelpChats = React.memo(({ darkMode, firestoreOperations, auth, showStatusMessage, formatDateTimePST, formatDatePST }) => {
     // Debug: Log when component re-renders (reduced frequency)
-    if (Math.random() < 0.1) console.log('🔄 HelpChats component rendered/re-rendered');
     const [conversations, setConversations] = useState([]);
     const [selectedConversationId, setSelectedConversationId] = useState(() => 
       localStorage.getItem('adminSelectedConversationId') || null
@@ -2849,9 +2838,7 @@ const AdminPortal = ({ darkMode, setDarkMode, selectedStation, setSelectedStatio
     // Smart message merging to prevent reload behavior
     const mergeMessages = useCallback((newMessages) => {
       // Debug: Log mergeMessages calls (reduced frequency)
-      if (Math.random() < 0.3) console.log('📨 mergeMessages called with:', newMessages.length, 'messages');
       setMessages(prevMessages => {
-        if (Math.random() < 0.3) console.log('📝 Previous messages:', prevMessages.length, 'New messages:', newMessages.length);
         // If it's the first load (no previous messages), just set them
         if (prevMessages.length === 0) {
           return newMessages;
@@ -3050,7 +3037,6 @@ const AdminPortal = ({ darkMode, setDarkMode, selectedStation, setSelectedStatio
     // Memoized messages list component to prevent unnecessary re-renders
     const MessagesList = React.memo(({ messages, darkMode }) => {
       // Debug: Log when MessagesList re-renders (reduced frequency)
-      if (Math.random() < 0.2) console.log('💬 MessagesList rendered with', messages.length, 'messages');
       return (
         <div className="space-y-4">
         {messages.map((message) => (
@@ -3293,7 +3279,7 @@ const AdminPortal = ({ darkMode, setDarkMode, selectedStation, setSelectedStatio
                 No conversations yet
               </p>
             ) : (
-              <div className="space-y-2 max-h-[600px] overflow-y-auto">
+              <div className="space-y-2 max-h-[500px] overflow-y-auto pr-4">
                 {conversations.map((conv) => (
                   <button
                     key={conv.id}
@@ -3368,11 +3354,11 @@ const AdminPortal = ({ darkMode, setDarkMode, selectedStation, setSelectedStatio
           </div>
 
           {/* Chat View */}
-          <div className={`lg:col-span-2 ${darkMode ? 'bg-gray-800' : 'bg-white'} rounded-lg shadow`}>
+          <div className={`lg:col-span-2 ${darkMode ? 'bg-gray-800' : 'bg-white'} rounded-lg shadow h-[600px] overflow-hidden`}>
             {selectedConversationId ? (
-              <div className="flex flex-col h-[600px]">
+              <div className="flex flex-col h-full">
                 {/* Chat Header */}
-                <div className={`p-4 border-b ${darkMode ? 'border-gray-700' : 'border-gray-200'}`}>
+                <div className={`p-4 border-b ${darkMode ? 'border-gray-700' : 'border-gray-200'}`} style={{ flexShrink: 0 }}>
                   <div className="flex justify-between items-start">
                     <div>
                       <h3 className={`text-lg font-semibold ${darkMode ? 'text-white' : 'text-gray-900'}`}>
@@ -3464,7 +3450,7 @@ const AdminPortal = ({ darkMode, setDarkMode, selectedStation, setSelectedStatio
 
                 {/* Message Input */}
                 {selectedConversation?.status !== 'resolved' && (
-                  <div className={`p-4 border-t ${darkMode ? 'border-gray-700' : 'border-gray-200'}`}>
+                  <div className={`p-4 border-t ${darkMode ? 'border-gray-700' : 'border-gray-200'}`} style={{ flexShrink: 0 }}>
                     <div className="flex gap-2">
                       <input
                         type="text"
@@ -3491,7 +3477,7 @@ const AdminPortal = ({ darkMode, setDarkMode, selectedStation, setSelectedStatio
                 )}
               </div>
             ) : (
-              <div className="flex items-center justify-center h-[600px]">
+              <div className="flex items-center justify-center h-full">
                 <p className={`text-lg ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>
                   Select a conversation to view messages
                 </p>
@@ -3687,12 +3673,10 @@ const AdminPortal = ({ darkMode, setDarkMode, selectedStation, setSelectedStatio
               if (selectedUser) {
                 // Update existing user in the local state
                 setUsers(users.map(u => u.id === selectedUser.id ? savedUser : u));
-                console.log(`User ${selectedUser.id} updated successfully`);
                 showStatusMessage(`User ${savedUser.firstName} ${savedUser.lastName} updated successfully`, "success");
               } else {
                 // Add new user to the local state
                 setUsers([...users, savedUser]);
-                console.log(`New user created with ID: ${savedUser.id}`);
                 showStatusMessage(`User ${savedUser.firstName} ${savedUser.lastName} created successfully`, "success");
               }
               setShowUserModal(false);
@@ -3722,10 +3706,8 @@ const AdminPortal = ({ darkMode, setDarkMode, selectedStation, setSelectedStatio
             
             if (savedStation) {
               if (selectedStationData) {
-                console.log(`Station ${selectedStationData.id} updated successfully`);
                 showStatusMessage(`Station ${savedStation.name} updated successfully`, "success");
               } else {
-                console.log(`New station created with ID: ${savedStation.id}`);
                 showStatusMessage(`Station ${savedStation.name} created successfully`, "success");
                 // For new stations, go to the last page to see the new station
                 const newTotalStations = totalStations + 1;

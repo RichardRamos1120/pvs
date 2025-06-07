@@ -7,8 +7,6 @@ export const setStationAndSaveLog = (station, logId) => {
   localStorage.setItem('selectedStation', station);
   localStorage.setItem('editLogId', logId || '');
   
-  console.log('Station set to:', station);
-  console.log('Log ID set to:', logId);
   
   // Return true to indicate success
   return true;

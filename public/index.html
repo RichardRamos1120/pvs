@@ -41,34 +41,6 @@
         }
       });
       
-      // Session timeout warning (30 minutes)
-      let warningTimer;
-      let logoutTimer;
-      
-      function resetTimers() {
-        clearTimeout(warningTimer);
-        clearTimeout(logoutTimer);
-        
-        // Warning after 25 minutes
-        warningTimer = setTimeout(() => {
-          if (window.confirm('Your session will expire in 5 minutes. Do you want to continue?')) {
-            resetTimers();
-          }
-        }, 25 * 60 * 1000);
-        
-        // Auto logout after 30 minutes
-        logoutTimer = setTimeout(() => {
-          window.location.href = '/login?session=expired';
-        }, 30 * 60 * 1000);
-      }
-      
-      // Reset timers on user activity
-      ['mousedown', 'keypress', 'scroll', 'touchstart'].forEach(event => {
-        document.addEventListener(event, resetTimers, true);
-      });
-      
-      // Initialize timers
-      window.addEventListener('load', resetTimers);
     </script>
   </head>
   <body>

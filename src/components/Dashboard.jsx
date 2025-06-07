@@ -133,7 +133,6 @@ const Dashboard = () => {
 
     // Create new log
     const createNewLog = () => {
-        console.log("Dashboard: Creating new log...");
         
         // Check if station is valid first
         if (selectedStation === 'No Stations Available' || selectedStation === 'Error Loading Stations') {
@@ -171,11 +170,9 @@ const Dashboard = () => {
                     notes: ""
                 };
 
-                console.log("Dashboard: Creating log with data:", newLog);
                 const createdLog = await firestoreOperations.createLog(newLog);
 
                 if (createdLog) {
-                    console.log("Dashboard: Log created successfully:", createdLog);
                     // Navigate to today's log after creation
                     navigate('/today');
                 } else {
@@ -244,7 +241,14 @@ const Dashboard = () => {
         }
 
         try {
-            await firestoreOperations.deleteLog(logToDelete.id);
+            // Pass user info to the delete function for audit logging
+            await firestoreOperations.deleteLog(logToDelete.id, {
+                userEmail: auth.currentUser?.email,
+                userDisplayName: userProfile?.firstName && userProfile?.lastName 
+                    ? `${userProfile.firstName} ${userProfile.lastName}`
+                    : userProfile?.displayName || auth.currentUser?.displayName || auth.currentUser?.email || 'Unknown User',
+                userId: auth.currentUser?.uid
+            });
 
             // Update the logs list by filtering out the deleted log
             setPastLogs(pastLogs.filter(log => log.id !== logToDelete.id));

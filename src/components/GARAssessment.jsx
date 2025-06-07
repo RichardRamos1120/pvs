@@ -21,7 +21,6 @@ const GARAssessment = () => {
   // CRITICAL: Force initialize with empty array to prevent flickering the button
   // This empty array ensures the button won't show until we confirm stations exist in database
   const [stations, setStations] = useState(() => {
-    console.log("INITIALIZATION: Force setting stations to empty array");
     return [];  // This ensures button is hidden until we load real database stations
   });
   
@@ -37,17 +36,14 @@ const GARAssessment = () => {
    */
   const fetchStations = async () => {
     try {
-      console.log("Fetching stations from Firestore database...");
       // Clear existing stations first to ensure UI updates correctly
       setStations([]);
       
       // Get stations from Firestore through the provided context
       const stationsData = await firestoreOperations.getStations();
-      console.log("Raw station data from database:", stationsData);
       
       // Validate we have proper data
       if (!stationsData || !Array.isArray(stationsData) || stationsData.length === 0) {
-        console.log("No stations found in database - showing No Stations Available message");
         setStations([]);
         handleStationChange('No Stations Available');
         return;
@@ -57,7 +53,6 @@ const GARAssessment = () => {
       const stationNames = stationsData.map(station => 
         `Station ${station.number || station.id.replace('station_', '')}`
       );
-      console.log("Formatted station names from database:", stationNames);
       
       // Update the stations state with the actual station names from the database
       setStations(stationNames);
@@ -68,7 +63,6 @@ const GARAssessment = () => {
                           selectedStation === 'Error Loading Stations';
                           
       if (!isValidStation || isPlaceholder) {
-        console.log(`Current selected station "${selectedStation}" is invalid or placeholder, updating to ${stationNames[0]}`);
         handleStationChange(stationNames[0]);
       }
     } catch (error) {
@@ -173,9 +167,7 @@ const GARAssessment = () => {
       setLoading(true);
       setError(''); // Clear any previous errors
       
-      console.log("Fetching all assessments from database...");
       const assessments = await firestoreOperations.getAllAssessments();
-      console.log("Fetched assessments:", assessments);
       
       // Check each assessment has an ID
       assessments.forEach((assessment, index) => {
@@ -229,14 +221,12 @@ const GARAssessment = () => {
         
         // CRITICAL: Load stations directly from Firestore database
         // This is the key part that ensures we're using actual database stations
-        console.log("Loading stations from Firestore database...");
         
         // Get raw station data from database
         const stationsData = await firestoreOperations.getStations();
         
         // If no stations in database, clear stations and show message
         if (!stationsData || !Array.isArray(stationsData) || stationsData.length === 0) {
-          console.log("NO STATIONS FOUND IN DATABASE - Setting empty stations array");
           setStations([]);
           if (selectedStation !== 'No Stations Available') {
             handleStationChange('No Stations Available');
@@ -248,13 +238,11 @@ const GARAssessment = () => {
         }
         
         // If we get here, we have actual stations in the database
-        console.log(`Found ${stationsData.length} stations in the database:`, stationsData);
         
         // Format the station names from database records
         const stationNames = stationsData.map(station => 
           `Station ${station.number || station.id.replace('station_', '')}`
         );
-        console.log("Station names from database:", stationNames);
         
         // Update state with these database-sourced stations
         setStations(stationNames);
@@ -280,7 +268,6 @@ const GARAssessment = () => {
         }
         
         // Apply the station selection
-        console.log(`Setting selected station to: ${stationToUse}`);
         handleStationChange(stationToUse);
         
         // Load all assessments
@@ -305,23 +292,16 @@ const GARAssessment = () => {
   
   // CRITICAL: Monitor station data to ensure UI updates correctly
   useEffect(() => {
-    console.log("%c STATION STATE CHANGE DETECTED:", "background: red; color: white; font-size: 16px");
-    console.log("%c Current stations array:", "font-weight: bold", stations);
-    console.log("%c Stations array length:", "font-weight: bold", stations.length);
-    console.log("%c Selected station:", "font-weight: bold", selectedStation);
     
     // IMPORTANT SAFETY MEASURE: Force verify if stations exist in database again
     (async () => {
       try {
         // This is a verification check only - the main data loading is in the component mount effect
         const stationsData = await firestoreOperations.getStations();
-        console.log("%c VERIFICATION - Database stations:", "background: blue; color: white", 
-          stationsData && Array.isArray(stationsData) ? stationsData : "NONE");
         
         // If database has no stations but our state shows stations, force reset it
         if (!stationsData || !Array.isArray(stationsData) || stationsData.length === 0) {
           if (stations.length > 0) {
-            console.log("%c CRITICAL MISMATCH - Resetting stations to empty", "background: red; color: white");
             setStations([]);
           }
         }
@@ -404,7 +384,6 @@ const GARAssessment = () => {
         captain: auth.currentUser?.displayName || "Captain",
         userId: auth.currentUser?.uid // Required for security rules
       });
-      console.log("Draft auto-updated in database");
     } catch (error) {
       console.error("Error auto-updating draft:", error);
     }
@@ -550,7 +529,6 @@ const GARAssessment = () => {
 
           const created = await firestoreOperations.createAssessment(assessmentToSave);
           if (created && created.id) {
-            console.log("Created assessment with ID:", created.id);
             setCurrentAssessmentId(created.id);
           } else {
             console.error("Failed to get ID for new assessment:", created);
@@ -657,7 +635,6 @@ const GARAssessment = () => {
   const startAssessment = async () => {
     // Check if we have stations from the database before doing anything
     if (stations.length === 0) {
-      console.log("Attempted to create assessment with no stations in database");
       setError('Cannot create assessment: No stations are available in the database. Please contact an administrator to set up stations.');
       return;
     }
@@ -666,7 +643,6 @@ const GARAssessment = () => {
     try {
       const stationsData = await firestoreOperations.getStations();
       if (!stationsData || !Array.isArray(stationsData) || stationsData.length === 0) {
-        console.log("Verified no stations in database during startAssessment");
         setError('Cannot create assessment: No stations are available in the database. Please contact an administrator to set up stations.');
         setStations([]);
         return;
@@ -678,7 +654,6 @@ const GARAssessment = () => {
     }
     
     // At this point we've verified stations exist in the database
-    console.log("Creating new assessment with stations from database");
     
     // Use All Stations for department-wide by default
     const newAssessmentData = {
@@ -723,7 +698,6 @@ const GARAssessment = () => {
       setLoading(true);
       const created = await firestoreOperations.createAssessment(newAssessmentData);
       if (created && created.id) {
-        console.log("Created initial draft with ID:", created.id);
         setCurrentDraftId(created.id);
         setCurrentAssessmentId(created.id);
       } else {
@@ -775,7 +749,6 @@ const GARAssessment = () => {
   // Fixed viewAssessment function that properly handles errors and logging
   const viewAssessment = async (assessmentId) => {
     try {
-      console.log("View assessment - ID:", assessmentId);
       
       // Clear any previous errors
       setError("");
@@ -788,12 +761,9 @@ const GARAssessment = () => {
         return;
       }
       
-      console.log("Fetching assessment data for ID:", assessmentId);
       const assessment = await firestoreOperations.getAssessment(assessmentId);
-      console.log("Fetched assessment:", assessment);
 
       if (assessment && assessment.id) {
-        console.log("Successfully loaded assessment with ID:", assessment.id);
         
         // Store assessment data for viewing
         setViewingAssessment(assessment);
@@ -1639,8 +1609,6 @@ const GARAssessment = () => {
               <div className="divide-y divide-gray-200 dark:divide-gray-700">
                 {pastAssessments.map(assessment => {
                   // Debug the assessment structure
-                  console.log("Assessment in list:", assessment);
-                  console.log("Assessment ID:", assessment.id);
                   
                   const assessmentScore = Object.values(assessment.riskFactors || {}).reduce((acc, val) => acc + val, 0);
                   const assessmentRisk = getRiskLevel(assessmentScore);
@@ -1672,7 +1640,6 @@ const GARAssessment = () => {
                         )}
                         <button 
                           onClick={() => {
-                            console.log("Clicked view for assessment:", assessment.id);
                             if (assessment.id) {
                               viewAssessment(assessment.id);
                             } else {

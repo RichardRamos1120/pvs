@@ -84,28 +84,19 @@ const HelpChat = ({ darkMode }) => {
 
 
   // SIMPLE: Just mark as read when chat is open, no fancy logic
-  const markConversationAsRead = useCallback(async () => {
+  const markConversationAsRead = useCallback(async (forceMarkIgnoreCount = false) => {
     if (!currentConversation) {
-      console.log('❌ USER CHAT: No current conversation');
       return;
     }
     
     // Check if there are unread messages
     const hasUnreadMessages = (currentConversation.userUnreadCount || currentConversation.unreadCount || 0) > 0;
-    console.log('📊 USER CHAT: Mark attempt', {
-      conversationId: currentConversation.id,
-      userUnreadCount: currentConversation.userUnreadCount,
-      unreadCount: currentConversation.unreadCount,
-      hasUnreadMessages
-    });
     
-    if (!hasUnreadMessages) {
-      console.log('✅ USER CHAT: No unread messages, skipping mark');
+    if (!hasUnreadMessages && !forceMarkIgnoreCount) {
       return;
     }
     
     try {
-      console.log('🔥 USER CHAT: Calling markHelpMessagesAsRead');
       await firestoreOperations.markHelpMessagesAsRead(currentConversation.id, auth.currentUser.uid, false);
       
       // Update conversations list
@@ -120,9 +111,8 @@ const HelpChat = ({ darkMode }) => {
         
         return updatedConversations;
       });
-      console.log('✅ USER CHAT: Successfully marked as read');
     } catch (error) {
-      console.error('❌ USER CHAT: Error marking conversation as read:', error);
+      console.error('Error marking conversation as read:', error);
     }
   }, [currentConversation, firestoreOperations, auth.currentUser.uid]);
 
@@ -174,18 +164,12 @@ const HelpChat = ({ darkMode }) => {
         setShowScrollToBottom(true);
       }
       
-      // SIMPLE: If admin sends message while user is in chat, mark as read immediately
+      // FORCE mark as read if admin sends message while user is viewing chat
       if (!isOwnMessage && currentView === 'chat' && currentConversation && isOpen && !isMinimized) {
-        console.log('🔥 USER CHAT: Marking as read because admin sent message while chat open');
-        markConversationAsRead();
-      } else if (!isOwnMessage) {
-        console.log('❌ USER CHAT: NOT marking as read', {
-          isOwnMessage,
-          currentView,
-          hasConversation: !!currentConversation,
-          isOpen,
-          isMinimized
-        });
+        // Debounce to avoid multiple calls for batch messages
+        setTimeout(() => {
+          markConversationAsRead(true); // Force mark, ignore unread count check
+        }, 300);
       }
     }
 
@@ -198,13 +182,13 @@ const HelpChat = ({ darkMode }) => {
     previousMessageCount.current = 0;
   }, [currentConversation?.id]);
 
-  // SIMPLE: Mark as read when user opens chat
+  // Mark as read when user opens chat view
   useEffect(() => {
     if (currentView === 'chat' && currentConversation && isOpen && !isMinimized) {
-      // Just mark it as read immediately - no questions asked!
+      // Mark as read immediately when opening chat
       markConversationAsRead();
     }
-  }, [currentView, currentConversation, isOpen, isMinimized, markConversationAsRead]);
+  }, [currentView, currentConversation?.id, isOpen, isMinimized]); // Only depend on conversation ID, not the whole object
 
 
   // Smart message merging to prevent reload behavior - same as admin
@@ -308,9 +292,9 @@ const HelpChat = ({ darkMode }) => {
 
   // Removed auto-marking timer that was causing conversation to close
 
-  // Real-time conversation subscription
+  // Real-time conversation subscription - ALWAYS listen for unread count updates
   useEffect(() => {
-    if (!isOpen || !auth.currentUser) return;
+    if (!auth.currentUser) return;
 
     const unsubscribe = firestoreOperations.subscribeToHelpConversations(
       auth.currentUser.uid,
@@ -325,9 +309,9 @@ const HelpChat = ({ darkMode }) => {
     );
 
     return unsubscribe;
-  }, [isOpen, auth.currentUser]);
+  }, [auth.currentUser]); // Removed isOpen dependency so it always listens
 
-  // Load conversations
+  // Load conversations - initial load for unread count
   const loadConversations = async () => {
     try {
       setLoading(true);
@@ -343,6 +327,13 @@ const HelpChat = ({ darkMode }) => {
       setLoading(false);
     }
   };
+
+  // Initial load of conversations for unread count on component mount
+  useEffect(() => {
+    if (auth.currentUser) {
+      loadConversations();
+    }
+  }, [auth.currentUser]);
 
   // Load messages for a conversation
   const loadMessages = async (conversationId) => {
@@ -363,8 +354,7 @@ const HelpChat = ({ darkMode }) => {
   const selectConversation = async (conversation) => {
     setCurrentConversation(conversation);
     setCurrentView('chat');
-    
-    // No automatic marking - only mark as read manually when user explicitly views
+    // The useEffect will handle marking as read when currentView changes to 'chat'
   };
 
   // Real-time messages subscription
@@ -377,12 +367,12 @@ const HelpChat = ({ darkMode }) => {
       conversationId,
       (updatedMessages) => {
         mergeMessages(updatedMessages);
-        // Smart merging prevents reload behavior
+        // The useLayoutEffect above handles marking as read when new admin messages arrive
       }
     );
 
     return unsubscribe;
-  }, [currentConversation?.id, mergeMessages]);
+  }, [currentConversation?.id, mergeMessages, currentView, isOpen, isMinimized, markConversationAsRead]);
 
   // Send a message
   const sendMessage = async (e) => {
@@ -516,25 +506,16 @@ const HelpChat = ({ darkMode }) => {
         <div className="fixed bottom-6 right-6 z-50">
           <button
             onClick={() => setIsOpen(true)}
-            className={`w-14 h-14 text-white rounded-full shadow-lg flex items-center justify-center transition-all duration-200 hover:scale-110 ${
-              unreadCount > 0 
-                ? 'bg-red-500 hover:bg-red-600 animate-pulse' 
-                : 'bg-blue-600 hover:bg-blue-700'
-            }`}
+            className="w-14 h-14 bg-blue-600 hover:bg-blue-700 text-white rounded-full shadow-lg flex items-center justify-center transition-all duration-200 hover:scale-110"
             aria-label="Open Help Chat"
           >
             <MessageCircle className="w-6 h-6" />
             {unreadCount > 0 && (
-              <span className="absolute -top-2 -right-2 bg-red-600 text-white text-xs font-bold rounded-full min-w-[20px] h-5 flex items-center justify-center px-1 shadow-lg border-2 border-white">
+              <span className="absolute -top-2 -right-2 bg-red-500 text-white text-xs font-bold rounded-full min-w-[20px] h-5 flex items-center justify-center px-1 shadow-lg border-2 border-white">
                 {unreadCount > 99 ? '99+' : unreadCount}
               </span>
             )}
           </button>
-          
-          {/* Notification pulse animation when chat is closed and there are unread messages */}
-          {unreadCount > 0 && (
-            <div className="absolute inset-0 bg-red-500 rounded-full animate-ping opacity-20"></div>
-          )}
         </div>
       )}
 
@@ -576,8 +557,8 @@ const HelpChat = ({ darkMode }) => {
             <div className="flex-1 flex flex-col overflow-hidden">
               {/* Conversations List */}
               {currentView === 'conversations' && (
-                <div className="flex-1 flex flex-col relative">
-                  <div className="flex-1 overflow-y-auto">
+                <div className="flex-1 flex flex-col overflow-hidden">
+                  <div className="flex-1 overflow-y-scroll min-h-0" style={{ scrollbarWidth: 'thin' }}>
                     {loading ? (
                       <div className="flex items-center justify-center h-full">
                         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
@@ -660,17 +641,17 @@ const HelpChat = ({ darkMode }) => {
                     )}
                   </div>
                   
-                  {/* Floating New Conversation Button */}
+                  {/* New Conversation Button - Fixed at bottom */}
                   {conversations.length > 0 && (
-                    <div className={`absolute ${isMobile ? 'bottom-8' : 'bottom-6'} left-1/2 transform -translate-x-1/2`}>
+                    <div className={`p-4 border-t dark:border-gray-700 bg-white dark:bg-gray-800 flex-shrink-0`}>
                       <button
                         onClick={() => setCurrentView('new')}
-                        className={`bg-blue-600 hover:bg-blue-700 text-white rounded-full ${
-                          isMobile ? 'py-4 px-8' : 'py-3 px-6'
-                        } flex items-center space-x-2 transition-all shadow-lg hover:shadow-xl`}
+                        className={`w-full bg-blue-600 hover:bg-blue-700 text-white rounded-lg ${
+                          isMobile ? 'py-4 px-6' : 'py-3 px-4'
+                        } flex items-center justify-center space-x-2 transition-colors`}
                       >
                         <Plus className="w-5 h-5" />
-                        <span>New Conversation</span>
+                        <span>Start New Conversation</span>
                       </button>
                     </div>
                   )}

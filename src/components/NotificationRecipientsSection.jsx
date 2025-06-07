@@ -20,17 +20,12 @@ const NotificationRecipientsSection = ({
 
   // Debug logging for users list
   useEffect(() => {
-    console.log("Loaded users:", allUsers);
-    console.log("Total user count:", allUsers?.length || 0);
 
     // Check if fetchUsers function exists
-    console.log("fetchUsers function exists:", typeof fetchUsers === 'function');
 
     if (allUsers && allUsers.length > 0) {
       // Log detail about each user for debugging
-      console.log("ALL USERS DETAIL:");
       allUsers.forEach((user, index) => {
-        console.log(`User ${index + 1}:`, {
           id: user.id || user.uid || user.userId,
           displayName: user.displayName,
           name: user.name,
