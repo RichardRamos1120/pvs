@@ -54,6 +54,11 @@ const Dashboard = () => {
         return userProfile?.role === 'admin' || 
                ['Captain', 'Deputy Chief', 'Battalion Chief', 'Chief'].includes(userProfile?.rank);
     };
+
+    const canCreateLogs = (userProfile) => {
+        return userProfile?.role === 'admin' || userProfile?.role === 'firefighter' ||
+               ['Captain', 'Deputy Chief', 'Battalion Chief', 'Chief'].includes(userProfile?.rank);
+    };
     const [userProfile, setUserProfile] = useState(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
@@ -375,8 +380,8 @@ const Dashboard = () => {
                             </p>
                         </div>
                         <div className="mt-4 md:mt-0 flex flex-wrap gap-2">
-                            {/* Only show "Start New Log" button for admins and captains if no active log exists and stations exist */}
-                            {!hasActiveLog && canManageLogs(userProfile) && 
+                            {/* Only show "Start New Log" button for users who can create logs if no active log exists and stations exist */}
+                            {!hasActiveLog && canCreateLogs(userProfile) && 
                              !(selectedStation === 'No Stations Available' || selectedStation === 'Error Loading Stations') && (
                                 <button
                                     onClick={createNewLog}
@@ -698,8 +703,8 @@ const Dashboard = () => {
                 <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
                     <h3 className="text-lg font-semibold mb-4">Quick Links</h3>
                     <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-                        {/* Only show "New Log" button for admins and captains when no active log exists and stations exist */}
-                        {!hasActiveLog && canManageLogs(userProfile) && 
+                        {/* Only show "New Log" button for users who can create logs when no active log exists and stations exist */}
+                        {!hasActiveLog && canCreateLogs(userProfile) && 
                          !(selectedStation === 'No Stations Available' || selectedStation === 'Error Loading Stations') && (
                             <button
                                 onClick={createNewLog}
@@ -711,7 +716,7 @@ const Dashboard = () => {
                         )}
                         
                         {/* Show a disabled button when no stations exist */}
-                        {!hasActiveLog && canManageLogs(userProfile) && 
+                        {!hasActiveLog && canCreateLogs(userProfile) && 
                          (selectedStation === 'No Stations Available' || selectedStation === 'Error Loading Stations') && (
                             <div className="flex flex-col items-center justify-center p-4 bg-gray-100 dark:bg-gray-800 rounded-lg text-gray-400 dark:text-gray-500 cursor-not-allowed">
                                 <PlusCircle className="h-8 w-8 mb-2" />

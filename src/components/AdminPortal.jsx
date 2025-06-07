@@ -1983,7 +1983,7 @@ const AdminPortal = ({ darkMode, setDarkMode, selectedStation, setSelectedStatio
     const [loading, setLoading] = useState(true);
     const [currentPage, setCurrentPage] = useState(1);
     const [totalLogs, setTotalLogs] = useState(0);
-    const [logsPerPage] = useState(10);
+    const [logsPerPage] = useState(5);
     const [filterType, setFilterType] = useState('all');
     const [filterStation, setFilterStation] = useState('all');
     const [showDeletedItemModal, setShowDeletedItemModal] = useState(false);
@@ -2743,6 +2743,45 @@ const AdminPortal = ({ darkMode, setDarkMode, selectedStation, setSelectedStatio
     // Auto-mark as read state
     const [isViewingConversation, setIsViewingConversation] = useState(false);
 
+    // Filter states
+    const [searchTerm, setSearchTerm] = useState('');
+    const [filterType, setFilterType] = useState('all');
+    const [filterPriority, setFilterPriority] = useState('all');
+    const [filterStatus, setFilterStatus] = useState('all');
+
+    // Filter conversations based on search and filters
+    const filteredConversations = conversations.filter(conv => {
+      // Search filter
+      if (searchTerm) {
+        const searchLower = searchTerm.toLowerCase();
+        const matchesSearch = 
+          conv.subject?.toLowerCase().includes(searchLower) ||
+          conv.userName?.toLowerCase().includes(searchLower) ||
+          conv.userEmail?.toLowerCase().includes(searchLower) ||
+          conv.lastMessage?.toLowerCase().includes(searchLower);
+        if (!matchesSearch) return false;
+      }
+
+      // Type filter
+      if (filterType !== 'all' && conv.type !== filterType) return false;
+
+      // Priority filter
+      if (filterPriority !== 'all' && conv.priority !== filterPriority) return false;
+
+      // Status filter
+      if (filterStatus !== 'all' && conv.status !== filterStatus) return false;
+
+      return true;
+    });
+
+    // Clear filters function
+    const clearFilters = () => {
+      setSearchTerm('');
+      setFilterType('all');
+      setFilterPriority('all');
+      setFilterStatus('all');
+    };
+
     // Instant scroll to bottom (no animation) - Messenger style
     const scrollToBottomInstant = useCallback(() => {
       if (messagesEndRef.current) {
@@ -3268,7 +3307,95 @@ const AdminPortal = ({ darkMode, setDarkMode, selectedStation, setSelectedStatio
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           {/* Conversations List */}
           <div className={`lg:col-span-1 ${darkMode ? 'bg-gray-800' : 'bg-white'} rounded-lg shadow p-4`}>
-            <h3 className={`text-lg font-semibold mb-4 ${darkMode ? 'text-white' : 'text-gray-900'}`}>Conversations</h3>
+            <div className="flex items-center justify-between mb-4">
+              <div>
+                <h3 className={`text-lg font-semibold ${darkMode ? 'text-white' : 'text-gray-900'}`}>Conversations</h3>
+                {conversations.length > 0 && (
+                  <p className={`text-xs ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>
+                    {filteredConversations.length} of {conversations.length} conversations
+                  </p>
+                )}
+              </div>
+              {(searchTerm || filterType !== 'all' || filterPriority !== 'all' || filterStatus !== 'all') && (
+                <button
+                  onClick={clearFilters}
+                  className="text-xs text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300 underline"
+                >
+                  Clear Filters
+                </button>
+              )}
+            </div>
+
+            {/* Filters */}
+            <div className="space-y-3 mb-4">
+              {/* Search */}
+              <div>
+                <input
+                  type="text"
+                  placeholder="Search conversations..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className={`w-full px-3 py-2 text-sm border rounded-lg ${
+                    darkMode
+                      ? 'bg-gray-700 border-gray-600 text-white placeholder-gray-400'
+                      : 'bg-white border-gray-300 text-gray-900 placeholder-gray-500'
+                  } focus:outline-none focus:ring-2 focus:ring-blue-500`}
+                />
+              </div>
+
+              {/* Filter Row */}
+              <div className="grid grid-cols-3 gap-2">
+                {/* Type Filter */}
+                <select
+                  value={filterType}
+                  onChange={(e) => setFilterType(e.target.value)}
+                  className={`px-2 py-1.5 text-xs border rounded ${
+                    darkMode
+                      ? 'bg-gray-700 border-gray-600 text-white'
+                      : 'bg-white border-gray-300 text-gray-900'
+                  } focus:outline-none focus:ring-1 focus:ring-blue-500`}
+                >
+                  <option value="all">All Types</option>
+                  <option value="general">General</option>
+                  <option value="bug">Bug</option>
+                  <option value="feature">Feature</option>
+                  <option value="help">Help</option>
+                </select>
+
+                {/* Priority Filter */}
+                <select
+                  value={filterPriority}
+                  onChange={(e) => setFilterPriority(e.target.value)}
+                  className={`px-2 py-1.5 text-xs border rounded ${
+                    darkMode
+                      ? 'bg-gray-700 border-gray-600 text-white'
+                      : 'bg-white border-gray-300 text-gray-900'
+                  } focus:outline-none focus:ring-1 focus:ring-blue-500`}
+                >
+                  <option value="all">All Priority</option>
+                  <option value="urgent">Urgent</option>
+                  <option value="high">High</option>
+                  <option value="medium">Medium</option>
+                  <option value="low">Low</option>
+                </select>
+
+                {/* Status Filter */}
+                <select
+                  value={filterStatus}
+                  onChange={(e) => setFilterStatus(e.target.value)}
+                  className={`px-2 py-1.5 text-xs border rounded ${
+                    darkMode
+                      ? 'bg-gray-700 border-gray-600 text-white'
+                      : 'bg-white border-gray-300 text-gray-900'
+                  } focus:outline-none focus:ring-1 focus:ring-blue-500`}
+                >
+                  <option value="all">All Status</option>
+                  <option value="open">Open</option>
+                  <option value="in-progress">In Progress</option>
+                  <option value="resolved">Resolved</option>
+                </select>
+              </div>
+            </div>
             
             {conversationsLoading ? (
               <div className="flex justify-center py-8">
@@ -3278,9 +3405,13 @@ const AdminPortal = ({ darkMode, setDarkMode, selectedStation, setSelectedStatio
               <p className={`text-center py-8 ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>
                 No conversations yet
               </p>
+            ) : filteredConversations.length === 0 ? (
+              <p className={`text-center py-8 ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>
+                No conversations match your filters
+              </p>
             ) : (
-              <div className="space-y-2 max-h-[500px] overflow-y-auto pr-4">
-                {conversations.map((conv) => (
+              <div className="space-y-2 max-h-[400px] overflow-y-auto pr-4">
+                {filteredConversations.map((conv) => (
                   <button
                     key={conv.id}
                     onClick={() => selectConversation(conv)}
@@ -3384,16 +3515,6 @@ const AdminPortal = ({ darkMode, setDarkMode, selectedStation, setSelectedStatio
                             Mark Resolved
                           </button>
                         </>
-                      )}
-                      {/* Manual Mark Read Button with auto-mark feedback */}
-                      {(selectedConversation?.adminUnreadCount || 0) > 0 && (
-                        <button
-                          onClick={markCurrentConversationAsRead}
-                          className="px-3 py-1 text-sm rounded transition-colors bg-gray-600 text-white hover:bg-gray-700"
-                          title="Mark as read"
-                        >
-                          Mark Read
-                        </button>
                       )}
                       {/* Manual Close Button */}
                       <button
