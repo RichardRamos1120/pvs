@@ -1,22 +1,35 @@
 import React, { useState, useContext, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useParams } from 'react-router-dom';
 import { getAuth } from 'firebase/auth';
-import { Calendar, Clock, ChevronRight, ChevronLeft, AlertTriangle, CheckCircle, FileText, Home, Trash2 } from 'lucide-react';
+import { Calendar, Clock, ChevronRight, ChevronLeft, AlertTriangle, CheckCircle, FileText, Home, Trash2, Edit3, Users, Mail, X } from 'lucide-react';
 import Layout from './Layout';
 import { FirestoreContext } from '../App';
 import ReadOnlyAssessmentView from './ReadOnlyAssessmentView';
+import NotificationRecipientsModal from './NotificationRecipientsModal';
+import { initEmailJS, sendGARAssessmentNotifications } from '../utils/emailService';
 
 // Main component
 const GARAssessment = () => {
   const navigate = useNavigate();
+  const { id } = useParams(); // Get assessment ID from URL if present
   const auth = getAuth();
   const firestoreOperations = useContext(FirestoreContext);
+  
+  // DEBUG: Track renders
+  const renderCount = React.useRef(0);
+  renderCount.current += 1;
+  console.log(`🔄 GAR Assessment Render #${renderCount.current}`);
   
   // Initialize darkMode from localStorage with default to true (dark mode)
   const [darkMode, setDarkMode] = useState(() => {
     const savedMode = localStorage.getItem('darkMode');
     return savedMode !== null ? savedMode === 'true' : true; // Default to true (dark mode)
   });
+  
+  // DEBUG: Track state changes
+  React.useEffect(() => {
+    console.log(`🌓 darkMode changed:`, darkMode);
+  }, [darkMode]);
   
   // CRITICAL: Force initialize with empty array to prevent flickering the button
   // This empty array ensures the button won't show until we confirm stations exist in database
@@ -28,6 +41,14 @@ const GARAssessment = () => {
   const [selectedStation, setSelectedStation] = useState(() => {
     return localStorage.getItem('selectedStation') || 'No Stations Available';
   });
+  
+  React.useEffect(() => {
+    console.log(`🏢 selectedStation changed:`, selectedStation);
+  }, [selectedStation]);
+  
+  React.useEffect(() => {
+    console.log(`🏭 stations changed:`, stations);
+  }, [stations]);
   
   /**
    * Fetch stations from Firestore database
@@ -85,25 +106,79 @@ const GARAssessment = () => {
   const [currentDraftId, setCurrentDraftId] = useState(null);
   const [viewingAssessment, setViewingAssessment] = useState(null);
   const [showReadOnlyView, setShowReadOnlyView] = useState(false);
+  const [showNotificationModal, setShowNotificationModal] = useState(false);
+  const [notificationRecipients, setNotificationRecipients] = useState({
+    groups: [],
+    users: [],
+    groupsData: [],
+    usersData: []
+  });
+  
+  // Notification state for better UX instead of alerts
+  const [notification, setNotification] = useState({ show: false, message: '', type: 'success' });
+  
+  // Cancel loading state
+  const [cancelLoading, setCancelLoading] = useState(false);
+  
+  // Show notification helper function
+  const showNotification = (message, type = 'success') => {
+    setNotification({ show: true, message, type });
+    // Auto-hide after 5 seconds
+    setTimeout(() => {
+      setNotification({ show: false, message: '', type: 'success' });
+    }, 5000);
+  };
 
-  // Local state to avoid saving on every keystroke - SIMPLE VERSION
-  const [localMitigations, setLocalMitigations] = useState({});
-  const [localFormData, setLocalFormData] = useState({
+  // USE REFS FOR MITIGATION TEXTAREAS TO PREVENT RE-RENDERS
+  const mitigationRefs = React.useRef({
+    supervision: null,
+    planning: null,
+    teamSelection: null,
+    teamFitness: null,
+    environment: null,
+    complexity: null
+  });
+  
+  // USE REFS FOR ALL FORM INPUTS TO PREVENT RE-RENDERS
+  const formRefs = React.useRef({
+    date: null,
+    time: null,
+    type: null,
+    station: null,
+    temperature: null,
+    temperatureUnit: null,
+    wind: null,
+    windDirection: null,
+    humidity: null,
+    precipitation: null,
+    precipitationRate: null,
+    waveHeight: null,
+    wavePeriod: null,
+    waveDirection: null,
+    alerts: null
+  });
+  
+  // INITIAL FORM DATA (NOT REACTIVE STATE)
+  const initialFormData = React.useRef({
     date: new Date().toISOString().split('T')[0],
     time: new Date().toTimeString().substring(0, 5),
     type: "Department-wide",
     station: '',
     weather: {
-      temperature: "37",
+      temperature: "",
       temperatureUnit: "°F",
-      wind: "18",
+      wind: "",
       windDirection: "NW",
-      humidity: "85",
-      precipitation: "Heavy Rain",
-      precipitationRate: "1.2",
-      alerts: "Flash Flood Warning until 5:00 PM"
+      humidity: "",
+      precipitation: "",
+      precipitationRate: "",
+      waveHeight: "",
+      wavePeriod: "",
+      waveDirection: "NW",
+      alerts: ""
     }
   });
+  
 
   // State for assessment form
   const [showAssessment, setShowAssessment] = useState(false);
@@ -118,14 +193,17 @@ const GARAssessment = () => {
     status: "draft",
     userId: null, // Will be set when creating assessment
     weather: {
-      temperature: "37",
+      temperature: "",
       temperatureUnit: "°F",
-      wind: "18",
+      wind: "",
       windDirection: "NW",
-      humidity: "85",
-      precipitation: "Heavy Rain",
-      precipitationRate: "1.2",
-      alerts: "Flash Flood Warning until 5:00 PM"
+      humidity: "",
+      precipitation: "",
+      precipitationRate: "",
+      waveHeight: "",
+      wavePeriod: "",
+      waveDirection: "NW",
+      alerts: ""
     },
     riskFactors: {
       supervision: 0,
@@ -142,8 +220,49 @@ const GARAssessment = () => {
       teamFitness: "",
       environment: "",
       complexity: ""
+    },
+    notificationRecipients: {
+      groups: [],
+      users: [],
+      groupsData: [],
+      usersData: []
     }
   });
+  
+  // FUNCTION TO GET CURRENT FORM VALUES FROM REFS
+  const getCurrentFormData = React.useCallback(() => {
+    return {
+      date: formRefs.current.date?.value || "",
+      time: formRefs.current.time?.value || "",
+      type: formRefs.current.type?.value || "",
+      station: formRefs.current.station?.value || "",
+      weather: {
+        temperature: formRefs.current.temperature?.value || "",
+        temperatureUnit: formRefs.current.temperatureUnit?.value || "°F",
+        wind: formRefs.current.wind?.value || "",
+        windDirection: formRefs.current.windDirection?.value || "NW",
+        humidity: formRefs.current.humidity?.value || "",
+        precipitation: formRefs.current.precipitation?.value || "",
+        precipitationRate: formRefs.current.precipitationRate?.value || "",
+        waveHeight: formRefs.current.waveHeight?.value || "",
+        wavePeriod: formRefs.current.wavePeriod?.value || "",
+        waveDirection: formRefs.current.waveDirection?.value || "NW",
+        alerts: formRefs.current.alerts?.value || ""
+      }
+    };
+  }, []);
+
+  // FUNCTION TO GET CURRENT MITIGATION VALUES FROM REFS
+  const getCurrentMitigationData = React.useCallback(() => {
+    return {
+      supervision: mitigationRefs.current.supervision?.value || "",
+      planning: mitigationRefs.current.planning?.value || "",
+      teamSelection: mitigationRefs.current.teamSelection?.value || "",
+      teamFitness: mitigationRefs.current.teamFitness?.value || "",
+      environment: mitigationRefs.current.environment?.value || "",
+      complexity: mitigationRefs.current.complexity?.value || ""
+    };
+  }, []);
   
   // Wrapper functions to update localStorage when state changes
   const handleDarkModeChange = (mode) => {
@@ -202,6 +321,9 @@ const GARAssessment = () => {
       try {
         setLoading(true);
         setError('');
+        
+        // Initialize EmailJS for notifications
+        initEmailJS();
         
         // First verify we have a logged-in user
         const user = auth.currentUser;
@@ -290,8 +412,10 @@ const GARAssessment = () => {
     loadComponentData();
   }, [auth, firestoreOperations]);
   
-  // CRITICAL: Monitor station data to ensure UI updates correctly
+  // Station verification useEffect - only run once after initial load
   useEffect(() => {
+    // Only run verification if we have loaded stations initially
+    if (!userChecked) return;
     
     // IMPORTANT SAFETY MEASURE: Force verify if stations exist in database again
     (async () => {
@@ -309,7 +433,46 @@ const GARAssessment = () => {
         console.error("Error in station verification:", err);
       }
     })();
-  }, [stations, selectedStation, firestoreOperations]);
+  }, [userChecked, firestoreOperations]); // Removed stations and selectedStation to prevent re-renders
+  
+  // Handle URL parameter changes for assessment viewing
+  useEffect(() => {
+    // Only run if component is initialized and user is checked
+    if (!userChecked) return;
+    
+    if (id) {
+      console.log(`🔍 URL changed - Loading assessment: ${id}`);
+      const loadAssessmentFromURL = async () => {
+        try {
+          setError(''); // Clear any existing errors
+          setLoading(true);
+          
+          const assessment = await firestoreOperations.getAssessment(id);
+          if (assessment && assessment.id) {
+            console.log(`✅ Assessment loaded from URL change:`, assessment);
+            setViewingAssessment(assessment);
+            setShowReadOnlyView(true);
+          } else {
+            console.error("Assessment not found for ID:", id);
+            setError("Assessment not found. It may have been deleted or you may not have permission to view it.");
+          }
+        } catch (error) {
+          console.error("Error loading assessment from URL change:", error);
+          setError(`Failed to load assessment: ${error.message || "Unknown error"}`);
+        } finally {
+          setLoading(false);
+        }
+      };
+      
+      loadAssessmentFromURL();
+    } else {
+      // No ID in URL, close any read-only view
+      if (showReadOnlyView) {
+        setShowReadOnlyView(false);
+        setViewingAssessment(null);
+      }
+    }
+  }, [id, userChecked, firestoreOperations, showReadOnlyView]);
   
   // Calculate total risk score and determine risk level
   const calculateRiskScore = () => {
@@ -333,45 +496,30 @@ const GARAssessment = () => {
     return "bg-red-500";
   };
 
-  // Handle slider change with auto-update
-  const handleSliderChange = (factor, value) => {
-    const updatedAssessmentData = {
-      ...assessmentData,
-      riskFactors: {
-        ...assessmentData.riskFactors,
-        [factor]: parseInt(value)
-      }
-    };
-    
-    setAssessmentData(updatedAssessmentData);
-    setHasChanges(true);
-    
-    // Auto-update draft in database
-    updateDraftInDatabase(updatedAssessmentData);
-  };
+  // Handle slider change - NO AUTO DATABASE UPDATE
+  const handleSliderChange = React.useCallback((factor, value) => {
+    React.startTransition(() => {
+      setAssessmentData(prevData => ({
+        ...prevData,
+        riskFactors: {
+          ...prevData.riskFactors,
+          [factor]: parseInt(value)
+        }
+      }));
+      
+      // Don't set hasChanges immediately to prevent focus loss
+      // setHasChanges(true);
+    });
+  }, []);
 
   // SIMPLIFIED HANDLERS FOR INPUT FIELDS
-  // Handle mitigation text change with auto-update
-  const handleMitigationChange = (factor, text) => {
-    const updatedMitigations = {
-      ...localMitigations,
-      [factor]: text
-    };
+  // Handle mitigation text change - NO STATE UPDATES TO PREVENT RE-RENDERS
+  const handleMitigationChange = React.useCallback((factor, text) => {
+    console.log(`📝 handleMitigationChange called: ${factor} = "${text}"`);
     
-    setLocalMitigations(updatedMitigations);
-    setHasChanges(true);
-    
-    // Auto-update draft in database
-    const assessmentUpdate = {
-      ...assessmentData,
-      mitigations: {
-        ...assessmentData.mitigations,
-        ...updatedMitigations
-      }
-    };
-    
-    updateDraftInDatabase(assessmentUpdate);
-  };
+    // No state updates = no re-renders = no focus loss!
+    // Data is stored in refs and collected when needed
+  }, []);
 
   // Auto-update draft in database whenever fields change
   const updateDraftInDatabase = async (updatedData) => {
@@ -389,84 +537,124 @@ const GARAssessment = () => {
     }
   };
 
-  // Handle form field changes with bidirectional logic and auto-update
-  const handleInputChange = (section, field, value) => {
-    let updatedFormData;
-    
-    if (section) {
-      updatedFormData = {
-        ...localFormData,
-        [section]: {
-          ...localFormData[section],
-          [field]: value
-        }
-      };
-    } else {
-      updatedFormData = {
-        ...localFormData,
-        [field]: value
-      };
-    }
-    
-    // Bidirectional station/type logic
+  // Handle bidirectional logic for station/type without state updates
+  const handleStationTypeLogic = React.useCallback((field, value) => {
     if (field === 'station') {
-      if (value === 'All Stations') {
-        updatedFormData.type = 'Department-wide';
-      } else if (value && value !== 'All Stations' && stations.includes(value)) {
-        updatedFormData.type = 'Mission-specific';
+      if (value === 'All Stations' && formRefs.current.type) {
+        formRefs.current.type.value = 'Department-wide';
+      } else if (value && value !== 'All Stations' && stations.includes(value) && formRefs.current.type) {
+        formRefs.current.type.value = 'Mission-specific';
       }
     } else if (field === 'type') {
-      if (value === 'Department-wide') {
-        updatedFormData.station = 'All Stations';
-      } else if (value === 'Mission-specific' && updatedFormData.station === 'All Stations') {
-        // Auto-select first station when switching to mission-specific
-        updatedFormData.station = stations.length > 0 ? stations[0] : '';
+      if (value === 'Department-wide' && formRefs.current.station) {
+        formRefs.current.station.value = 'All Stations';
+      } else if (value === 'Mission-specific' && formRefs.current.station?.value === 'All Stations') {
+        if (stations.length > 0 && formRefs.current.station) {
+          formRefs.current.station.value = stations[0];
+        }
       }
     }
+  }, [stations]);
+  
+  // SIMPLE INPUT CHANGE HANDLER THAT DOESN'T TRIGGER RE-RENDERS
+  const handleInputChange = React.useCallback((field, value) => {
+    console.log(`📝 handleInputChange called: ${field} = "${value}"`);
     
-    setLocalFormData(updatedFormData);
-    setHasChanges(true);
+    // Handle bidirectional logic
+    handleStationTypeLogic(field, value);
     
-    // Auto-update draft in database
-    const assessmentUpdate = {
-      ...assessmentData,
-      date: updatedFormData.date,
-      time: updatedFormData.time,
-      type: updatedFormData.type,
-      station: updatedFormData.station,
-      weather: updatedFormData.weather
-    };
-    
-    updateDraftInDatabase(assessmentUpdate);
-  };
+    // No state updates = no re-renders = no focus loss!
+  }, [handleStationTypeLogic]);
 
-  // Sync local mitigations to assessment data when navigating between steps
+  // Sync mitigation data from refs to assessment data when navigating between steps
   const syncMitigations = () => {
-    // First, check if we have any local mitigations
-    if (Object.keys(localMitigations).length === 0) return;
+    // Get current mitigation data from refs
+    const currentMitigationData = getCurrentMitigationData();
 
-    // Update assessment data with local mitigations
+    // Update assessment data with current mitigation data
     setAssessmentData({
       ...assessmentData,
       mitigations: {
         ...assessmentData.mitigations,
-        ...localMitigations
+        ...currentMitigationData
       }
     });
   };
 
-  // Sync local form data to assessment data
+  // Sync form data from refs to assessment data
   const syncFormData = () => {
-    // Update assessment data with local form data
+    const currentFormData = getCurrentFormData();
     setAssessmentData({
       ...assessmentData,
-      date: localFormData.date,
-      time: localFormData.time,
-      type: localFormData.type,
-      station: localFormData.station || selectedStation, // Use selected station as fallback
-      weather: localFormData.weather
+      date: currentFormData.date,
+      time: currentFormData.time,
+      type: currentFormData.type,
+      station: currentFormData.station || selectedStation,
+      weather: currentFormData.weather
     });
   };
+
+  // Sync assessment data back to form refs (when navigating back to step 1)
+  const syncAssessmentDataToRefs = React.useCallback(() => {
+    if (!assessmentData) return;
+    
+    console.log('🔄 Syncing assessment data back to form refs:', assessmentData);
+    
+    // Sync basic fields
+    if (formRefs.current.date) formRefs.current.date.value = assessmentData.date || '';
+    if (formRefs.current.time) formRefs.current.time.value = assessmentData.time || '';
+    if (formRefs.current.type) formRefs.current.type.value = assessmentData.type || 'Department-wide';
+    if (formRefs.current.station) formRefs.current.station.value = assessmentData.station || '';
+    
+    // Sync weather fields
+    const weather = assessmentData.weather || {};
+    if (formRefs.current.temperature) formRefs.current.temperature.value = weather.temperature || '';
+    if (formRefs.current.temperatureUnit) formRefs.current.temperatureUnit.value = weather.temperatureUnit || '°F';
+    if (formRefs.current.wind) formRefs.current.wind.value = weather.wind || '';
+    if (formRefs.current.windDirection) formRefs.current.windDirection.value = weather.windDirection || 'NW';
+    if (formRefs.current.humidity) formRefs.current.humidity.value = weather.humidity || '';
+    if (formRefs.current.precipitation) formRefs.current.precipitation.value = weather.precipitation || '';
+    if (formRefs.current.precipitationRate) formRefs.current.precipitationRate.value = weather.precipitationRate || '';
+    if (formRefs.current.waveHeight) formRefs.current.waveHeight.value = weather.waveHeight || '';
+    if (formRefs.current.wavePeriod) formRefs.current.wavePeriod.value = weather.wavePeriod || '';
+    if (formRefs.current.waveDirection) formRefs.current.waveDirection.value = weather.waveDirection || 'NW';
+    if (formRefs.current.alerts) formRefs.current.alerts.value = weather.alerts || '';
+  }, [assessmentData]);
+
+  // Sync assessment data back to Step 2 (risk factors)
+  const syncAssessmentDataToStep2 = React.useCallback(() => {
+    if (!assessmentData?.riskFactors) return;
+    
+    console.log('🔄 Syncing assessment risk factors to Step 2:', assessmentData.riskFactors);
+    
+    // The risk factors are already in assessmentData.riskFactors and Step2 reads from there
+    // No additional sync needed since Step2 uses controlled components that read from assessmentData
+  }, [assessmentData]);
+
+  // Sync assessment data back to Step 3 (mitigations)
+  const syncAssessmentDataToStep3 = React.useCallback(() => {
+    if (!assessmentData?.mitigations) return;
+    
+    console.log('🔄 Syncing assessment mitigations to Step 3:', assessmentData.mitigations);
+    
+    // Update mitigation refs with saved data
+    const mitigations = assessmentData.mitigations;
+    if (mitigationRefs.current.supervision) mitigationRefs.current.supervision.value = mitigations.supervision || "";
+    if (mitigationRefs.current.planning) mitigationRefs.current.planning.value = mitigations.planning || "";
+    if (mitigationRefs.current.teamSelection) mitigationRefs.current.teamSelection.value = mitigations.teamSelection || "";
+    if (mitigationRefs.current.teamFitness) mitigationRefs.current.teamFitness.value = mitigations.teamFitness || "";
+    if (mitigationRefs.current.environment) mitigationRefs.current.environment.value = mitigations.environment || "";
+    if (mitigationRefs.current.complexity) mitigationRefs.current.complexity.value = mitigations.complexity || "";
+  }, [assessmentData]);
+
+  // Sync assessment data to Step 4 (review - NO STATE UPDATES, just for display)
+  const syncAssessmentDataToStep4 = React.useCallback(() => {
+    console.log('🔄 Step 4 review - data is already synced from navigation');
+    
+    // Step 4 is read-only, no need to update state here
+    // All data syncing happens during navigation in nextStep/prevStep functions
+    // This prevents infinite re-render loops
+  }, []);
 
   // Navigation functions
   const nextStep = async () => {
@@ -479,8 +667,9 @@ const GARAssessment = () => {
       syncMitigations();
     }
 
-    // Only save to database if there are changes
-    if (hasChanges) {
+    // Always save to database when moving from step 1 (form data), step 2 (risk factors), or step 3 (mitigations)
+    const shouldSave = currentStep === 1 || currentStep === 2 || currentStep === 3;
+    if (shouldSave) {
       try {
         setLoading(true);
 
@@ -493,15 +682,16 @@ const GARAssessment = () => {
 
           // Add local data based on current step
           if (currentStep === 1) {
-            updatedAssessment.date = localFormData.date;
-            updatedAssessment.time = localFormData.time;
-            updatedAssessment.type = localFormData.type;
-            updatedAssessment.station = localFormData.station || selectedStation;
-            updatedAssessment.weather = localFormData.weather;
+            const currentFormData = getCurrentFormData();
+            updatedAssessment.date = currentFormData.date;
+            updatedAssessment.time = currentFormData.time;
+            updatedAssessment.type = currentFormData.type;
+            updatedAssessment.station = currentFormData.station || selectedStation;
+            updatedAssessment.weather = currentFormData.weather;
           } else if (currentStep === 3) {
             updatedAssessment.mitigations = {
               ...assessmentData.mitigations,
-              ...localMitigations
+              ...getCurrentMitigationData()
             };
           }
 
@@ -512,15 +702,16 @@ const GARAssessment = () => {
 
           // Add local data based on current step
           if (currentStep === 1) {
-            assessmentToSave.date = localFormData.date;
-            assessmentToSave.time = localFormData.time;
-            assessmentToSave.type = localFormData.type;
-            assessmentToSave.station = localFormData.station || selectedStation;
-            assessmentToSave.weather = localFormData.weather;
+            const currentFormData = getCurrentFormData();
+            assessmentToSave.date = currentFormData.date;
+            assessmentToSave.time = currentFormData.time;
+            assessmentToSave.type = currentFormData.type;
+            assessmentToSave.station = currentFormData.station || selectedStation;
+            assessmentToSave.weather = currentFormData.weather;
           } else if (currentStep === 3) {
             assessmentToSave.mitigations = {
               ...assessmentData.mitigations,
-              ...localMitigations
+              ...getCurrentMitigationData()
             };
           }
 
@@ -535,8 +726,7 @@ const GARAssessment = () => {
           }
         }
 
-        // Reset hasChanges after saving
-        setHasChanges(false);
+        console.log("✅ Assessment draft saved successfully during navigation");
       } catch (error) {
         console.error("Error saving assessment:", error);
       } finally {
@@ -559,8 +749,9 @@ const GARAssessment = () => {
       syncMitigations();
     }
 
-    // Only save to database if there are changes
-    if (hasChanges) {
+    // Always save to database when moving from step 1 (form data), step 2 (risk factors), or step 3 (mitigations)
+    const shouldSave = currentStep === 1 || currentStep === 2 || currentStep === 3;
+    if (shouldSave) {
       try {
         setLoading(true);
 
@@ -573,15 +764,16 @@ const GARAssessment = () => {
 
           // Add local data based on current step
           if (currentStep === 1) {
-            updatedAssessment.date = localFormData.date;
-            updatedAssessment.time = localFormData.time;
-            updatedAssessment.type = localFormData.type;
-            updatedAssessment.station = localFormData.station || selectedStation;
-            updatedAssessment.weather = localFormData.weather;
+            const currentFormData = getCurrentFormData();
+            updatedAssessment.date = currentFormData.date;
+            updatedAssessment.time = currentFormData.time;
+            updatedAssessment.type = currentFormData.type;
+            updatedAssessment.station = currentFormData.station || selectedStation;
+            updatedAssessment.weather = currentFormData.weather;
           } else if (currentStep === 3) {
             updatedAssessment.mitigations = {
               ...assessmentData.mitigations,
-              ...localMitigations
+              ...getCurrentMitigationData()
             };
           }
 
@@ -592,15 +784,16 @@ const GARAssessment = () => {
 
           // Add local data based on current step
           if (currentStep === 1) {
-            assessmentToSave.date = localFormData.date;
-            assessmentToSave.time = localFormData.time;
-            assessmentToSave.type = localFormData.type;
-            assessmentToSave.station = localFormData.station || selectedStation;
-            assessmentToSave.weather = localFormData.weather;
+            const currentFormData = getCurrentFormData();
+            assessmentToSave.date = currentFormData.date;
+            assessmentToSave.time = currentFormData.time;
+            assessmentToSave.type = currentFormData.type;
+            assessmentToSave.station = currentFormData.station || selectedStation;
+            assessmentToSave.weather = currentFormData.weather;
           } else if (currentStep === 3) {
             assessmentToSave.mitigations = {
               ...assessmentData.mitigations,
-              ...localMitigations
+              ...getCurrentMitigationData()
             };
           }
 
@@ -613,8 +806,7 @@ const GARAssessment = () => {
           }
         }
 
-        // Reset hasChanges after saving
-        setHasChanges(false);
+        console.log("✅ Assessment draft saved successfully during navigation");
       } catch (error) {
         console.error("Error saving assessment:", error);
       } finally {
@@ -633,6 +825,12 @@ const GARAssessment = () => {
    * It creates an initial draft in the database immediately
    */
   const startAssessment = async () => {
+    // Check if there's already a draft assessment for today
+    if (todayDraftAssessment) {
+      setError('Cannot create new assessment: You already have a draft assessment for today. Please complete or delete the existing draft first.');
+      return;
+    }
+    
     // Check if we have stations from the database before doing anything
     if (stations.length === 0) {
       setError('Cannot create assessment: No stations are available in the database. Please contact an administrator to set up stations.');
@@ -666,14 +864,17 @@ const GARAssessment = () => {
       captain: auth.currentUser?.displayName || "Captain",
       userId: auth.currentUser?.uid, // Required for security rules
       weather: {
-        temperature: "37",
+        temperature: "",
         temperatureUnit: "°F",
-        wind: "18",
+        wind: "",
         windDirection: "NW",
-        humidity: "85",
-        precipitation: "Heavy Rain",
-        precipitationRate: "1.2",
-        alerts: "Flash Flood Warning until 5:00 PM"
+        humidity: "",
+        precipitation: "",
+        precipitationRate: "",
+        waveHeight: "",
+        wavePeriod: "",
+        waveDirection: "NW",
+        alerts: ""
       },
       riskFactors: {
         supervision: 0,
@@ -690,6 +891,12 @@ const GARAssessment = () => {
         teamFitness: "",
         environment: "",
         complexity: ""
+      },
+      notificationRecipients: {
+        groups: [],
+        users: [],
+        groupsData: [],
+        usersData: []
       }
     };
     
@@ -716,17 +923,23 @@ const GARAssessment = () => {
     // Set assessment data
     setAssessmentData(newAssessmentData);
     
-    // Initialize local form data
-    setLocalFormData({
-      date: newAssessmentData.date,
-      time: newAssessmentData.time,
-      type: newAssessmentData.type,
-      station: newAssessmentData.station,
-      weather: { ...newAssessmentData.weather }
-    });
+    // Initialize form refs with data
+    setTimeout(() => {
+      if (formRefs.current.date) formRefs.current.date.value = newAssessmentData.date;
+      if (formRefs.current.time) formRefs.current.time.value = newAssessmentData.time;
+      if (formRefs.current.type) formRefs.current.type.value = newAssessmentData.type;
+      if (formRefs.current.station) formRefs.current.station.value = newAssessmentData.station;
+      if (formRefs.current.temperatureUnit) formRefs.current.temperatureUnit.value = newAssessmentData.weather.temperatureUnit;
+      if (formRefs.current.windDirection) formRefs.current.windDirection.value = newAssessmentData.weather.windDirection;
+      if (formRefs.current.waveDirection) formRefs.current.waveDirection.value = newAssessmentData.weather.waveDirection;
+    }, 0);
     
-    // Reset mitigations data
-    setLocalMitigations({});
+    // Reset mitigation refs
+    Object.keys(mitigationRefs.current).forEach(factor => {
+      if (mitigationRefs.current[factor]) {
+        mitigationRefs.current[factor].value = "";
+      }
+    });
     
     // Reset control states
     setHasChanges(false);
@@ -734,50 +947,113 @@ const GARAssessment = () => {
     setShowAssessment(true);
   };
 
-  const closeAssessment = () => {
-    setShowAssessment(false);
-    setCurrentStep(1);
-    setCurrentAssessmentId(null);
-    setCurrentDraftId(null);
+  const closeAssessment = async () => {
+    setCancelLoading(true);
+    try {
+      // Delete the draft assessment if it exists
+      if (currentDraftId) {
+        await firestoreOperations.deleteAssessment(currentDraftId, {
+          userEmail: auth.currentUser?.email,
+          userDisplayName: auth.currentUser?.displayName,
+          userId: auth.currentUser?.uid
+        });
+      }
+    } catch (error) {
+      console.error("Error deleting draft assessment:", error);
+    }
+    
+    // Full page reload
+    window.location.reload();
   };
 
   const closeReadOnlyView = () => {
     setShowReadOnlyView(false);
     setViewingAssessment(null);
+    // If we're viewing an assessment via URL, navigate back to the main GAR page
+    if (id) {
+      navigate('/gar-assessment');
+    }
   };
 
-  // Fixed viewAssessment function that properly handles errors and logging
-  const viewAssessment = async (assessmentId) => {
-    try {
-      
-      // Clear any previous errors
-      setError("");
-      setLoading(true);
-      
-      if (!assessmentId) {
-        console.error("Invalid assessment ID (empty or undefined)");
-        setError("Cannot view assessment: Invalid ID");
-        setLoading(false);
-        return;
-      }
-      
-      const assessment = await firestoreOperations.getAssessment(assessmentId);
+  // Handle notification recipients save
+  const handleNotificationRecipientsSave = (recipientsData) => {
+    setNotificationRecipients(recipientsData);
+    setAssessmentData(prevData => ({
+      ...prevData,
+      notificationRecipients: recipientsData
+    }));
+  };
 
-      if (assessment && assessment.id) {
-        
-        // Store assessment data for viewing
-        setViewingAssessment(assessment);
-        setShowReadOnlyView(true);
-      } else {
-        console.error("Failed to load assessment - null or missing ID");
-        setError("Assessment not found. Please try again or create a new assessment.");
-      }
-    } catch (error) {
-      console.error("Error in viewAssessment:", error);
-      setError(`Failed to load assessment: ${error.message || "Unknown error"}`);
-    } finally {
-      setLoading(false);
+  // Check if there's a draft assessment for today - MEMOIZED
+  const todayDraftAssessment = React.useMemo(() => {
+    const today = new Date().toISOString().split('T')[0];
+    return pastAssessments.find(assessment => 
+      assessment.status === 'draft' && 
+      assessment.date === today &&
+      assessment.userId === auth.currentUser?.uid
+    );
+  }, [pastAssessments, auth.currentUser?.uid]);
+
+  // Continue working on draft assessment
+  const continueDraftAssessment = (draftAssessment) => {
+    // Set the assessment data
+    setAssessmentData(draftAssessment);
+    setCurrentAssessmentId(draftAssessment.id);
+    setCurrentDraftId(draftAssessment.id);
+    
+    // Set notification recipients if they exist in the draft
+    if (draftAssessment.notificationRecipients) {
+      setNotificationRecipients(draftAssessment.notificationRecipients);
     }
+    
+    // Initialize form refs with draft data
+    setTimeout(() => {
+      if (formRefs.current.date) formRefs.current.date.value = draftAssessment.date;
+      if (formRefs.current.time) formRefs.current.time.value = draftAssessment.time;
+      if (formRefs.current.type) formRefs.current.type.value = draftAssessment.type;
+      if (formRefs.current.station) formRefs.current.station.value = draftAssessment.station;
+      
+      const weather = draftAssessment.weather || {};
+      if (formRefs.current.temperature) formRefs.current.temperature.value = weather.temperature || "";
+      if (formRefs.current.temperatureUnit) formRefs.current.temperatureUnit.value = weather.temperatureUnit || "°F";
+      if (formRefs.current.wind) formRefs.current.wind.value = weather.wind || "";
+      if (formRefs.current.windDirection) formRefs.current.windDirection.value = weather.windDirection || "NW";
+      if (formRefs.current.humidity) formRefs.current.humidity.value = weather.humidity || "";
+      if (formRefs.current.precipitation) formRefs.current.precipitation.value = weather.precipitation || "";
+      if (formRefs.current.precipitationRate) formRefs.current.precipitationRate.value = weather.precipitationRate || "";
+      if (formRefs.current.waveHeight) formRefs.current.waveHeight.value = weather.waveHeight || "";
+      if (formRefs.current.wavePeriod) formRefs.current.wavePeriod.value = weather.wavePeriod || "";
+      if (formRefs.current.waveDirection) formRefs.current.waveDirection.value = weather.waveDirection || "NW";
+      if (formRefs.current.alerts) formRefs.current.alerts.value = weather.alerts || "";
+    }, 0);
+    
+    // Initialize mitigation refs with draft data
+    const mitigations = draftAssessment.mitigations || {};
+    setTimeout(() => {
+      Object.keys(mitigationRefs.current).forEach(factor => {
+        if (mitigationRefs.current[factor]) {
+          mitigationRefs.current[factor].value = mitigations[factor] || "";
+        }
+      });
+    }, 0);
+    
+    // Start from step 1
+    setCurrentStep(1);
+    setShowAssessment(true);
+    setHasChanges(false);
+  };
+
+  // Navigate to assessment view page instead of opening modal
+  const viewAssessment = (assessmentId) => {
+    if (!assessmentId) {
+      console.error("Invalid assessment ID (empty or undefined)");
+      setError("Cannot view assessment: Invalid ID");
+      return;
+    }
+    
+    console.log(`🔗 Navigating to assessment: ${assessmentId}`);
+    // Navigate to the assessment view URL
+    navigate(`/gar-assessment/${assessmentId}`);
   };
 
   const deleteAssessment = async (assessmentId) => {
@@ -790,12 +1066,22 @@ const GARAssessment = () => {
         userId: auth.currentUser?.uid
       });
       
-      // Refresh assessments list
-      await fetchAssessments();
+      // Show success notification
+      showNotification("Assessment deleted successfully", 'success');
+      
+      // Clear confirmDelete state first
       setConfirmDelete(null);
+      
+      // Add small delay to ensure deletion completes
+      await new Promise(resolve => setTimeout(resolve, 500));
+      
+      // Force refresh assessments list
+      await fetchAssessments();
+      
     } catch (error) {
       console.error("Error deleting assessment:", error);
       setError("Failed to delete assessment");
+      showNotification("Failed to delete assessment", 'error');
     } finally {
       setLoading(false);
     }
@@ -826,7 +1112,7 @@ const GARAssessment = () => {
       }
       
       // Show success message or other feedback
-      alert("Assessment saved as draft");
+      showNotification("Assessment saved as draft", 'success');
     } catch (error) {
       console.error("Error saving assessment:", error);
       setError("Failed to save assessment");
@@ -840,23 +1126,15 @@ const GARAssessment = () => {
     try {
       setLoading(true);
       
-      // Sync all current form data
+      // ONLY update status and completion fields - DON'T touch form data
       const finalAssessmentData = {
-        ...assessmentData,
-        date: localFormData.date,
-        time: localFormData.time,
-        type: localFormData.type,
-        station: localFormData.station,
-        weather: localFormData.weather,
-        mitigations: {
-          ...assessmentData.mitigations,
-          ...localMitigations
-        },
+        ...assessmentData, // Keep ALL existing data exactly as is
         status: "complete",
-        captain: auth.currentUser?.displayName || "Captain",
-        userId: auth.currentUser?.uid, // Required for security rules
         completedAt: new Date().toISOString(),
-        completedBy: auth.currentUser?.displayName || "Captain"
+        completedBy: auth.currentUser?.displayName || "Captain",
+        totalScore: totalScore,
+        riskLevel: riskLevel,
+        overallRisk: riskLevel.level
       };
       
       if (currentDraftId || currentAssessmentId) {
@@ -867,7 +1145,38 @@ const GARAssessment = () => {
         await firestoreOperations.createAssessment(finalAssessmentData);
       }
       
-      alert(`GAR Assessment published with risk level: ${riskLevel.level} and score: ${totalScore}`);
+      // Send email notifications if recipients are configured
+      let emailSuccess = true;
+      if (notificationRecipients && (notificationRecipients.groups?.length > 0 || notificationRecipients.users?.length > 0)) {
+        try {
+          console.log("[DEBUG] Sending email notifications for published GAR assessment");
+          emailSuccess = await sendGARAssessmentNotifications(
+            finalAssessmentData, 
+            notificationRecipients, 
+            firestoreOperations,
+            currentDraftId || currentAssessmentId
+          );
+          
+          if (emailSuccess) {
+            console.log("[DEBUG] Email notifications sent successfully");
+          } else {
+            console.warn("[DEBUG] Some email notifications may have failed");
+          }
+        } catch (emailError) {
+          console.error("[DEBUG] Error sending email notifications:", emailError);
+          emailSuccess = false;
+        }
+      }
+      
+      // Show success message with email status
+      const baseMessage = `GAR Assessment published with risk level: ${riskLevel.level} and score: ${totalScore}`;
+      const emailMessage = emailSuccess && (notificationRecipients.groups?.length > 0 || notificationRecipients.users?.length > 0) 
+        ? "\n\nEmail notifications have been sent to selected recipients."
+        : (notificationRecipients.groups?.length > 0 || notificationRecipients.users?.length > 0) 
+          ? "\n\nNote: There was an issue sending email notifications. The assessment was still published successfully."
+          : "";
+      
+      showNotification(baseMessage + emailMessage, 'success');
       closeAssessment();
       
       // Refresh assessments list
@@ -945,7 +1254,16 @@ const GARAssessment = () => {
   };
 
   // Step 1: Start/Details
-  const Step1 = () => (
+  const Step1 = () => {
+    console.log(`🔧 Step1 rendering`);
+    
+    // Sync assessment data back to form refs when Step1 renders
+    React.useEffect(() => {
+      console.log('📋 Step1 mounted, syncing assessment data to refs');
+      syncAssessmentDataToRefs();
+    }, [currentStep]); // Only run when currentStep changes (when navigating to Step 1)
+    
+    return (
     <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
       <h2 className="text-xl font-bold mb-4 text-gray-900 dark:text-white">Assessment Details</h2>
       
@@ -954,10 +1272,11 @@ const GARAssessment = () => {
           <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Date</label>
           <div className="relative">
             <input
+              ref={(el) => formRefs.current.date = el}
               type="date"
               className="w-full p-2 border border-gray-300 dark:border-gray-600 rounded-md pl-10 bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
-              value={localFormData.date}
-              onChange={(e) => handleInputChange(null, 'date', e.target.value)}
+              defaultValue={initialFormData.current.date}
+              onChange={(e) => handleInputChange('date', e.target.value)}
             />
             <Calendar className="absolute left-3 top-3 w-4 h-4 text-gray-500 dark:text-gray-400" />
           </div>
@@ -966,10 +1285,11 @@ const GARAssessment = () => {
           <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Time</label>
           <div className="relative">
             <input
+              ref={(el) => formRefs.current.time = el}
               type="time"
               className="w-full p-2 border border-gray-300 dark:border-gray-600 rounded-md pl-10 bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
-              value={localFormData.time}
-              onChange={(e) => handleInputChange(null, 'time', e.target.value)}
+              defaultValue={initialFormData.current.time}
+              onChange={(e) => handleInputChange('time', e.target.value)}
             />
             <Clock className="absolute left-3 top-3 w-4 h-4 text-gray-500 dark:text-gray-400" />
           </div>
@@ -980,9 +1300,10 @@ const GARAssessment = () => {
         <div>
           <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Assessment Type</label>
           <select
+            ref={(el) => formRefs.current.type = el}
             className="w-full p-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
-            value={localFormData.type}
-            onChange={(e) => handleInputChange(null, 'type', e.target.value)}
+            defaultValue={initialFormData.current.type}
+            onChange={(e) => handleInputChange('type', e.target.value)}
           >
             <option value="Department-wide">Department-wide</option>
             <option value="Mission-specific">Mission-specific</option>
@@ -999,14 +1320,12 @@ const GARAssessment = () => {
           ) : (
             // Stations found in database - show dropdown with database stations
             <select
+              ref={(el) => formRefs.current.station = el}
               className="w-full p-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
-              value={localFormData.station}
-              onChange={(e) => handleInputChange(null, 'station', e.target.value)}
-              disabled={localFormData.type !== "Mission-specific"}
+              defaultValue={initialFormData.current.station}
+              onChange={(e) => handleInputChange('station', e.target.value)}
             >
-              {localFormData.type !== "Mission-specific" && (
-                <option value="All Stations">All Stations</option>
-              )}
+              <option value="All Stations">All Stations</option>
               
               {/* Map through the actual database stations */}
               {stations.map(station => (
@@ -1025,15 +1344,20 @@ const GARAssessment = () => {
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Temperature</label>
               <div className="flex">
                 <input
+                  ref={(el) => formRefs.current.temperature = el}
                   type="text"
                   className="w-full p-2 border border-gray-300 dark:border-gray-600 rounded-l-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
-                  value={localFormData.weather?.temperature || ""}
-                  onChange={(e) => handleInputChange('weather', 'temperature', e.target.value)}
+                  placeholder="37"
+                  defaultValue={""}
+                  onChange={(e) => handleInputChange('temperature', e.target.value)}
+                  onFocus={() => console.log('🎯 Temperature input FOCUSED')}
+                  onBlur={() => console.log('❌ Temperature input LOST FOCUS')}
                 />
                 <select
+                  ref={(el) => formRefs.current.temperatureUnit = el}
                   className="p-2 border border-gray-300 dark:border-gray-600 border-l-0 rounded-r-md bg-gray-50 dark:bg-gray-600 text-gray-900 dark:text-white"
-                  value={localFormData.weather?.temperatureUnit || "°F"}
-                  onChange={(e) => handleInputChange('weather', 'temperatureUnit', e.target.value)}
+                  defaultValue={"°F"}
+                  onChange={(e) => handleInputChange('temperatureUnit', e.target.value)}
                 >
                   <option value="°F">°F</option>
                   <option value="°C">°C</option>
@@ -1045,15 +1369,18 @@ const GARAssessment = () => {
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Wind</label>
               <div className="flex">
                 <input
+                  ref={(el) => formRefs.current.wind = el}
                   type="text"
                   className="w-full p-2 border border-gray-300 dark:border-gray-600 rounded-l-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
-                  value={localFormData.weather?.wind || ""}
-                  onChange={(e) => handleInputChange('weather', 'wind', e.target.value)}
+                  placeholder="18"
+                  defaultValue={""}
+                  onChange={(e) => handleInputChange('wind', e.target.value)}
                 />
                 <select
+                  ref={(el) => formRefs.current.windDirection = el}
                   className="p-2 border border-gray-300 dark:border-gray-600 border-l-0 rounded-r-md bg-gray-50 dark:bg-gray-600 text-gray-900 dark:text-white w-20"
-                  value={localFormData.weather?.windDirection || "N"}
-                  onChange={(e) => handleInputChange('weather', 'windDirection', e.target.value)}
+                  defaultValue={"NW"}
+                  onChange={(e) => handleInputChange('windDirection', e.target.value)}
                 >
                   <option value="N">N</option>
                   <option value="NE">NE</option>
@@ -1070,106 +1397,164 @@ const GARAssessment = () => {
             <div>
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Humidity (%)</label>
               <input
+                ref={(el) => formRefs.current.humidity = el}
                 type="text"
                 className="w-full p-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
-                value={localFormData.weather?.humidity || ""}
-                onChange={(e) => handleInputChange('weather', 'humidity', e.target.value)}
+                placeholder="85"
+                defaultValue={""}
+                onChange={(e) => handleInputChange('humidity', e.target.value)}
               />
             </div>
             
             <div>
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Precipitation</label>
               <input
+                ref={(el) => formRefs.current.precipitation = el}
                 type="text"
                 className="w-full p-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
-                placeholder="Type (e.g., Rain, Snow)"
-                value={localFormData.weather?.precipitation || ""}
-                onChange={(e) => handleInputChange('weather', 'precipitation', e.target.value)}
+                placeholder="Heavy Rain"
+                defaultValue={""}
+                onChange={(e) => handleInputChange('precipitation', e.target.value)}
               />
             </div>
             
             <div>
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Rate (in/hr)</label>
               <input
+                ref={(el) => formRefs.current.precipitationRate = el}
                 type="text"
                 className="w-full p-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
-                value={localFormData.weather?.precipitationRate || ""}
-                onChange={(e) => handleInputChange('weather', 'precipitationRate', e.target.value)}
+                placeholder="1.2"
+                defaultValue={""}
+                onChange={(e) => handleInputChange('precipitationRate', e.target.value)}
               />
+            </div>
+            
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Wave Height (ft)</label>
+              <input
+                ref={(el) => formRefs.current.waveHeight = el}
+                type="text"
+                className="w-full p-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                placeholder="3"
+                defaultValue={""}
+                onChange={(e) => handleInputChange('waveHeight', e.target.value)}
+              />
+            </div>
+            
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Wave Period (sec)</label>
+              <input
+                ref={(el) => formRefs.current.wavePeriod = el}
+                type="text"
+                className="w-full p-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                placeholder="8"
+                defaultValue={""}
+                onChange={(e) => handleInputChange('wavePeriod', e.target.value)}
+              />
+            </div>
+            
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Wave Direction</label>
+              <select
+                ref={(el) => formRefs.current.waveDirection = el}
+                className="w-full p-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                defaultValue={"NW"}
+                onChange={(e) => handleInputChange('waveDirection', e.target.value)}
+              >
+                <option value="N">N</option>
+                <option value="NE">NE</option>
+                <option value="E">E</option>
+                <option value="SE">SE</option>
+                <option value="S">S</option>
+                <option value="SW">SW</option>
+                <option value="W">W</option>
+                <option value="NW">NW</option>
+              </select>
             </div>
           </div>
           
           <div className="mt-4">
             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Weather Alerts</label>
             <input
+              ref={(el) => formRefs.current.alerts = el}
               type="text"
               className="w-full p-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
-              placeholder="Enter any active weather alerts"
-              value={localFormData.weather?.alerts || ""}
-              onChange={(e) => handleInputChange('weather', 'alerts', e.target.value)}
+              placeholder="Flash Flood Warning until 5:00 PM"
+              defaultValue={""}
+              onChange={(e) => handleInputChange('alerts', e.target.value)}
             />
           </div>
         </div>
       </div>
     </div>
-  );
+    );
+  };
 
   // Step 2: Risk Assessment
-  const Step2 = () => (
-    <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
-      <div className="flex justify-between items-center mb-4">
-        <h2 className="text-xl font-bold text-gray-900 dark:text-white">Risk Assessment Factors</h2>
-        <div className={`${riskLevel.color} text-white font-bold px-4 py-2 rounded-md flex items-center`}>
-          <span className="mr-2">Total:</span>
-          <span className="text-2xl">{totalScore}</span>
+  const Step2 = () => {
+    // Sync assessment data back to Step 2 when it renders
+    React.useEffect(() => {
+      console.log('📋 Step2 mounted, syncing assessment data');
+      syncAssessmentDataToStep2();
+    }, [currentStep]); // Only run when currentStep changes (when navigating to Step 2)
+    
+    return (
+      <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
+        <div className="flex justify-between items-center mb-4">
+          <h2 className="text-xl font-bold text-gray-900 dark:text-white">Risk Assessment Factors</h2>
+          <div className={`${riskLevel.color} text-white font-bold px-4 py-2 rounded-md flex items-center`}>
+            <span className="mr-2">Total:</span>
+            <span className="text-2xl">{totalScore}</span>
+          </div>
+        </div>
+        
+        <div className="space-y-6">
+          <RiskFactor 
+            name="Supervision" 
+            description="Quality and effectiveness of oversight"
+            value={assessmentData.riskFactors.supervision}
+            onChange={(value) => handleSliderChange('supervision', value)}
+          />
+          
+          <RiskFactor 
+            name="Planning" 
+            description="Adequacy of operational planning"
+            value={assessmentData.riskFactors.planning}
+            onChange={(value) => handleSliderChange('planning', value)}
+          />
+          
+          <RiskFactor 
+            name="Team Selection" 
+            description="Personnel qualifications and experience"
+            value={assessmentData.riskFactors.teamSelection}
+            onChange={(value) => handleSliderChange('teamSelection', value)}
+          />
+          
+          <RiskFactor 
+            name="Team Fitness" 
+            description="Physical and mental readiness"
+            value={assessmentData.riskFactors.teamFitness}
+            onChange={(value) => handleSliderChange('teamFitness', value)}
+          />
+          
+          <RiskFactor 
+            name="Environment" 
+            description="Weather, terrain, and other external conditions"
+            value={assessmentData.riskFactors.environment}
+            onChange={(value) => handleSliderChange('environment', value)}
+          />
+          
+          <RiskFactor 
+            name="Event Complexity" 
+            description="Technical difficulty and operational complexity"
+            value={assessmentData.riskFactors.complexity}
+            onChange={(value) => handleSliderChange('complexity', value)}
+          />
         </div>
       </div>
-      
-      <div className="space-y-6">
-        <RiskFactor 
-          name="Supervision" 
-          description="Quality and effectiveness of oversight"
-          value={assessmentData.riskFactors.supervision}
-          onChange={(value) => handleSliderChange('supervision', value)}
-        />
-        
-        <RiskFactor 
-          name="Planning" 
-          description="Adequacy of operational planning"
-          value={assessmentData.riskFactors.planning}
-          onChange={(value) => handleSliderChange('planning', value)}
-        />
-        
-        <RiskFactor 
-          name="Team Selection" 
-          description="Personnel qualifications and experience"
-          value={assessmentData.riskFactors.teamSelection}
-          onChange={(value) => handleSliderChange('teamSelection', value)}
-        />
-        
-        <RiskFactor 
-          name="Team Fitness" 
-          description="Physical and mental readiness"
-          value={assessmentData.riskFactors.teamFitness}
-          onChange={(value) => handleSliderChange('teamFitness', value)}
-        />
-        
-        <RiskFactor 
-          name="Environment" 
-          description="Weather, terrain, and other external conditions"
-          value={assessmentData.riskFactors.environment}
-          onChange={(value) => handleSliderChange('environment', value)}
-        />
-        
-        <RiskFactor 
-          name="Event Complexity" 
-          description="Technical difficulty and operational complexity"
-          value={assessmentData.riskFactors.complexity}
-          onChange={(value) => handleSliderChange('complexity', value)}
-        />
-      </div>
-    </div>
-  );
+    );
+  };
 
   // Risk Factor component for Step 2
   const RiskFactor = ({ name, description, value, onChange }) => {
@@ -1211,6 +1596,28 @@ const GARAssessment = () => {
 
   // Step 3: Mitigation Strategies
   const Step3 = () => {
+    // Sync assessment data back to Step 3 when it renders
+    React.useEffect(() => {
+      console.log('📋 Step3 mounted, syncing mitigation data', assessmentData?.mitigations);
+      
+      // Use a longer timeout to ensure all data is loaded and refs are available
+      setTimeout(() => {
+        if (assessmentData?.mitigations) {
+          const mitigations = assessmentData.mitigations;
+          console.log('🔄 Actually syncing mitigations to refs:', mitigations);
+          
+          Object.keys(mitigationRefs.current).forEach(factor => {
+            if (mitigationRefs.current[factor]) {
+              // Always update with saved value (including empty strings)
+              const savedValue = mitigations[factor] || "";
+              mitigationRefs.current[factor].value = savedValue;
+              console.log(`📝 Set ${factor} to: "${savedValue}"`);
+            }
+          });
+        }
+      }, 100); // Longer timeout to ensure everything is ready
+    }, [currentStep, assessmentData?.mitigations]); // Also depend on mitigations data
+    
     const highRiskFactors = Object.entries(assessmentData.riskFactors)
       .filter(([_, value]) => value >= 5)
       .map(([key, _]) => key);
@@ -1261,10 +1668,11 @@ const GARAssessment = () => {
                     </div>
 
                     <textarea
+                      ref={(el) => mitigationRefs.current[factor] = el}
                       className="w-full p-3 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
                       rows="3"
                       placeholder={`Describe mitigation strategies for ${factorLabels[factor]}...`}
-                      value={localMitigations[factor] || ''}
+                      defaultValue=""
                       onChange={(e) => handleMitigationChange(factor, e.target.value)}
                     ></textarea>
                   </div>
@@ -1287,6 +1695,12 @@ const GARAssessment = () => {
 
   // Step 4: Review and Publish
   const Step4 = () => {
+    // Sync all data when Step 4 renders to ensure review shows latest info
+    React.useEffect(() => {
+      console.log('📋 Step4 mounted, syncing all data for review');
+      syncAssessmentDataToStep4();
+    }, [currentStep]); // Only run when currentStep changes (when navigating to Step 4)
+    
     const highRiskFactors = Object.entries(assessmentData.riskFactors)
       .filter(([_, value]) => value >= 5)
       .map(([key, _]) => key);
@@ -1327,12 +1741,16 @@ const GARAssessment = () => {
           <div>
             <h3 className="font-medium mb-2 text-gray-900 dark:text-white">Risk Summary</h3>
             <div className={`${riskLevel.color} text-white rounded-md p-4`}>
-              <div className="grid grid-cols-2 gap-2">
-                <div className="font-medium">Total Score:</div>
-                <div className="font-bold text-xl">{totalScore}</div>
+              <div className="flex flex-col space-y-3">
+                <div className="flex justify-between items-center">
+                  <div className="font-medium">Total Score:</div>
+                  <div className="font-bold text-2xl">{totalScore}</div>
+                </div>
                 
-                <div className="font-medium">Risk Level:</div>
-                <div className="font-bold text-xl">{riskLevel.level}</div>
+                <div className="flex justify-between items-center">
+                  <div className="font-medium">Risk Level:</div>
+                  <div className="font-bold text-2xl">{riskLevel.level}</div>
+                </div>
               </div>
             </div>
           </div>
@@ -1354,6 +1772,12 @@ const GARAssessment = () => {
                 
                 <div className="text-gray-600 dark:text-gray-400">Precipitation:</div>
                 <div className="text-gray-900 dark:text-white">{assessmentData.weather.precipitation} ({assessmentData.weather.precipitationRate}"/hr)</div>
+                
+                <div className="text-gray-600 dark:text-gray-400">Wave Height:</div>
+                <div className="text-gray-900 dark:text-white">{assessmentData.weather.waveHeight} ft</div>
+                
+                <div className="text-gray-600 dark:text-gray-400">Wave Period:</div>
+                <div className="text-gray-900 dark:text-white">{assessmentData.weather.wavePeriod} sec {assessmentData.weather.waveDirection}</div>
                 
                 <div className="text-gray-600 dark:text-gray-400">Alerts:</div>
                 <div className="text-amber-600 dark:text-amber-400">{assessmentData.weather.alerts}</div>
@@ -1378,6 +1802,68 @@ const GARAssessment = () => {
           </div>
         </div>
         
+        <div className="bg-gray-50 dark:bg-gray-750 rounded-md p-4 mb-6">
+          <div className="flex justify-between items-center mb-3">
+            <h3 className="font-medium text-gray-900 dark:text-white">Notification Recipients</h3>
+            <button 
+              onClick={() => setShowNotificationModal(true)}
+              className="text-blue-600 dark:text-blue-400 text-sm underline hover:text-blue-800 dark:hover:text-blue-300 flex items-center"
+            >
+              <Mail className="w-4 h-4 mr-1" />
+              Edit Recipients
+            </button>
+          </div>
+          
+          {(notificationRecipients.groups?.length > 0 || notificationRecipients.users?.length > 0) ? (
+            <div className="space-y-3">
+              {/* Selected Groups */}
+              {notificationRecipients.groupsData?.length > 0 && (
+                <div>
+                  <p className="text-xs text-gray-500 dark:text-gray-400 mb-2">Department Groups:</p>
+                  <div className="flex flex-wrap gap-2">
+                    {notificationRecipients.groupsData.map(group => (
+                      <div key={group.id} className="bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-300 px-3 py-1 rounded-md text-sm flex items-center">
+                        <Users className="w-3 h-3 mr-1" />
+                        {group.name}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+              
+              {/* Selected Individual Users */}
+              {notificationRecipients.usersData?.length > 0 && (
+                <div>
+                  <p className="text-xs text-gray-500 dark:text-gray-400 mb-2">Individual Users:</p>
+                  <div className="flex flex-wrap gap-2">
+                    {notificationRecipients.usersData.slice(0, 5).map(user => (
+                      <div key={user.id} className="bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300 px-3 py-1 rounded-md text-sm flex items-center">
+                        <Mail className="w-3 h-3 mr-1" />
+                        {user.displayName}
+                      </div>
+                    ))}
+                    {notificationRecipients.usersData.length > 5 && (
+                      <div className="bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 px-3 py-1 rounded-md text-sm">
+                        +{notificationRecipients.usersData.length - 5} more
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+              
+              <div className="text-xs text-gray-500 dark:text-gray-400 mt-2">
+                Email notifications will be sent to selected recipients when this assessment is published.
+              </div>
+            </div>
+          ) : (
+            <div className="text-center py-6 text-gray-500 dark:text-gray-400">
+              <Mail className="w-8 h-8 mx-auto mb-2 opacity-50" />
+              <p className="text-sm">No notification recipients selected</p>
+              <p className="text-xs mt-1">Click "Edit Recipients" to select who should be notified</p>
+            </div>
+          )}
+        </div>
+        
         {highRiskFactors.length > 0 && (
           <div className="mb-6">
             <h3 className="font-medium mb-2 text-gray-900 dark:text-white">Mitigation Summary</h3>
@@ -1399,37 +1885,6 @@ const GARAssessment = () => {
             </div>
           </div>
         )}
-        
-        <div className="bg-gray-50 dark:bg-gray-750 rounded-md p-4 mb-6">
-          <h3 className="font-medium mb-2 text-gray-900 dark:text-white">Notification Preview</h3>
-          <div className="border border-gray-300 dark:border-gray-600 rounded-md overflow-hidden max-w-xs mx-auto">
-            <div className={`${riskLevel.color} text-white p-2 text-center font-bold`}>
-              GAR Alert: {riskLevel.level}
-            </div>
-            <div className="p-3 bg-white dark:bg-gray-700 text-sm">
-              <div className="mb-2 text-gray-900 dark:text-white">Score: {totalScore} | {assessmentData.weather.precipitation} | {assessmentData.weather.alerts}</div>
-              <div className="text-blue-600 dark:text-blue-400">Tap to view mitigations &gt;</div>
-            </div>
-          </div>
-        </div>
-        
-        <div className="bg-gray-50 dark:bg-gray-750 rounded-md p-4 mb-6">
-          <h3 className="font-medium mb-2 text-gray-900 dark:text-white">Notification Recipients</h3>
-          <div className="flex flex-wrap gap-2">
-            <div className="bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-300 px-2 py-1 rounded-md text-sm">
-              All Firefighters (231)
-            </div>
-            <div className="bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-300 px-2 py-1 rounded-md text-sm">
-              All Officers (27)
-            </div>
-            <div className="bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-300 px-2 py-1 rounded-md text-sm">
-              Chief Staff (5)
-            </div>
-            <button className="text-blue-600 dark:text-blue-400 text-sm underline">
-              Edit Recipients
-            </button>
-          </div>
-        </div>
       </div>
     );
   };
@@ -1523,6 +1978,30 @@ const GARAssessment = () => {
   // Main application rendering
   return (
     <Layout darkMode={darkMode} setDarkMode={handleDarkModeChange} selectedStation={selectedStation} setSelectedStation={handleStationChange}>
+      {/* Notification Component */}
+      {notification.show && (
+        <div className="fixed top-4 right-4 z-50 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg p-4 max-w-md">
+          <div className={`flex items-center ${notification.type === 'success' ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
+            {notification.type === 'success' ? (
+              <CheckCircle className="w-5 h-5 mr-3 flex-shrink-0" />
+            ) : (
+              <AlertTriangle className="w-5 h-5 mr-3 flex-shrink-0" />
+            )}
+            <div className="flex-1">
+              <p className="text-sm font-medium text-gray-900 dark:text-white">
+                {notification.message}
+              </p>
+            </div>
+            <button
+              onClick={() => setNotification({ show: false, message: '', type: 'success' })}
+              className="ml-3 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+        </div>
+      )}
+      
       {showReadOnlyView && viewingAssessment ? (
         <ReadOnlyAssessmentView
           assessment={viewingAssessment}
@@ -1568,14 +2047,25 @@ const GARAssessment = () => {
                 {/* Only show button when stations exist and user has permissions */}
                 {stations.length > 0 && !readOnlyMode && (
                   <div className="flex space-x-4">
-                    <button 
-                      className="flex items-center px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
-                      onClick={startAssessment}
-                      disabled={stations.length === 0}
-                    >
-                      <AlertTriangle className="w-4 h-4 mr-2" />
-                      Create New Assessment
-                    </button>
+                    {/* Check for draft assessment */}
+                    {todayDraftAssessment ? (
+                      <button 
+                        className="flex items-center px-4 py-2 bg-amber-600 text-white rounded-md hover:bg-amber-700"
+                        onClick={() => continueDraftAssessment(todayDraftAssessment)}
+                      >
+                        <Edit3 className="w-4 h-4 mr-2" />
+                        Continue Draft Assessment
+                      </button>
+                    ) : (
+                      <button 
+                        className="flex items-center px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
+                        onClick={startAssessment}
+                        disabled={stations.length === 0}
+                      >
+                        <AlertTriangle className="w-4 h-4 mr-2" />
+                        Create New Assessment
+                      </button>
+                    )}
                   </div>
                 )}
               </div>
@@ -1620,9 +2110,16 @@ const GARAssessment = () => {
                           <AlertTriangle className="w-5 h-5" />
                         </div>
                         <div>
-                          <h3 className="font-medium text-gray-900 dark:text-white">
-                            {assessment.type || "Unknown Type"} - {assessment.station || "Unknown Station"}
-                          </h3>
+                          <div className="flex items-center">
+                            <h3 className="font-medium text-gray-900 dark:text-white">
+                              {assessment.type || "Unknown Type"} - {assessment.station || "Unknown Station"}
+                            </h3>
+                            {assessment.status === 'draft' && (
+                              <span className="ml-2 px-2 py-1 text-xs font-medium bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-200 rounded-full">
+                                DRAFT
+                              </span>
+                            )}
+                          </div>
                           <p className="text-sm text-gray-500 dark:text-gray-400">
                             {assessment.date || "No date"} • Score: {assessmentScore} ({assessmentRisk.level})
                           </p>
@@ -1638,19 +2135,36 @@ const GARAssessment = () => {
                             <Trash2 className="w-5 h-5" />
                           </button>
                         )}
-                        <button 
-                          onClick={() => {
-                            if (assessment.id) {
-                              viewAssessment(assessment.id);
-                            } else {
-                              setError("Cannot view assessment: missing ID");
-                            }
-                          }}
-                          className="text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 text-sm flex items-center"
-                          disabled={!assessment.id}
-                        >
-                          View
-                        </button>
+                        {assessment.status === 'draft' ? (
+                          <button 
+                            onClick={() => {
+                              if (assessment.id) {
+                                continueDraftAssessment(assessment);
+                              } else {
+                                setError("Cannot continue assessment: missing ID");
+                              }
+                            }}
+                            className="text-amber-600 dark:text-amber-400 hover:text-amber-800 dark:hover:text-amber-300 text-sm flex items-center"
+                            disabled={!assessment.id}
+                          >
+                            <Edit3 className="w-4 h-4 mr-1" />
+                            Continue
+                          </button>
+                        ) : (
+                          <button 
+                            onClick={() => {
+                              if (assessment.id) {
+                                viewAssessment(assessment.id);
+                              } else {
+                                setError("Cannot view assessment: missing ID");
+                              }
+                            }}
+                            className="text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 text-sm flex items-center"
+                            disabled={!assessment.id}
+                          >
+                            View
+                          </button>
+                        )}
                       </div>
                     </div>
                   );
@@ -1674,10 +2188,18 @@ const GARAssessment = () => {
             <div className="flex justify-between items-center">
               <h1 className="text-2xl font-bold text-gray-900 dark:text-white">GAR Assessment Tool</h1>
               <button 
-                className="text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200"
+                className={`flex items-center ${cancelLoading ? 'text-gray-400 cursor-not-allowed' : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200'}`}
                 onClick={closeAssessment}
+                disabled={cancelLoading}
               >
-                Cancel
+                {cancelLoading ? (
+                  <>
+                    <div className="animate-spin rounded-full h-4 w-4 border-t-2 border-b-2 border-gray-400 mr-2"></div>
+                    Canceling...
+                  </>
+                ) : (
+                  'Cancel'
+                )}
               </button>
             </div>
           </div>
@@ -1726,6 +2248,32 @@ const GARAssessment = () => {
           </div>
         </div>
       )}
+      
+      {/* Success/Error Notification */}
+      {notification.show && (
+        <div className={`fixed top-4 right-4 z-50 max-w-md p-4 rounded-lg shadow-lg ${
+          notification.type === 'success' 
+            ? 'bg-green-500 text-white' 
+            : 'bg-red-500 text-white'
+        } transition-all duration-300 ease-in-out transform`}>
+          <div className="flex items-center">
+            {notification.type === 'success' ? (
+              <CheckCircle className="w-5 h-5 mr-2" />
+            ) : (
+              <AlertTriangle className="w-5 h-5 mr-2" />
+            )}
+            <p className="text-sm font-medium">{notification.message}</p>
+          </div>
+        </div>
+      )}
+      
+      {/* Notification Recipients Modal */}
+      <NotificationRecipientsModal
+        isOpen={showNotificationModal}
+        onClose={() => setShowNotificationModal(false)}
+        currentRecipients={notificationRecipients}
+        onSave={handleNotificationRecipientsSave}
+      />
     </Layout>
   );
 };

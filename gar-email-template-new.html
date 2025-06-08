@@ -1,0 +1,320 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <title>{{subject}}</title>
+    <style>
+        /* Email client compatibility styles */
+        body, table, td, p, a, li, blockquote {
+            -webkit-text-size-adjust: 100%;
+            -ms-text-size-adjust: 100%;
+        }
+        table, td {
+            mso-table-lspace: 0pt;
+            mso-table-rspace: 0pt;
+        }
+        img {
+            -ms-interpolation-mode: bicubic;
+            border: 0;
+            height: auto;
+            line-height: 100%;
+            outline: none;
+            text-decoration: none;
+        }
+        
+        /* Reset styles */
+        body {
+            margin: 0 !important;
+            padding: 0 !important;
+            background-color: #f4f4f4;
+            font-family: Arial, sans-serif;
+        }
+        
+        /* Media queries for mobile */
+        @media screen and (max-width: 600px) {
+            .container {
+                width: 100% !important;
+                max-width: 100% !important;
+            }
+            .mobile-padding {
+                padding: 20px !important;
+            }
+            .mobile-text {
+                font-size: 16px !important;
+                line-height: 22px !important;
+            }
+            .mobile-button {
+                display: block !important;
+                width: 200px !important;
+                margin: 20px auto !important;
+            }
+            .details-table {
+                font-size: 14px !important;
+            }
+            .risk-badge {
+                font-size: 18px !important;
+                padding: 12px 20px !important;
+            }
+        }
+    </style>
+</head>
+<body style="margin: 0; padding: 0; background-color: #f4f4f4; font-family: Arial, sans-serif;">
+    
+    <!-- Main container table -->
+    <table border="0" cellpadding="0" cellspacing="0" width="100%" style="background-color: #f4f4f4; min-height: 100vh;">
+        <tr>
+            <td align="center" style="padding: 20px 0;">
+                
+                <!-- Email container -->
+                <table border="0" cellpadding="0" cellspacing="0" width="600" class="container" style="background-color: #ffffff; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); overflow: hidden;">
+                    
+                    <!-- Header -->
+                    <tr>
+                        <td style="background: linear-gradient(135deg, #1e3a8a 0%, #3b82f6 100%); padding: 30px; text-align: center;">
+                            <table border="0" cellpadding="0" cellspacing="0" width="100%">
+                                <tr>
+                                    <td align="center">
+                                        <!-- Fire Department Logo -->
+                                        <img src="https://firebasestorage.googleapis.com/v0/b/pvs-app-61e6b.appspot.com/o/firefighter-helmet.png?alt=media" alt="Fire Department" style="width: 60px; height: 60px; margin-bottom: 15px; display: block;">
+                                        
+                                        <!-- Title -->
+                                        <h1 style="margin: 0; color: #ffffff; font-size: 28px; font-weight: bold; line-height: 32px;">
+                                            GAR Assessment Alert
+                                        </h1>
+                                        
+                                        <!-- Subtitle -->
+                                        <p style="margin: 10px 0 0 0; color: #e0e7ff; font-size: 16px; line-height: 20px;">
+                                            Fire Department Safety Notification
+                                        </p>
+                                    </td>
+                                </tr>
+                            </table>
+                        </td>
+                    </tr>
+                    
+                    <!-- Content -->
+                    <tr>
+                        <td style="padding: 40px 30px;" class="mobile-padding">
+                            
+                            <!-- Greeting -->
+                            <p style="margin: 0 0 20px 0; font-size: 18px; line-height: 24px; color: #374151;" class="mobile-text">
+                                Hello {{to_name}},
+                            </p>
+                            
+                            <p style="margin: 0 0 30px 0; font-size: 16px; line-height: 22px; color: #6b7280;" class="mobile-text">
+                                A new GAR (Green-Amber-Red) risk assessment has been completed for your operational area.
+                            </p>
+                            
+                            <!-- Risk Level Badge -->
+                            <table border="0" cellpadding="0" cellspacing="0" width="100%" style="margin-bottom: 30px;">
+                                <tr>
+                                    <td align="center">
+                                        <table border="0" cellpadding="0" cellspacing="0">
+                                            <tr>
+                                                <td style="background-color: {{risk_color}}; border-radius: 25px; padding: 15px 30px;" class="risk-badge">
+                                                    <span style="color: #ffffff; font-size: 20px; font-weight: bold; text-transform: uppercase; letter-spacing: 1px;">
+                                                        {{risk_level}}
+                                                    </span>
+                                                    <br>
+                                                    <span style="color: #ffffff; font-size: 16px; margin-top: 5px; display: block;">
+                                                        Risk Score: {{score}}
+                                                    </span>
+                                                </td>
+                                            </tr>
+                                        </table>
+                                    </td>
+                                </tr>
+                            </table>
+                            
+                            <!-- Assessment Details -->
+                            <table border="0" cellpadding="0" cellspacing="0" width="100%" style="background-color: #f8fafc; border-radius: 8px; padding: 25px; margin-bottom: 30px;" class="details-table">
+                                <tr>
+                                    <td>
+                                        <h3 style="margin: 0 0 20px 0; color: #1f2937; font-size: 20px; font-weight: bold;">
+                                            Assessment Details
+                                        </h3>
+                                        
+                                        <!-- Details Table -->
+                                        <table border="0" cellpadding="0" cellspacing="0" width="100%">
+                                            <tr>
+                                                <td style="padding: 8px 0; border-bottom: 1px solid #e5e7eb; width: 40%;">
+                                                    <strong style="color: #374151; font-size: 15px;">Date & Time:</strong>
+                                                </td>
+                                                <td style="padding: 8px 0; border-bottom: 1px solid #e5e7eb; color: #6b7280; font-size: 15px;">
+                                                    {{date}} at {{time}}
+                                                </td>
+                                            </tr>
+                                            <tr>
+                                                <td style="padding: 8px 0; border-bottom: 1px solid #e5e7eb;">
+                                                    <strong style="color: #374151; font-size: 15px;">Station:</strong>
+                                                </td>
+                                                <td style="padding: 8px 0; border-bottom: 1px solid #e5e7eb; color: #6b7280; font-size: 15px;">
+                                                    {{station}}
+                                                </td>
+                                            </tr>
+                                            <tr>
+                                                <td style="padding: 8px 0; border-bottom: 1px solid #e5e7eb;">
+                                                    <strong style="color: #374151; font-size: 15px;">Assessment Type:</strong>
+                                                </td>
+                                                <td style="padding: 8px 0; border-bottom: 1px solid #e5e7eb; color: #6b7280; font-size: 15px;">
+                                                    {{type}}
+                                                </td>
+                                            </tr>
+                                            <tr>
+                                                <td style="padding: 8px 0; border-bottom: 1px solid #e5e7eb;">
+                                                    <strong style="color: #374151; font-size: 15px;">Created By:</strong>
+                                                </td>
+                                                <td style="padding: 8px 0; border-bottom: 1px solid #e5e7eb; color: #6b7280; font-size: 15px;">
+                                                    {{captain}}
+                                                </td>
+                                            </tr>
+                                            <tr>
+                                                <td style="padding: 8px 0;">
+                                                    <strong style="color: #374151; font-size: 15px;">Weather Alerts:</strong>
+                                                </td>
+                                                <td style="padding: 8px 0; color: #d97706; font-size: 15px; font-weight: 500;">
+                                                    {{weather_alerts}}
+                                                </td>
+                                            </tr>
+                                        </table>
+                                    </td>
+                                </tr>
+                            </table>
+                            
+                            <!-- Weather Summary -->
+                            <table border="0" cellpadding="0" cellspacing="0" width="100%" style="background-color: #eff6ff; border-radius: 8px; padding: 20px; margin-bottom: 30px;">
+                                <tr>
+                                    <td>
+                                        <h4 style="margin: 0 0 15px 0; color: #1e40af; font-size: 16px; font-weight: bold;">
+                                            Current Weather Conditions
+                                        </h4>
+                                        
+                                        <table border="0" cellpadding="0" cellspacing="0" width="100%">
+                                            <tr>
+                                                <td style="width: 33%; padding: 5px 0;">
+                                                    <span style="color: #1f2937; font-size: 14px;">
+                                                        <strong>Temperature:</strong> {{weather_temp}}{{weather_temp_unit}}
+                                                    </span>
+                                                </td>
+                                                <td style="width: 33%; padding: 5px 0;">
+                                                    <span style="color: #1f2937; font-size: 14px;">
+                                                        <strong>Wind:</strong> {{weather_wind}} mph {{weather_wind_direction}}
+                                                    </span>
+                                                </td>
+                                                <td style="width: 34%; padding: 5px 0;">
+                                                    <span style="color: #1f2937; font-size: 14px;">
+                                                        <strong>Humidity:</strong> {{weather_humidity}}%
+                                                    </span>
+                                                </td>
+                                            </tr>
+                                            <tr>
+                                                <td style="width: 33%; padding: 5px 0;">
+                                                    <span style="color: #1f2937; font-size: 14px;">
+                                                        <strong>Precipitation:</strong> {{weather_precipitation}}
+                                                    </span>
+                                                </td>
+                                                <td style="width: 33%; padding: 5px 0;">
+                                                    <span style="color: #1f2937; font-size: 14px;">
+                                                        <strong>Precip. Rate:</strong> {{weather_precipitation_rate}}"/hr
+                                                    </span>
+                                                </td>
+                                                <td style="width: 34%; padding: 5px 0;">
+                                                    <span style="color: #1f2937; font-size: 14px;">
+                                                        <strong>Wave Height:</strong> {{weather_wave_height}} ft
+                                                    </span>
+                                                </td>
+                                            </tr>
+                                            <tr>
+                                                <td style="width: 50%; padding: 5px 0;">
+                                                    <span style="color: #1f2937; font-size: 14px;">
+                                                        <strong>Wave Period:</strong> {{weather_wave_period}} sec {{weather_wave_direction}}
+                                                    </span>
+                                                </td>
+                                                <td style="width: 50%; padding: 5px 0;" colspan="2">
+                                                    <span style="color: #1f2937; font-size: 14px;">
+                                                        <strong>Weather Alerts:</strong> {{weather_alerts}}
+                                                    </span>
+                                                </td>
+                                            </tr>
+                                        </table>
+                                    </td>
+                                </tr>
+                            </table>
+                            
+                            <!-- Mitigation Notice -->
+                            <table border="0" cellpadding="0" cellspacing="0" width="100%" style="background-color: #fef3c7; border-left: 4px solid #f59e0b; padding: 20px; margin-bottom: 30px;">
+                                <tr>
+                                    <td>
+                                        <p style="margin: 0; color: #92400e; font-size: 15px; font-weight: 500;">
+                                            ⚠️ <strong>Mitigation Strategies:</strong> {{mitigation_count}} risk mitigation measures have been identified and documented in this assessment.
+                                        </p>
+                                    </td>
+                                </tr>
+                            </table>
+                            
+                            <!-- Call to Action -->
+                            <table border="0" cellpadding="0" cellspacing="0" width="100%" style="margin-bottom: 30px;">
+                                <tr>
+                                    <td align="center">
+                                        <table border="0" cellpadding="0" cellspacing="0" class="mobile-button">
+                                            <tr>
+                                                <td style="background-color: #1e40af; border-radius: 6px; text-align: center;">
+                                                    <a href="{{app_url}}" target="_blank" style="display: inline-block; padding: 16px 32px; color: #ffffff; text-decoration: none; font-size: 16px; font-weight: bold; border-radius: 6px;">
+                                                        View Full Assessment Details
+                                                    </a>
+                                                </td>
+                                            </tr>
+                                        </table>
+                                    </td>
+                                </tr>
+                            </table>
+                            
+                            <!-- Important Notice -->
+                            <table border="0" cellpadding="0" cellspacing="0" width="100%" style="background-color: #fef3c7; border-radius: 6px; padding: 20px;">
+                                <tr>
+                                    <td>
+                                        <p style="margin: 0; color: #92400e; font-size: 14px; text-align: center;">
+                                            <strong>Next Steps:</strong> Click the button above to view the complete GAR assessment details and any required mitigation strategies.
+                                        </p>
+                                    </td>
+                                </tr>
+                            </table>
+                        </td>
+                    </tr>
+                    
+                    <!-- Footer -->
+                    <tr>
+                        <td style="background-color: #f9fafb; padding: 30px; border-top: 1px solid #e5e7eb;">
+                            <table border="0" cellpadding="0" cellspacing="0" width="100%">
+                                <tr>
+                                    <td align="center">
+                                        <p style="margin: 0 0 10px 0; color: #6b7280; font-size: 14px; line-height: 18px;">
+                                            This notification was sent from the Fire Department GAR Assessment System
+                                        </p>
+                                        
+                                        <p style="margin: 0 0 15px 0; color: #9ca3af; font-size: 12px; line-height: 16px;">
+                                            Sent by {{from}} • Do not reply to this email
+                                        </p>
+                                        
+                                        <p style="margin: 0; color: #9ca3af; font-size: 12px; line-height: 16px;">
+                                            If you have questions about this assessment, contact your supervisor or the issuing captain.
+                                        </p>
+                                        
+                                        <div style="margin-top: 20px; padding-top: 20px; border-top: 1px solid #e5e7eb;">
+                                            <p style="margin: 0; color: #9ca3af; font-size: 11px; text-align: center;">
+                                                © 2025 Fire Department Safety System. All rights reserved.
+                                            </p>
+                                        </div>
+                                    </td>
+                                </tr>
+                            </table>
+                        </td>
+                    </tr>
+                </table>
+            </td>
+        </tr>
+    </table>
+</body>
+</html>
