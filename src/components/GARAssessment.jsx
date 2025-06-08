@@ -1,11 +1,12 @@
 import React, { useState, useContext, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { getAuth } from 'firebase/auth';
-import { Calendar, Clock, ChevronRight, ChevronLeft, AlertTriangle, CheckCircle, FileText, Home, Trash2, Edit3, Users, Mail, X } from 'lucide-react';
+import { Calendar, Clock, ChevronRight, ChevronLeft, AlertTriangle, CheckCircle, FileText, Home, Trash2, Edit3, Users, Mail, X, Search } from 'lucide-react';
 import Layout from './Layout';
 import { FirestoreContext } from '../App';
 import ReadOnlyAssessmentView from './ReadOnlyAssessmentView';
 import NotificationRecipientsModal from './NotificationRecipientsModal';
+import Pagination from './Pagination';
 import { initEmailJS, sendGARAssessmentNotifications } from '../utils/emailService';
 
 // Main component
@@ -120,13 +121,20 @@ const GARAssessment = () => {
   // Cancel loading state
   const [cancelLoading, setCancelLoading] = useState(false);
   
+  // Assessment history pagination and filtering state
+  const [currentPage, setCurrentPage] = useState(1);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [statusFilter, setStatusFilter] = useState('all'); // 'all', 'published', 'draft'
+  const [riskFilter, setRiskFilter] = useState('all'); // 'all', 'low', 'medium', 'high'
+  const itemsPerPage = 5;
+  
   // Show notification helper function
   const showNotification = (message, type = 'success') => {
     setNotification({ show: true, message, type });
-    // Auto-hide after 5 seconds
+    // Auto-hide after 4 seconds
     setTimeout(() => {
       setNotification({ show: false, message: '', type: 'success' });
-    }, 5000);
+    }, 4000);
   };
 
   // USE REFS FOR MITIGATION TEXTAREAS TO PREVENT RE-RENDERS
@@ -324,6 +332,13 @@ const GARAssessment = () => {
         
         // Initialize EmailJS for notifications
         initEmailJS();
+        
+        // Check for publish notification after reload
+        const publishNotification = localStorage.getItem('garPublishNotification');
+        if (publishNotification) {
+          showNotification(publishNotification, 'success');
+          localStorage.removeItem('garPublishNotification');
+        }
         
         // First verify we have a logged-in user
         const user = auth.currentUser;
@@ -1066,8 +1081,6 @@ const GARAssessment = () => {
         userId: auth.currentUser?.uid
       });
       
-      // Show success notification
-      showNotification("Assessment deleted successfully", 'success');
       
       // Clear confirmDelete state first
       setConfirmDelete(null);
@@ -1176,11 +1189,11 @@ const GARAssessment = () => {
           ? "\n\nNote: There was an issue sending email notifications. The assessment was still published successfully."
           : "";
       
-      showNotification(baseMessage + emailMessage, 'success');
-      closeAssessment();
+      // Store message in localStorage to show after reload
+      localStorage.setItem('garPublishNotification', baseMessage + emailMessage);
       
-      // Refresh assessments list
-      await fetchAssessments();
+      // Reload the page
+      window.location.reload();
     } catch (error) {
       console.error("Error publishing assessment:", error);
       setError("Failed to publish assessment");
@@ -1201,6 +1214,80 @@ const GARAssessment = () => {
       </div>
     </div>
   );
+
+  // Filter and search functions for assessment history
+  const getFilteredAndSearchedAssessments = React.useMemo(() => {
+    let filtered = [...pastAssessments];
+
+    // Apply search filter
+    if (searchTerm.trim()) {
+      const searchLower = searchTerm.toLowerCase();
+      filtered = filtered.filter(assessment => 
+        (assessment.type || '').toLowerCase().includes(searchLower) ||
+        (assessment.station || '').toLowerCase().includes(searchLower) ||
+        (assessment.captain || '').toLowerCase().includes(searchLower) ||
+        (assessment.date || '').toLowerCase().includes(searchLower)
+      );
+    }
+
+    // Apply status filter
+    if (statusFilter !== 'all') {
+      filtered = filtered.filter(assessment => {
+        if (statusFilter === 'published') return assessment.status !== 'draft';
+        if (statusFilter === 'draft') return assessment.status === 'draft';
+        return true;
+      });
+    }
+
+    // Apply risk filter
+    if (riskFilter !== 'all') {
+      filtered = filtered.filter(assessment => {
+        const riskFactorValues = Object.values(assessment.riskFactors || {});
+        const totalScore = riskFactorValues.reduce((acc, val) => acc + val, 0);
+        const riskLevel = getRiskLevel(totalScore);
+        
+        if (riskFilter === 'green') return riskLevel.level === 'GREEN';
+        if (riskFilter === 'amber') return riskLevel.level === 'AMBER';
+        if (riskFilter === 'red') return riskLevel.level === 'RED';
+        return true;
+      });
+    }
+
+    return filtered;
+  }, [pastAssessments, searchTerm, statusFilter, riskFilter]);
+
+  // Get paginated assessments
+  const getPaginatedAssessments = React.useMemo(() => {
+    const startIndex = (currentPage - 1) * itemsPerPage;
+    const endIndex = startIndex + itemsPerPage;
+    return getFilteredAndSearchedAssessments.slice(startIndex, endIndex);
+  }, [getFilteredAndSearchedAssessments, currentPage, itemsPerPage]);
+
+  // Calculate pagination values
+  const totalFilteredAssessments = getFilteredAndSearchedAssessments.length;
+  const totalPages = Math.ceil(totalFilteredAssessments / itemsPerPage);
+
+  // Reset to page 1 when filters change
+  React.useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm, statusFilter, riskFilter]);
+
+  // Handle filter changes
+  const handleSearchChange = (value) => {
+    setSearchTerm(value);
+  };
+
+  const handleStatusFilterChange = (value) => {
+    setStatusFilter(value);
+  };
+
+  const handleRiskFilterChange = (value) => {
+    setRiskFilter(value);
+  };
+
+  const handlePageChange = (page) => {
+    setCurrentPage(page);
+  };
 
   // Progress indicator component
   const ProgressIndicator = ({ currentStep, totalSteps }) => {
@@ -1807,9 +1894,9 @@ const GARAssessment = () => {
             <h3 className="font-medium text-gray-900 dark:text-white">Notification Recipients</h3>
             <button 
               onClick={() => setShowNotificationModal(true)}
-              className="text-blue-600 dark:text-blue-400 text-sm underline hover:text-blue-800 dark:hover:text-blue-300 flex items-center"
+              className="inline-flex items-center px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-md shadow-sm transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
             >
-              <Mail className="w-4 h-4 mr-1" />
+              <Mail className="w-4 h-4 mr-2" />
               Edit Recipients
             </button>
           </div>
@@ -2091,13 +2178,63 @@ const GARAssessment = () => {
           </div>
           
           <div className="bg-white dark:bg-gray-800 rounded-lg shadow">
-            <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700 flex justify-between items-center">
-              <h2 className="text-xl font-semibold text-gray-900 dark:text-white">All Assessment History</h2>
+            <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
+              <div className="flex justify-between items-center mb-4">
+                <h2 className="text-xl font-semibold text-gray-900 dark:text-white">All Assessment History</h2>
+                <div className="text-sm text-gray-500 dark:text-gray-400">
+                  {totalFilteredAssessments} of {pastAssessments.length} assessments
+                </div>
+              </div>
+              
+              {/* Search and Filter Controls */}
+              <div className="flex flex-col sm:flex-row gap-4">
+                {/* Search Input */}
+                <div className="flex-1">
+                  <div className="relative">
+                    <Search className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
+                    <input
+                      type="text"
+                      placeholder="Search by type, station, captain, or date..."
+                      value={searchTerm}
+                      onChange={(e) => handleSearchChange(e.target.value)}
+                      className="w-full pl-10 pr-4 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                    />
+                  </div>
+                </div>
+                
+                {/* Status Filter */}
+                <div className="sm:w-48">
+                  <select
+                    value={statusFilter}
+                    onChange={(e) => handleStatusFilterChange(e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  >
+                    <option value="all">All Status</option>
+                    <option value="published">Published</option>
+                    <option value="draft">Draft</option>
+                  </select>
+                </div>
+                
+                {/* Risk Level Filter */}
+                <div className="sm:w-48">
+                  <select
+                    value={riskFilter}
+                    onChange={(e) => handleRiskFilterChange(e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  >
+                    <option value="all">All Risk Levels</option>
+                    <option value="green">🟢 GREEN (Low Risk)</option>
+                    <option value="amber">🟡 AMBER (Medium Risk)</option>
+                    <option value="red">🔴 RED (High Risk)</option>
+                  </select>
+                </div>
+              </div>
             </div>
             
-            {pastAssessments.length > 0 ? (
-              <div className="divide-y divide-gray-200 dark:divide-gray-700">
-                {pastAssessments.map(assessment => {
+            {totalFilteredAssessments > 0 ? (
+              <>
+                <div className="divide-y divide-gray-200 dark:divide-gray-700">
+                  {getPaginatedAssessments.map(assessment => {
                   // Debug the assessment structure
                   
                   const assessmentScore = Object.values(assessment.riskFactors || {}).reduce((acc, val) => acc + val, 0);
@@ -2135,7 +2272,7 @@ const GARAssessment = () => {
                             <Trash2 className="w-5 h-5" />
                           </button>
                         )}
-                        {assessment.status === 'draft' ? (
+                        {assessment.status === 'draft' && (userProfile?.role === 'admin' || userProfile?.role === 'captain') ? (
                           <button 
                             onClick={() => {
                               if (assessment.id) {
@@ -2169,12 +2306,30 @@ const GARAssessment = () => {
                     </div>
                   );
                 })}
-              </div>
+                </div>
+                
+                {/* Pagination Component */}
+                {totalPages > 1 && (
+                  <Pagination
+                    currentPage={currentPage}
+                    totalPages={totalPages}
+                    totalItems={totalFilteredAssessments}
+                    itemsPerPage={itemsPerPage}
+                    onPageChange={handlePageChange}
+                    darkMode={darkMode}
+                    showItemCount={true}
+                  />
+                )}
+              </>
             ) : (
               <div className="p-8 text-center text-gray-500 dark:text-gray-400">
                 <AlertTriangle className="w-12 h-12 mx-auto mb-4 opacity-30" />
-                <p className="text-lg">No assessments found</p>
-                <p className="text-sm mt-1">Create your first risk assessment to get started</p>
+                <p className="text-lg">
+                  {pastAssessments.length === 0 ? "No assessments found" : "No assessments match your search criteria"}
+                </p>
+                <p className="text-sm mt-1">
+                  {pastAssessments.length === 0 ? "Create your first risk assessment to get started" : "Try adjusting your search or filters"}
+                </p>
               </div>
             )}
           </div>

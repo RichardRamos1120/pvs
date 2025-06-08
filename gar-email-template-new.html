@@ -191,54 +191,57 @@
                                             Current Weather Conditions
                                         </h4>
                                         
-                                        <table border="0" cellpadding="0" cellspacing="0" width="100%">
-                                            <tr>
-                                                <td style="width: 33%; padding: 5px 0;">
-                                                    <span style="color: #1f2937; font-size: 14px;">
-                                                        <strong>Temperature:</strong> {{weather_temp}}{{weather_temp_unit}}
-                                                    </span>
-                                                </td>
-                                                <td style="width: 33%; padding: 5px 0;">
-                                                    <span style="color: #1f2937; font-size: 14px;">
-                                                        <strong>Wind:</strong> {{weather_wind}} mph {{weather_wind_direction}}
-                                                    </span>
-                                                </td>
-                                                <td style="width: 34%; padding: 5px 0;">
-                                                    <span style="color: #1f2937; font-size: 14px;">
-                                                        <strong>Humidity:</strong> {{weather_humidity}}%
-                                                    </span>
-                                                </td>
-                                            </tr>
-                                            <tr>
-                                                <td style="width: 33%; padding: 5px 0;">
-                                                    <span style="color: #1f2937; font-size: 14px;">
-                                                        <strong>Precipitation:</strong> {{weather_precipitation}}
-                                                    </span>
-                                                </td>
-                                                <td style="width: 33%; padding: 5px 0;">
-                                                    <span style="color: #1f2937; font-size: 14px;">
-                                                        <strong>Precip. Rate:</strong> {{weather_precipitation_rate}}"/hr
-                                                    </span>
-                                                </td>
-                                                <td style="width: 34%; padding: 5px 0;">
-                                                    <span style="color: #1f2937; font-size: 14px;">
-                                                        <strong>Wave Height:</strong> {{weather_wave_height}} ft
-                                                    </span>
-                                                </td>
-                                            </tr>
-                                            <tr>
-                                                <td style="width: 50%; padding: 5px 0;">
-                                                    <span style="color: #1f2937; font-size: 14px;">
-                                                        <strong>Wave Period:</strong> {{weather_wave_period}} sec {{weather_wave_direction}}
-                                                    </span>
-                                                </td>
-                                                <td style="width: 50%; padding: 5px 0;" colspan="2">
-                                                    <span style="color: #1f2937; font-size: 14px;">
-                                                        <strong>Weather Alerts:</strong> {{weather_alerts}}
-                                                    </span>
-                                                </td>
-                                            </tr>
-                                        </table>
+<table border="0" cellpadding="0" cellspacing="0" width="100%">
+    <tr>
+        <td style="width: 50%; padding: 6px 0;">
+            <span style="color: #1f2937; font-size: 14px;">
+                <strong>Temperature:</strong> {{weather_temp}}{{weather_temp_unit}}
+            </span>
+        </td>
+        <td style="width: 50%; padding: 6px 0;">
+            <span style="color: #1f2937; font-size: 14px;">
+                <strong>Wind:</strong> {{weather_wind}} mph {{weather_wind_direction}}
+            </span>
+        </td>
+    </tr>
+    <tr>
+        <td style="width: 50%; padding: 6px 0;">
+            <span style="color: #1f2937; font-size: 14px;">
+                <strong>Humidity:</strong> {{weather_humidity}}%
+            </span>
+        </td>
+        <td style="width: 50%; padding: 6px 0;">
+            <span style="color: #1f2937; font-size: 14px;">
+                <strong>Precipitation:</strong> {{weather_precipitation}}
+            </span>
+        </td>
+    </tr>
+    <tr>
+        <td style="width: 50%; padding: 6px 0;">
+            <span style="color: #1f2937; font-size: 14px;">
+                <strong>Precip. Rate:</strong> {{weather_precipitation_rate}}"/hr
+            </span>
+        </td>
+        <td style="width: 50%; padding: 6px 0;">
+            <span style="color: #1f2937; font-size: 14px;">
+                <strong>Wave Height:</strong> {{weather_wave_height}} ft
+            </span>
+        </td>
+    </tr>
+    <tr>
+        <td style="width: 50%; padding: 6px 0;">
+            <span style="color: #1f2937; font-size: 14px;">
+                <strong>Wave Period:</strong> {{weather_wave_period}} sec {{weather_wave_direction}}
+            </span>
+        </td>
+        <td style="width: 50%; padding: 6px 0;">
+            <span style="color: #1f2937; font-size: 14px;">
+                <strong>Weather Alerts:</strong> {{weather_alerts}}
+            </span>
+        </td>
+    </tr>
+</table>
+
                                     </td>
                                 </tr>
                             </table>
