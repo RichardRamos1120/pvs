@@ -1100,39 +1100,6 @@ const GARAssessment = () => {
     }
   };
 
-  // Save assessment as draft
-  const saveAsDraft = async () => {
-    try {
-      setLoading(true);
-      
-      const assessmentToSave = {
-        ...assessmentData,
-        station: selectedStation,
-        status: "draft",
-        captain: auth.currentUser?.displayName || "Captain",
-        userId: auth.currentUser?.uid, // Required for security rules
-      };
-      
-      if (currentAssessmentId) {
-        // Update existing assessment
-        await firestoreOperations.updateAssessment(currentAssessmentId, assessmentToSave);
-      } else {
-        // Create new assessment
-        const created = await firestoreOperations.createAssessment(assessmentToSave);
-        if (created && created.id) {
-          setCurrentAssessmentId(created.id);
-        }
-      }
-      
-      // Show success message or other feedback
-      showNotification("Assessment saved as draft", 'success');
-    } catch (error) {
-      console.error("Error saving assessment:", error);
-      setError("Failed to save assessment");
-    } finally {
-      setLoading(false);
-    }
-  };
 
   // Publication function
   const publishAssessment = async () => {
@@ -2385,20 +2352,12 @@ const GARAssessment = () => {
                 <ChevronRight className="w-4 h-4 ml-2" />
               </button>
             ) : (
-              <div className="space-x-3">
-                <button 
-                  className="px-4 py-2 border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-white rounded-md bg-white dark:bg-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600"
-                  onClick={saveAsDraft}
-                >
-                  Save as Draft
-                </button>
-                <button 
-                  className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-md"
-                  onClick={publishAssessment}
-                >
-                  Publish Now
-                </button>
-              </div>
+              <button 
+                className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-md"
+                onClick={publishAssessment}
+              >
+                Publish Now
+              </button>
             )}
           </div>
         </div>

@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useContext } from 'react';
-import { X, Search, Users, Mail, Filter } from 'lucide-react';
+import { X, Search, Users, Mail, Filter, ChevronLeft, ChevronRight } from 'lucide-react';
 import { FirestoreContext } from '../App';
 
 const NotificationRecipientsModal = ({ 
@@ -21,6 +21,10 @@ const NotificationRecipientsModal = ({
   // State for managing selections
   const [selectedGroups, setSelectedGroups] = useState([]);
   const [selectedUsers, setSelectedUsers] = useState([]);
+  
+  // Pagination state for individual users
+  const [currentPage, setCurrentPage] = useState(1);
+  const usersPerPage = 5;
   
   // Predefined recipient groups
   const availableGroups = [
@@ -67,6 +71,8 @@ const NotificationRecipientsModal = ({
     }
 
     setFilteredUsers(filtered);
+    // Reset to first page when filters change
+    setCurrentPage(1);
   }, [availableUsers, searchTerm, stationFilter, roleFilter]);
 
   const fetchUsers = async () => {
@@ -246,56 +252,100 @@ const NotificationRecipientsModal = ({
                     <div className="text-center py-8">
                       <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-500 mx-auto"></div>
                     </div>
-                  ) : filteredUsers.length > 0 ? (
-                    <div className="space-y-1 p-2">
-                      {filteredUsers.map(user => (
-                    <div
-                      key={user.id}
-                      className={`flex items-center p-3 border rounded-md cursor-pointer transition-all ${
-                        selectedUsers.includes(user.id)
-                          ? 'border-green-500 bg-green-50 dark:bg-green-900/30'
-                          : 'border-gray-200 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-700'
-                      }`}
-                      onClick={() => handleUserToggle(user.id)}
-                    >
-                      <input
-                        type="checkbox"
-                        checked={selectedUsers.includes(user.id)}
-                        onChange={() => handleUserToggle(user.id)}
-                        className="sr-only"
-                        tabIndex={-1}
-                      />
-                      <div className={`flex items-center justify-center w-5 h-5 mr-3 border-2 rounded flex-shrink-0 ${
-                        selectedUsers.includes(user.id)
-                          ? 'border-green-500 bg-green-500'
-                          : 'border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700'
-                      }`}>
-                        {selectedUsers.includes(user.id) && (
-                          <svg className="w-3 h-3 text-white" fill="currentColor" viewBox="0 0 20 20">
-                            <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                          </svg>
-                        )}
+                  ) : filteredUsers.length > 0 ? (() => {
+                    // Calculate pagination
+                    const totalPages = Math.ceil(filteredUsers.length / usersPerPage);
+                    const startIndex = (currentPage - 1) * usersPerPage;
+                    const endIndex = startIndex + usersPerPage;
+                    const currentUsers = filteredUsers.slice(startIndex, endIndex);
+                    
+                    return (
+                      <div className="space-y-1 p-2">
+                        {currentUsers.map(user => (
+                          <div
+                            key={user.id}
+                            className={`flex items-center p-3 border rounded-md cursor-pointer transition-all ${
+                              selectedUsers.includes(user.id)
+                                ? 'border-green-500 bg-green-50 dark:bg-green-900/30'
+                                : 'border-gray-200 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-700'
+                            }`}
+                            onClick={() => handleUserToggle(user.id)}
+                          >
+                            <input
+                              type="checkbox"
+                              checked={selectedUsers.includes(user.id)}
+                              onChange={() => handleUserToggle(user.id)}
+                              className="sr-only"
+                              tabIndex={-1}
+                            />
+                            <div className={`flex items-center justify-center w-5 h-5 mr-3 border-2 rounded flex-shrink-0 ${
+                              selectedUsers.includes(user.id)
+                                ? 'border-green-500 bg-green-500'
+                                : 'border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700'
+                            }`}>
+                              {selectedUsers.includes(user.id) && (
+                                <svg className="w-3 h-3 text-white" fill="currentColor" viewBox="0 0 20 20">
+                                  <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                                </svg>
+                              )}
+                            </div>
+                            <div className="flex-1">
+                              <div className="flex items-center">
+                                <Mail className="w-4 h-4 mr-2 text-green-500" />
+                                <span className="font-medium text-gray-900 dark:text-white">
+                                  {user.displayName}
+                                </span>
+                              </div>
+                              <p className="text-xs text-gray-500 dark:text-gray-400">
+                                {user.email} • {user.station} • {user.role}
+                              </p>
+                            </div>
+                          </div>
+                        ))}
                       </div>
-                      <div className="flex-1">
-                        <div className="flex items-center">
-                          <Mail className="w-4 h-4 mr-2 text-green-500" />
-                          <span className="font-medium text-gray-900 dark:text-white">
-                            {user.displayName}
-                          </span>
-                        </div>
-                        <p className="text-xs text-gray-500 dark:text-gray-400">
-                          {user.email} • {user.station} • {user.role}
-                        </p>
-                      </div>
-                    </div>
-                      ))}
-                    </div>
-                  ) : (
+                    );
+                  })() : (
                     <div className="text-center py-8 text-gray-500 dark:text-gray-400">
                       No users found matching your criteria
                     </div>
                   )}
                 </div>
+                
+                {/* Pagination Controls */}
+                {!loading && filteredUsers.length > usersPerPage && (() => {
+                  const totalPages = Math.ceil(filteredUsers.length / usersPerPage);
+                  const startItem = (currentPage - 1) * usersPerPage + 1;
+                  const endItem = Math.min(currentPage * usersPerPage, filteredUsers.length);
+                  
+                  return (
+                    <div className="border-t border-gray-200 dark:border-gray-600 px-3 py-2 bg-gray-50 dark:bg-gray-700/50">
+                      <div className="flex items-center justify-between">
+                        <div className="text-xs text-gray-500 dark:text-gray-400">
+                          {startItem}-{endItem} of {filteredUsers.length}
+                        </div>
+                        <div className="flex items-center space-x-1">
+                          <button
+                            onClick={() => setCurrentPage(currentPage - 1)}
+                            disabled={currentPage === 1}
+                            className="p-1 rounded text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 disabled:opacity-50 disabled:cursor-not-allowed"
+                          >
+                            <ChevronLeft className="w-4 h-4" />
+                          </button>
+                          <span className="text-xs text-gray-500 dark:text-gray-400 px-2">
+                            {currentPage} / {totalPages}
+                          </span>
+                          <button
+                            onClick={() => setCurrentPage(currentPage + 1)}
+                            disabled={currentPage === totalPages}
+                            className="p-1 rounded text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 disabled:opacity-50 disabled:cursor-not-allowed"
+                          >
+                            <ChevronRight className="w-4 h-4" />
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })()}
               </div>
             </div>
 
