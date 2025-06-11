@@ -352,9 +352,8 @@ const GARAssessment = () => {
         const profile = await firestoreOperations.getUserProfile(user.uid);
         setUserProfile(profile);
         
-        // Set read-only mode based on user role (only captains and admins can edit)
-        const isEditor = profile?.role === 'captain' || profile?.role === 'admin';
-        setReadOnlyMode(!isEditor);
+        // Anyone can create and edit GAR assessments now
+        setReadOnlyMode(false);
         
         // CRITICAL: Load stations directly from Firestore database
         // This is the key part that ensures we're using actual database stations
@@ -496,9 +495,9 @@ const GARAssessment = () => {
   };
 
   const getRiskLevel = (score) => {
-    if (score >= 0 && score <= 23) return { level: "GREEN", color: "bg-green-500" };
-    if (score >= 24 && score <= 44) return { level: "AMBER", color: "bg-amber-500" };
-    return { level: "RED", color: "bg-red-500" };
+    if (score >= 0 && score <= 23) return { level: "LOW RISK", color: "bg-green-500" };
+    if (score >= 24 && score <= 44) return { level: "MODERATE RISK", color: "bg-amber-500" };
+    return { level: "HIGH RISK", color: "bg-red-500" };
   };
 
   const totalScore = calculateRiskScore();
@@ -1213,9 +1212,9 @@ const GARAssessment = () => {
         const totalScore = riskFactorValues.reduce((acc, val) => acc + val, 0);
         const riskLevel = getRiskLevel(totalScore);
         
-        if (riskFilter === 'green') return riskLevel.level === 'GREEN';
-        if (riskFilter === 'amber') return riskLevel.level === 'AMBER';
-        if (riskFilter === 'red') return riskLevel.level === 'RED';
+        if (riskFilter === 'green') return riskLevel.level === 'LOW RISK';
+        if (riskFilter === 'amber') return riskLevel.level === 'MODERATE RISK';
+        if (riskFilter === 'red') return riskLevel.level === 'HIGH RISK';
         return true;
       });
     }
@@ -1401,7 +1400,7 @@ const GARAssessment = () => {
                   ref={(el) => formRefs.current.temperature = el}
                   type="text"
                   className="w-full p-2 border border-gray-300 dark:border-gray-600 rounded-l-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
-                  placeholder="37"
+                  placeholder=""
                   defaultValue={""}
                   onChange={(e) => handleInputChange('temperature', e.target.value)}
                   onFocus={() => console.log('🎯 Temperature input FOCUSED')}
@@ -1426,7 +1425,7 @@ const GARAssessment = () => {
                   ref={(el) => formRefs.current.wind = el}
                   type="text"
                   className="w-full p-2 border border-gray-300 dark:border-gray-600 rounded-l-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
-                  placeholder="18"
+                  placeholder=""
                   defaultValue={""}
                   onChange={(e) => handleInputChange('wind', e.target.value)}
                 />
@@ -1454,7 +1453,7 @@ const GARAssessment = () => {
                 ref={(el) => formRefs.current.humidity = el}
                 type="text"
                 className="w-full p-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
-                placeholder="85"
+                placeholder=""
                 defaultValue={""}
                 onChange={(e) => handleInputChange('humidity', e.target.value)}
               />
@@ -1466,7 +1465,7 @@ const GARAssessment = () => {
                 ref={(el) => formRefs.current.precipitation = el}
                 type="text"
                 className="w-full p-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
-                placeholder="Heavy Rain"
+                placeholder=""
                 defaultValue={""}
                 onChange={(e) => handleInputChange('precipitation', e.target.value)}
               />
@@ -1478,7 +1477,7 @@ const GARAssessment = () => {
                 ref={(el) => formRefs.current.precipitationRate = el}
                 type="text"
                 className="w-full p-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
-                placeholder="1.2"
+                placeholder=""
                 defaultValue={""}
                 onChange={(e) => handleInputChange('precipitationRate', e.target.value)}
               />
@@ -1490,7 +1489,7 @@ const GARAssessment = () => {
                 ref={(el) => formRefs.current.waveHeight = el}
                 type="text"
                 className="w-full p-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
-                placeholder="3"
+                placeholder=""
                 defaultValue={""}
                 onChange={(e) => handleInputChange('waveHeight', e.target.value)}
               />
@@ -1502,7 +1501,7 @@ const GARAssessment = () => {
                 ref={(el) => formRefs.current.wavePeriod = el}
                 type="text"
                 className="w-full p-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
-                placeholder="8"
+                placeholder=""
                 defaultValue={""}
                 onChange={(e) => handleInputChange('wavePeriod', e.target.value)}
               />
@@ -1534,7 +1533,7 @@ const GARAssessment = () => {
               ref={(el) => formRefs.current.alerts = el}
               type="text"
               className="w-full p-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
-              placeholder="Flash Flood Warning until 5:00 PM"
+              placeholder=""
               defaultValue={""}
               onChange={(e) => handleInputChange('alerts', e.target.value)}
             />
@@ -2098,8 +2097,8 @@ const GARAssessment = () => {
                   </div>
                 )}
                 
-                {/* Only show button when stations exist and user has permissions */}
-                {stations.length > 0 && !readOnlyMode && (
+                {/* Only show button when stations exist */}
+                {stations.length > 0 && (
                   <div className="flex space-x-4">
                     {/* Check for draft assessment */}
                     {todayDraftAssessment ? (
@@ -2190,9 +2189,9 @@ const GARAssessment = () => {
                     className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                   >
                     <option value="all">All Risk Levels</option>
-                    <option value="green">🟢 GREEN (Low Risk)</option>
-                    <option value="amber">🟡 AMBER (Medium Risk)</option>
-                    <option value="red">🔴 RED (High Risk)</option>
+                    <option value="green">🟢 LOW RISK</option>
+                    <option value="amber">🟡 MODERATE RISK</option>
+                    <option value="red">🔴 HIGH RISK</option>
                   </select>
                 </div>
               </div>
@@ -2239,7 +2238,7 @@ const GARAssessment = () => {
                             <Trash2 className="w-5 h-5" />
                           </button>
                         )}
-                        {assessment.status === 'draft' && (userProfile?.role === 'admin' || userProfile?.role === 'captain') ? (
+                        {assessment.status === 'draft' ? (
                           <button 
                             onClick={() => {
                               if (assessment.id) {

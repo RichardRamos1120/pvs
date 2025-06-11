@@ -32,7 +32,7 @@ const getRiskColor = (riskLevel, score) => {
   if (typeof riskLevel === 'string') {
     const lowerRisk = riskLevel.toLowerCase();
     if (lowerRisk.includes('green') || lowerRisk.includes('low')) return '#10b981'; // Green
-    if (lowerRisk.includes('amber') || lowerRisk.includes('yellow') || lowerRisk.includes('medium')) return '#f59e0b'; // Amber
+    if (lowerRisk.includes('amber') || lowerRisk.includes('yellow') || lowerRisk.includes('medium') || lowerRisk.includes('moderate')) return '#f59e0b'; // Amber
     if (lowerRisk.includes('red') || lowerRisk.includes('high')) return '#ef4444'; // Red
   }
   
@@ -197,9 +197,9 @@ export const sendAssessmentNotifications = async (assessmentData, recipients, as
         riskLevel = assessmentData.riskLevel.level;
       } else if (typeof assessmentData.riskLevel === 'number') {
         riskScore = assessmentData.riskLevel;
-        if (riskScore <= 40) riskLevel = "GREEN (Low risk)";
-        else if (riskScore <= 60) riskLevel = "AMBER (Medium risk)";
-        else riskLevel = "RED (High risk)";
+        if (riskScore <= 40) riskLevel = "LOW RISK";
+        else if (riskScore <= 60) riskLevel = "MODERATE RISK";
+        else riskLevel = "HIGH RISK";
       }
     }
     
@@ -240,8 +240,8 @@ export const sendAssessmentNotifications = async (assessmentData, recipients, as
           const level = riskLevel.toUpperCase();
           if (level.includes('RED') || level.includes('HIGH')) {
             return `🔴 HIGH RISK - GAR Assessment Complete`;
-          } else if (level.includes('AMBER') || level.includes('MEDIUM')) {
-            return `🟡 MEDIUM RISK - GAR Assessment Complete`;
+          } else if (level.includes('AMBER') || level.includes('MEDIUM') || level.includes('MODERATE')) {
+            return `🟡 MODERATE RISK - GAR Assessment Complete`;
           } else if (level.includes('GREEN') || level.includes('LOW')) {
             return `🟢 LOW RISK - GAR Assessment Complete`;
           }
@@ -352,7 +352,7 @@ export const sendTestEmail = async (email) => {
       type: "Test Assessment",
       captain: "Test Captain",
       score: 45,
-      risk_level: "AMBER (Medium Risk)",
+      risk_level: "MODERATE RISK",
       risk_color: "#f59e0b",
       
       // App link

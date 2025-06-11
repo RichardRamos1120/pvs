@@ -165,9 +165,9 @@ const ReadOnlyAssessmentView = ({
       let y = 50;
 
       // Risk Level Box
-      const boxColor = riskLevelInfo.level === 'Low' ? [0, 128, 0] : 
-                       riskLevelInfo.level === 'Medium' ? [255, 165, 0] : 
-                       riskLevelInfo.level === 'High' ? [255, 140, 0] : [255, 0, 0];
+      const boxColor = riskLevelInfo.level === 'LOW RISK' ? [0, 128, 0] : 
+                       riskLevelInfo.level === 'MODERATE RISK' ? [255, 165, 0] : 
+                       riskLevelInfo.level === 'HIGH RISK' ? [255, 0, 0] : [255, 0, 0];
       
       pdf.setFillColor(...boxColor);
       pdf.rect(15, y - 8, 180, 20, 'F');

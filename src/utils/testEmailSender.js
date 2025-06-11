@@ -68,7 +68,7 @@ const sendTestEmail = async (to, name = "User") => {
       type: "Test Assessment",
       captain: "Test Captain",
       score: 45,
-      risk_level: "AMBER (Medium Risk)",
+      risk_level: "MODERATE RISK",
       risk_color: "amber",
       
       // For custom text message fallback
