@@ -13,7 +13,8 @@ import {
   AlertCircle,
   CheckCircle,
   User,
-  Bot
+  Bot,
+  HelpCircle
 } from 'lucide-react';
 
 const HelpChat = ({ darkMode }) => {
@@ -506,10 +507,10 @@ const HelpChat = ({ darkMode }) => {
         <div className="fixed bottom-6 right-6 z-50">
           <button
             onClick={() => setIsOpen(true)}
-            className="w-14 h-14 bg-blue-600 hover:bg-blue-700 text-white rounded-full shadow-lg flex items-center justify-center transition-all duration-200 hover:scale-110"
+            className="w-14 h-14 bg-red-600 hover:bg-red-700 text-white rounded-full shadow-lg flex items-center justify-center transition-all duration-200 hover:scale-110"
             aria-label="Open Help Chat"
           >
-            <MessageCircle className="w-6 h-6" />
+            <HelpCircle className="w-7 h-7" />
             {unreadCount > 0 && (
               <span className="absolute -top-2 -right-2 bg-red-500 text-white text-xs font-bold rounded-full min-w-[20px] h-5 flex items-center justify-center px-1 shadow-lg border-2 border-white">
                 {unreadCount > 99 ? '99+' : unreadCount}
@@ -566,7 +567,7 @@ const HelpChat = ({ darkMode }) => {
                     ) : conversations.length === 0 ? (
                       <div className="flex flex-col items-center justify-center h-full p-6 text-gray-500">
                         <MessageCircle className="w-12 h-12 mb-4 opacity-20" />
-                        <p className="text-center">No conversations yet. Start a new one!</p>
+                        <p className="text-center text-sm">Need help, have questions, or feedback? Let us know</p>
                         <button
                           onClick={() => setCurrentView('new')}
                           className={`mt-4 bg-blue-600 hover:bg-blue-700 text-white rounded-lg ${
