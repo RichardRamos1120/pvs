@@ -8,6 +8,7 @@ import ReadOnlyAssessmentView from './ReadOnlyAssessmentView';
 import NotificationRecipientsModal from './NotificationRecipientsModal';
 import Pagination from './Pagination';
 import { initEmailJS, sendGARAssessmentNotifications } from '../utils/emailService';
+import { getGARWeatherData, refreshGARWeatherData } from '../services/garWeatherService';
 
 // Main component
 const GARAssessment = () => {
@@ -120,6 +121,9 @@ const GARAssessment = () => {
   
   // Cancel loading state
   const [cancelLoading, setCancelLoading] = useState(false);
+  
+  // Weather loading state for professional loading indicators
+  const [weatherLoading, setWeatherLoading] = useState(false);
   
   // Assessment history pagination and filtering state
   const [currentPage, setCurrentPage] = useState(1);
@@ -425,6 +429,72 @@ const GARAssessment = () => {
     // Execute the initialization
     loadComponentData();
   }, [auth, firestoreOperations]);
+  
+  /**
+   * Automatically fetch weather data when component is ready
+   */
+  useEffect(() => {
+    // Only fetch weather data if:
+    // 1. User is checked and authenticated
+    // 2. Component is not loading
+    // 3. We're not in read-only view mode
+    // 4. We haven't already fetched weather data
+    if (userChecked && !loading && !showReadOnlyView && !id) {
+      console.log('🌤️ Component ready, fetching initial weather data...');
+      
+      // Fetch weather data automatically (cache-first approach)
+      const fetchInitialWeather = async () => {
+        try {
+          setWeatherLoading(true);
+          console.log('🌤️ [GAR] Fetching initial weather data (cache-first)...');
+          const weatherData = await getGARWeatherData(); // Use cache-first instead of force refresh
+          
+          if (weatherData) {
+            console.log('✅ [GAR] Initial weather data loaded:', weatherData);
+            
+            // Update assessment data
+            setAssessmentData(prev => ({
+              ...prev,
+              weather: {
+                ...prev.weather,
+                ...weatherData
+              }
+            }));
+            
+            // Update form fields
+            setTimeout(() => {
+              if (formRefs.current.temperature) formRefs.current.temperature.value = weatherData.temperature || '';
+              if (formRefs.current.temperatureUnit) formRefs.current.temperatureUnit.value = weatherData.temperatureUnit || '°F';
+              if (formRefs.current.wind) formRefs.current.wind.value = weatherData.wind || '';
+              if (formRefs.current.windDirection) formRefs.current.windDirection.value = weatherData.windDirection || 'NW';
+              if (formRefs.current.humidity) formRefs.current.humidity.value = weatherData.humidity || '';
+              if (formRefs.current.precipitation) formRefs.current.precipitation.value = weatherData.precipitation || '';
+              if (formRefs.current.precipitationRate) formRefs.current.precipitationRate.value = weatherData.precipitationRate || '';
+              if (formRefs.current.waveHeight) formRefs.current.waveHeight.value = weatherData.waveHeight || '';
+              if (formRefs.current.wavePeriod) formRefs.current.wavePeriod.value = weatherData.wavePeriod || '';
+              if (formRefs.current.waveDirection) formRefs.current.waveDirection.value = weatherData.waveDirection || 'N';
+              if (formRefs.current.alerts) formRefs.current.alerts.value = weatherData.alerts || '';
+            }, 100);
+          } else {
+            console.log('⚠️ [GAR] No initial weather data available');
+          }
+        } catch (error) {
+          console.error('Failed to fetch initial weather data:', error);
+          // Don't show error notification for initial fetch failure
+          // User can manually refresh if needed
+        } finally {
+          setWeatherLoading(false);
+        }
+      };
+      
+      // Small delay to ensure form is ready
+      const timer = setTimeout(() => {
+        fetchInitialWeather();
+      }, 500);
+      
+      return () => clearTimeout(timer);
+    }
+  }, [userChecked, loading, showReadOnlyView, id]);
   
   // Station verification useEffect - only run once after initial load
   useEffect(() => {
@@ -834,6 +904,51 @@ const GARAssessment = () => {
   };
 
   /**
+   * Refresh weather data
+   * This function fetches fresh weather data and updates the form
+   */
+  const refreshWeatherData = async () => {
+    try {
+      setWeatherLoading(true);
+      console.log('🔄 [GAR] Refreshing weather data...');
+      
+      const weatherData = await refreshGARWeatherData();
+      
+      if (weatherData) {
+        console.log('✅ [GAR] Weather data refreshed successfully:', weatherData);
+        
+        // Update assessment data
+        setAssessmentData(prev => ({
+          ...prev,
+          weather: {
+            ...prev.weather,
+            ...weatherData
+          }
+        }));
+        
+        // Update form refs
+        if (formRefs.current.temperature) formRefs.current.temperature.value = weatherData.temperature || '';
+        if (formRefs.current.temperatureUnit) formRefs.current.temperatureUnit.value = weatherData.temperatureUnit || '°F';
+        if (formRefs.current.wind) formRefs.current.wind.value = weatherData.wind || '';
+        if (formRefs.current.windDirection) formRefs.current.windDirection.value = weatherData.windDirection || 'NW';
+        if (formRefs.current.humidity) formRefs.current.humidity.value = weatherData.humidity || '';
+        if (formRefs.current.precipitation) formRefs.current.precipitation.value = weatherData.precipitation || '';
+        if (formRefs.current.precipitationRate) formRefs.current.precipitationRate.value = weatherData.precipitationRate || '';
+        if (formRefs.current.waveHeight) formRefs.current.waveHeight.value = weatherData.waveHeight || '';
+        if (formRefs.current.wavePeriod) formRefs.current.wavePeriod.value = weatherData.wavePeriod || '';
+        if (formRefs.current.waveDirection) formRefs.current.waveDirection.value = weatherData.waveDirection || 'NW';
+        if (formRefs.current.alerts) formRefs.current.alerts.value = weatherData.alerts || '';
+        
+        setHasChanges(true);
+      }
+    } catch (error) {
+      console.error('❌ [GAR] Error refreshing weather data:', error);
+    } finally {
+      setWeatherLoading(false);
+    }
+  };
+
+  /**
    * Start a new assessment
    * This function is called when the user clicks "Create New Assessment"
    * It creates an initial draft in the database immediately
@@ -934,6 +1049,28 @@ const GARAssessment = () => {
       setLoading(false);
     }
     
+    // Fetch weather data
+    try {
+      setWeatherLoading(true);
+      console.log('🌤️ [GAR] Fetching weather data for new assessment...');
+      const weatherData = await getGARWeatherData();
+      
+      if (weatherData) {
+        console.log('✅ [GAR] Weather data loaded:', weatherData);
+        newAssessmentData.weather = {
+          ...newAssessmentData.weather,
+          ...weatherData
+        };
+      } else {
+        console.log('⚠️ [GAR] No weather data available, using defaults');
+      }
+    } catch (error) {
+      console.error('❌ [GAR] Error fetching weather data:', error);
+      // Continue with empty weather data if fetch fails
+    } finally {
+      setWeatherLoading(false);
+    }
+    
     // Set assessment data
     setAssessmentData(newAssessmentData);
     
@@ -943,9 +1080,19 @@ const GARAssessment = () => {
       if (formRefs.current.time) formRefs.current.time.value = newAssessmentData.time;
       if (formRefs.current.type) formRefs.current.type.value = newAssessmentData.type;
       if (formRefs.current.station) formRefs.current.station.value = newAssessmentData.station;
+      
+      // Weather fields
+      if (formRefs.current.temperature) formRefs.current.temperature.value = newAssessmentData.weather.temperature || '';
       if (formRefs.current.temperatureUnit) formRefs.current.temperatureUnit.value = newAssessmentData.weather.temperatureUnit;
+      if (formRefs.current.wind) formRefs.current.wind.value = newAssessmentData.weather.wind || '';
       if (formRefs.current.windDirection) formRefs.current.windDirection.value = newAssessmentData.weather.windDirection;
+      if (formRefs.current.humidity) formRefs.current.humidity.value = newAssessmentData.weather.humidity || '';
+      if (formRefs.current.precipitation) formRefs.current.precipitation.value = newAssessmentData.weather.precipitation || '';
+      if (formRefs.current.precipitationRate) formRefs.current.precipitationRate.value = newAssessmentData.weather.precipitationRate || '';
+      if (formRefs.current.waveHeight) formRefs.current.waveHeight.value = newAssessmentData.weather.waveHeight || '';
+      if (formRefs.current.wavePeriod) formRefs.current.wavePeriod.value = newAssessmentData.weather.wavePeriod || '';
       if (formRefs.current.waveDirection) formRefs.current.waveDirection.value = newAssessmentData.weather.waveDirection;
+      if (formRefs.current.alerts) formRefs.current.alerts.value = newAssessmentData.weather.alerts || '';
     }, 0);
     
     // Reset mitigation refs
@@ -1009,7 +1156,7 @@ const GARAssessment = () => {
   }, [pastAssessments, auth.currentUser?.uid]);
 
   // Continue working on draft assessment
-  const continueDraftAssessment = (draftAssessment) => {
+  const continueDraftAssessment = async (draftAssessment) => {
     // Set the assessment data
     setAssessmentData(draftAssessment);
     setCurrentAssessmentId(draftAssessment.id);
@@ -1020,25 +1167,53 @@ const GARAssessment = () => {
       setNotificationRecipients(draftAssessment.notificationRecipients);
     }
     
-    // Initialize form refs with draft data
+    // Check if weather data needs refreshing (cache-first approach)
+    let weatherToUse = draftAssessment.weather || {};
+    
+    try {
+      setWeatherLoading(true);
+      console.log('🌤️ [GAR] Checking weather data for draft assessment...');
+      // This will use cached data if it's fresh, or fetch new data if cache is stale
+      const freshWeatherData = await getGARWeatherData();
+      
+      if (freshWeatherData) {
+        console.log('✅ [GAR] Using refreshed weather data for draft');
+        weatherToUse = freshWeatherData;
+        
+        // Update the assessment data with fresh weather
+        const updatedAssessment = {
+          ...draftAssessment,
+          weather: weatherToUse
+        };
+        setAssessmentData(updatedAssessment);
+      } else {
+        console.log('📦 [GAR] Using existing weather data from draft');
+      }
+    } catch (error) {
+      console.error('❌ [GAR] Error checking weather data for draft:', error);
+      // Continue with existing weather data if fetch fails
+    } finally {
+      setWeatherLoading(false);
+    }
+    
+    // Initialize form refs with draft data (using potentially refreshed weather)
     setTimeout(() => {
       if (formRefs.current.date) formRefs.current.date.value = draftAssessment.date;
       if (formRefs.current.time) formRefs.current.time.value = draftAssessment.time;
       if (formRefs.current.type) formRefs.current.type.value = draftAssessment.type;
       if (formRefs.current.station) formRefs.current.station.value = draftAssessment.station;
       
-      const weather = draftAssessment.weather || {};
-      if (formRefs.current.temperature) formRefs.current.temperature.value = weather.temperature || "";
-      if (formRefs.current.temperatureUnit) formRefs.current.temperatureUnit.value = weather.temperatureUnit || "°F";
-      if (formRefs.current.wind) formRefs.current.wind.value = weather.wind || "";
-      if (formRefs.current.windDirection) formRefs.current.windDirection.value = weather.windDirection || "NW";
-      if (formRefs.current.humidity) formRefs.current.humidity.value = weather.humidity || "";
-      if (formRefs.current.precipitation) formRefs.current.precipitation.value = weather.precipitation || "";
-      if (formRefs.current.precipitationRate) formRefs.current.precipitationRate.value = weather.precipitationRate || "";
-      if (formRefs.current.waveHeight) formRefs.current.waveHeight.value = weather.waveHeight || "";
-      if (formRefs.current.wavePeriod) formRefs.current.wavePeriod.value = weather.wavePeriod || "";
-      if (formRefs.current.waveDirection) formRefs.current.waveDirection.value = weather.waveDirection || "NW";
-      if (formRefs.current.alerts) formRefs.current.alerts.value = weather.alerts || "";
+      if (formRefs.current.temperature) formRefs.current.temperature.value = weatherToUse.temperature || "";
+      if (formRefs.current.temperatureUnit) formRefs.current.temperatureUnit.value = weatherToUse.temperatureUnit || "°F";
+      if (formRefs.current.wind) formRefs.current.wind.value = weatherToUse.wind || "";
+      if (formRefs.current.windDirection) formRefs.current.windDirection.value = weatherToUse.windDirection || "NW";
+      if (formRefs.current.humidity) formRefs.current.humidity.value = weatherToUse.humidity || "";
+      if (formRefs.current.precipitation) formRefs.current.precipitation.value = weatherToUse.precipitation || "";
+      if (formRefs.current.precipitationRate) formRefs.current.precipitationRate.value = weatherToUse.precipitationRate || "";
+      if (formRefs.current.waveHeight) formRefs.current.waveHeight.value = weatherToUse.waveHeight || "";
+      if (formRefs.current.wavePeriod) formRefs.current.wavePeriod.value = weatherToUse.wavePeriod || "";
+      if (formRefs.current.waveDirection) formRefs.current.waveDirection.value = weatherToUse.waveDirection || "NW";
+      if (formRefs.current.alerts) formRefs.current.alerts.value = weatherToUse.alerts || "";
     }, 0);
     
     // Initialize mitigation refs with draft data
@@ -1390,8 +1565,79 @@ const GARAssessment = () => {
       </div>
       
       <div className="mb-6">
-        <h3 className="text-lg font-medium mb-2 text-gray-900 dark:text-white">Weather Conditions</h3>
-        <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-md p-4">
+        <div className="flex justify-between items-center mb-2">
+          <h3 className="text-lg font-medium text-gray-900 dark:text-white">Weather Conditions</h3>
+          <button
+            type="button"
+            onClick={refreshWeatherData}
+            disabled={weatherLoading}
+            className={`flex items-center gap-2 px-3 py-1 text-sm rounded-md transition-colors ${
+              weatherLoading 
+                ? 'bg-gray-400 cursor-not-allowed text-gray-200' 
+                : 'bg-blue-500 hover:bg-blue-600 text-white'
+            }`}
+            title={weatherLoading ? "Loading weather data..." : "Refresh weather data"}
+          >
+            <svg className={`w-4 h-4 ${weatherLoading ? 'animate-spin' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+            </svg>
+            {weatherLoading ? 'Loading...' : 'Refresh'}
+          </button>
+        </div>
+        <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-md p-4 relative">
+          {/* Loading Overlay */}
+          {weatherLoading && (
+            <div className="absolute inset-0 bg-white/80 dark:bg-gray-900/80 rounded-md flex items-center justify-center z-10">
+              <div className="flex items-center gap-3 text-gray-700 dark:text-gray-300">
+                <svg className="w-5 h-5 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                </svg>
+                <span className="text-sm font-medium">Loading weather data...</span>
+              </div>
+            </div>
+          )}
+          
+          {/* Professional Weather Data Attribution */}
+          {assessmentData.weather?.weatherDataSource && (
+            <div className="mb-4 p-3 bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-900/20 dark:to-indigo-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
+              <div className="flex items-start gap-3">
+                <div className="flex-shrink-0">
+                  <svg className="w-5 h-5 text-blue-600 dark:text-blue-400 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="text-sm font-semibold text-blue-900 dark:text-blue-100 mb-1">
+                    Weather Data Pre-filled by Authorized Sources
+                  </div>
+                  <div className="text-xs text-blue-800 dark:text-blue-200 space-y-1">
+                    <div className="flex flex-wrap items-center gap-4">
+                      <span>
+                        <strong>Primary Source:</strong> {assessmentData.weather.weatherDataSource === 'NOAA' ? 'National Oceanic and Atmospheric Administration (NOAA)' : assessmentData.weather.weatherDataSource}
+                      </span>
+                      <span>
+                        <strong>Data Provider:</strong> {assessmentData.weather.apiSource}
+                      </span>
+                    </div>
+                    <div className="flex flex-wrap items-center gap-4">
+                      <span>
+                        <strong>Last Updated:</strong> {assessmentData.weather.lastUpdatedPST}
+                      </span>
+                      <span className="inline-flex items-center px-2 py-1 rounded-full text-xs bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-200">
+                        <svg className="w-3 h-3 mr-1" fill="currentColor" viewBox="0 0 20 20">
+                          <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                        </svg>
+                        Verified Marine Weather Data
+                      </span>
+                    </div>
+                  </div>
+                  <div className="mt-2 text-xs text-blue-700 dark:text-blue-300 italic">
+                    Weather conditions are automatically populated from official meteorological sources for accuracy and compliance with marine safety protocols.
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
           <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Temperature</label>
@@ -1399,7 +1645,12 @@ const GARAssessment = () => {
                 <input
                   ref={(el) => formRefs.current.temperature = el}
                   type="text"
-                  className="w-full p-2 border border-gray-300 dark:border-gray-600 rounded-l-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                  disabled={weatherLoading}
+                  className={`w-full p-2 border border-gray-300 dark:border-gray-600 rounded-l-md text-gray-900 dark:text-white ${
+                    weatherLoading 
+                      ? 'bg-gray-100 dark:bg-gray-800 cursor-not-allowed opacity-60' 
+                      : 'bg-white dark:bg-gray-700'
+                  }`}
                   placeholder=""
                   defaultValue={""}
                   onChange={(e) => handleInputChange('temperature', e.target.value)}
@@ -1408,7 +1659,12 @@ const GARAssessment = () => {
                 />
                 <select
                   ref={(el) => formRefs.current.temperatureUnit = el}
-                  className="p-2 border border-gray-300 dark:border-gray-600 border-l-0 rounded-r-md bg-gray-50 dark:bg-gray-600 text-gray-900 dark:text-white"
+                  disabled={weatherLoading}
+                  className={`p-2 border border-gray-300 dark:border-gray-600 border-l-0 rounded-r-md text-gray-900 dark:text-white ${
+                    weatherLoading 
+                      ? 'bg-gray-100 dark:bg-gray-800 cursor-not-allowed opacity-60' 
+                      : 'bg-gray-50 dark:bg-gray-600'
+                  }`}
                   defaultValue={"°F"}
                   onChange={(e) => handleInputChange('temperatureUnit', e.target.value)}
                 >
@@ -1424,25 +1680,43 @@ const GARAssessment = () => {
                 <input
                   ref={(el) => formRefs.current.wind = el}
                   type="text"
-                  className="w-full p-2 border border-gray-300 dark:border-gray-600 rounded-l-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                  disabled={weatherLoading}
+                  className={`w-full p-2 border border-gray-300 dark:border-gray-600 rounded-l-md text-gray-900 dark:text-white ${
+                    weatherLoading 
+                      ? 'bg-gray-100 dark:bg-gray-800 cursor-not-allowed opacity-60' 
+                      : 'bg-white dark:bg-gray-700'
+                  }`}
                   placeholder=""
                   defaultValue={""}
                   onChange={(e) => handleInputChange('wind', e.target.value)}
                 />
                 <select
                   ref={(el) => formRefs.current.windDirection = el}
-                  className="p-2 border border-gray-300 dark:border-gray-600 border-l-0 rounded-r-md bg-gray-50 dark:bg-gray-600 text-gray-900 dark:text-white w-20"
+                  disabled={weatherLoading}
+                  className={`p-2 border border-gray-300 dark:border-gray-600 border-l-0 rounded-r-md text-gray-900 dark:text-white w-20 ${
+                    weatherLoading 
+                      ? 'bg-gray-100 dark:bg-gray-800 cursor-not-allowed opacity-60' 
+                      : 'bg-gray-50 dark:bg-gray-600'
+                  }`}
                   defaultValue={"NW"}
                   onChange={(e) => handleInputChange('windDirection', e.target.value)}
                 >
                   <option value="N">N</option>
+                  <option value="NNE">NNE</option>
                   <option value="NE">NE</option>
+                  <option value="ENE">ENE</option>
                   <option value="E">E</option>
+                  <option value="ESE">ESE</option>
                   <option value="SE">SE</option>
+                  <option value="SSE">SSE</option>
                   <option value="S">S</option>
+                  <option value="SSW">SSW</option>
                   <option value="SW">SW</option>
+                  <option value="WSW">WSW</option>
                   <option value="W">W</option>
+                  <option value="WNW">WNW</option>
                   <option value="NW">NW</option>
+                  <option value="NNW">NNW</option>
                 </select>
               </div>
             </div>
@@ -1452,7 +1726,12 @@ const GARAssessment = () => {
               <input
                 ref={(el) => formRefs.current.humidity = el}
                 type="text"
-                className="w-full p-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                disabled={weatherLoading}
+                className={`w-full p-2 border border-gray-300 dark:border-gray-600 rounded-md text-gray-900 dark:text-white ${
+                  weatherLoading 
+                    ? 'bg-gray-100 dark:bg-gray-800 cursor-not-allowed opacity-60' 
+                    : 'bg-white dark:bg-gray-700'
+                }`}
                 placeholder=""
                 defaultValue={""}
                 onChange={(e) => handleInputChange('humidity', e.target.value)}
@@ -1464,7 +1743,12 @@ const GARAssessment = () => {
               <input
                 ref={(el) => formRefs.current.precipitation = el}
                 type="text"
-                className="w-full p-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                disabled={weatherLoading}
+                className={`w-full p-2 border border-gray-300 dark:border-gray-600 rounded-md text-gray-900 dark:text-white ${
+                  weatherLoading 
+                    ? 'bg-gray-100 dark:bg-gray-800 cursor-not-allowed opacity-60' 
+                    : 'bg-white dark:bg-gray-700'
+                }`}
                 placeholder=""
                 defaultValue={""}
                 onChange={(e) => handleInputChange('precipitation', e.target.value)}
@@ -1476,7 +1760,12 @@ const GARAssessment = () => {
               <input
                 ref={(el) => formRefs.current.precipitationRate = el}
                 type="text"
-                className="w-full p-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                disabled={weatherLoading}
+                className={`w-full p-2 border border-gray-300 dark:border-gray-600 rounded-md text-gray-900 dark:text-white ${
+                  weatherLoading 
+                    ? 'bg-gray-100 dark:bg-gray-800 cursor-not-allowed opacity-60' 
+                    : 'bg-white dark:bg-gray-700'
+                }`}
                 placeholder=""
                 defaultValue={""}
                 onChange={(e) => handleInputChange('precipitationRate', e.target.value)}
@@ -1488,7 +1777,12 @@ const GARAssessment = () => {
               <input
                 ref={(el) => formRefs.current.waveHeight = el}
                 type="text"
-                className="w-full p-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                disabled={weatherLoading}
+                className={`w-full p-2 border border-gray-300 dark:border-gray-600 rounded-md text-gray-900 dark:text-white ${
+                  weatherLoading 
+                    ? 'bg-gray-100 dark:bg-gray-800 cursor-not-allowed opacity-60' 
+                    : 'bg-white dark:bg-gray-700'
+                }`}
                 placeholder=""
                 defaultValue={""}
                 onChange={(e) => handleInputChange('waveHeight', e.target.value)}
@@ -1500,7 +1794,12 @@ const GARAssessment = () => {
               <input
                 ref={(el) => formRefs.current.wavePeriod = el}
                 type="text"
-                className="w-full p-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                disabled={weatherLoading}
+                className={`w-full p-2 border border-gray-300 dark:border-gray-600 rounded-md text-gray-900 dark:text-white ${
+                  weatherLoading 
+                    ? 'bg-gray-100 dark:bg-gray-800 cursor-not-allowed opacity-60' 
+                    : 'bg-white dark:bg-gray-700'
+                }`}
                 placeholder=""
                 defaultValue={""}
                 onChange={(e) => handleInputChange('wavePeriod', e.target.value)}
@@ -1511,18 +1810,31 @@ const GARAssessment = () => {
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Wave Direction</label>
               <select
                 ref={(el) => formRefs.current.waveDirection = el}
-                className="w-full p-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                disabled={weatherLoading}
+                className={`w-full p-2 border border-gray-300 dark:border-gray-600 rounded-md text-gray-900 dark:text-white ${
+                  weatherLoading 
+                    ? 'bg-gray-100 dark:bg-gray-800 cursor-not-allowed opacity-60' 
+                    : 'bg-white dark:bg-gray-700'
+                }`}
                 defaultValue={"NW"}
                 onChange={(e) => handleInputChange('waveDirection', e.target.value)}
               >
                 <option value="N">N</option>
+                <option value="NNE">NNE</option>
                 <option value="NE">NE</option>
+                <option value="ENE">ENE</option>
                 <option value="E">E</option>
+                <option value="ESE">ESE</option>
                 <option value="SE">SE</option>
+                <option value="SSE">SSE</option>
                 <option value="S">S</option>
+                <option value="SSW">SSW</option>
                 <option value="SW">SW</option>
+                <option value="WSW">WSW</option>
                 <option value="W">W</option>
+                <option value="WNW">WNW</option>
                 <option value="NW">NW</option>
+                <option value="NNW">NNW</option>
               </select>
             </div>
           </div>

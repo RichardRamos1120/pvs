@@ -1,7 +1,10 @@
 // src/utils/timezone.js
 // Utility functions for handling Pacific Standard Time (PST) / Pacific Daylight Time (PDT)
 
+import { Timestamp } from 'firebase/firestore';
+
 const PST_TIMEZONE = 'America/Los_Angeles';
+const CACHE_DURATION = 60 * 60 * 1000; // 1 hour in milliseconds
 
 /**
  * Get current date/time in PST
@@ -215,4 +218,73 @@ export const calculateEndTimePST = (startTime, durationHours) => {
   const endDate = new Date(startDate.getTime() + durationMinutes * 60000);
   
   return endDate.toTimeString().slice(0, 5); // Format as HH:MM
+};
+
+/**
+ * Check if data is stale based on PST timestamp
+ */
+export const isDataStalePST = (timestamp) => {
+  if (!timestamp) return true;
+  
+  const lastFetchTime = timestampToPST(timestamp);
+  if (!lastFetchTime) return true;
+  
+  const now = getCurrentPSTDate();
+  const timeDiff = now.getTime() - lastFetchTime.getTime();
+  
+  return timeDiff > CACHE_DURATION;
+};
+
+/**
+ * Create a PST timestamp for Firebase
+ */
+export const createPSTTimestamp = () => {
+  // Create a Firebase Timestamp from the current time
+  return Timestamp.now();
+};
+
+/**
+ * Convert Firebase Timestamp to PST Date
+ */
+export const timestampToPST = (timestamp) => {
+  if (!timestamp) return null;
+  
+  // Handle Firebase Timestamp
+  if (timestamp && typeof timestamp.toDate === 'function') {
+    return convertToPST(timestamp.toDate());
+  }
+  
+  // Handle regular timestamps
+  return convertToPST(timestamp);
+};
+
+/**
+ * Format relative time in PST (e.g., "2 hours ago")
+ */
+export const formatRelativeTimePST = (timestamp) => {
+  const date = timestampToPST(timestamp);
+  if (!date) return 'Never';
+  
+  const now = getCurrentPSTDate();
+  const diffMs = now.getTime() - date.getTime();
+  const diffMins = Math.floor(diffMs / 60000);
+  
+  if (diffMins < 1) return 'Just now';
+  if (diffMins === 1) return '1 minute ago';
+  if (diffMins < 60) return `${diffMins} minutes ago`;
+  
+  const diffHours = Math.floor(diffMins / 60);
+  if (diffHours === 1) return '1 hour ago';
+  if (diffHours < 24) return `${diffHours} hours ago`;
+  
+  const diffDays = Math.floor(diffHours / 24);
+  if (diffDays === 1) return '1 day ago';
+  return `${diffDays} days ago`;
+};
+
+/**
+ * Format PST time (alias for formatTimePST)
+ */
+export const formatPSTTime = (date) => {
+  return formatTimePST(date);
 };
