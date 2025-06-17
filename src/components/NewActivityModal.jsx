@@ -35,6 +35,10 @@ const NewActivityModal = ({ show, onClose, onAddActivity, darkMode, currentStati
   const [crewSearchTerm, setCrewSearchTerm] = useState("");
   const [tempSelectedCrew, setTempSelectedCrew] = useState([]); // Temporary selection state
 
+  // Custom apparatus dropdown states
+  const [apparatusDropdownOpen, setApparatusDropdownOpen] = useState(false);
+  const [apparatusSearchTerm, setApparatusSearchTerm] = useState("");
+
   const firestoreOperations = useContext(FirestoreContext);
 
   // Fetch stations from Firebase when modal opens
@@ -186,12 +190,71 @@ const NewActivityModal = ({ show, onClose, onAddActivity, darkMode, currentStati
   // List of apparatus
   const apparatusList = [
     "Engine 1",
-    "Engine 2",
-    "Ladder 1",
-    "Rescue 1",
-    "Battalion Chief Vehicle",
-    "Utility Vehicle"
+    "Engine 2", 
+    "Engine 4",
+    "Engine 6",
+    "Engine 7",
+    "Engine 8",
+    "Engine 9",
+    "Engine 604",
+    "Engine 607",
+    "Truck 4",
+    "Rescue 9",
+    "Fire Boat Liberty",
+    "IRB 1",
+    "Medic 1",
+    "Medic 4",
+    "Medic 6",
+    "Medic 7",
+    "Chief 1",
+    "Chief 2",
+    "Chief 3",
+    "Chief 4",
+    "Battalion 1",
+    "Battalion 2",
+    "Battalion 3",
+    "Battalion 4",
+    "Unit 1",
+    "Unit 4",
+    "Unit 6",
+    "Unit 7",
+    "Unit 8",
+    "Unit 9",
+    "Dive Tender 1",
+    "Prevention 1",
+    "Prevention 2",
+    "Prevention 3",
+    "Prevention 4",
+    "Prevention 5",
+    "Prevention 6",
+    "Prevention 7",
+    "Prevention 8",
+    "15U9",
+    "15R1",
+    "15R2",
+    "15R3",
+    "15R4"
   ];
+
+  // Filter apparatus based on search term
+  const filteredApparatus = apparatusList.filter(apparatus =>
+    apparatus.toLowerCase().includes(apparatusSearchTerm.toLowerCase())
+  );
+
+  // Handle apparatus selection
+  const handleApparatusSelect = (apparatus) => {
+    setNewActivityApparatus(apparatus);
+    setApparatusSearchTerm("");
+    setApparatusDropdownOpen(false);
+  };
+
+  // Handle apparatus input change
+  const handleApparatusInputChange = (e) => {
+    const value = e.target.value;
+    setApparatusSearchTerm(value);
+    setNewActivityApparatus(value);
+    setApparatusDropdownOpen(true);
+  };
   
   // Stations are now loaded from Firebase - see useEffect above
   
@@ -479,16 +542,39 @@ const NewActivityModal = ({ show, onClose, onAddActivity, darkMode, currentStati
                   <label className="block text-sm font-medium mb-1">
                     Apparatus
                   </label>
-                  <select 
-                    className="w-full p-2 border rounded-lg"
-                    value={newActivityApparatus}
-                    onChange={(e) => setNewActivityApparatus(e.target.value)}
-                  >
-                    <option value="">Select Apparatus</option>
-                    {apparatusList.map((apparatus) => (
-                      <option key={apparatus} value={apparatus}>{apparatus}</option>
-                    ))}
-                  </select>
+                  {/* Custom searchable apparatus dropdown */}
+                  <div className="relative">
+                    <input
+                      type="text"
+                      className="w-full p-2 border rounded-lg"
+                      placeholder="Type to search apparatus..."
+                      value={apparatusSearchTerm || newActivityApparatus}
+                      onChange={handleApparatusInputChange}
+                      onFocus={() => setApparatusDropdownOpen(true)}
+                      onBlur={() => setTimeout(() => setApparatusDropdownOpen(false), 150)}
+                    />
+                    
+                    {/* Dropdown list */}
+                    {apparatusDropdownOpen && (
+                      <div className="absolute top-full left-0 right-0 bg-white border border-gray-300 rounded-lg shadow-lg z-50 max-h-40 overflow-y-auto">
+                        {filteredApparatus.length > 0 ? (
+                          filteredApparatus.map((apparatus) => (
+                            <div
+                              key={apparatus}
+                              className="p-2 hover:bg-gray-100 cursor-pointer border-b border-gray-100 last:border-b-0"
+                              onMouseDown={() => handleApparatusSelect(apparatus)}
+                            >
+                              {apparatus}
+                            </div>
+                          ))
+                        ) : (
+                          <div className="p-2 text-gray-500 text-sm">
+                            No apparatus found
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
                 </div>
                 <div>
                   <label className="block text-sm font-medium mb-1">
@@ -575,16 +661,39 @@ const NewActivityModal = ({ show, onClose, onAddActivity, darkMode, currentStati
                   <label className="block text-sm font-medium mb-1">
                     Apparatus
                   </label>
-                  <select 
-                    className="w-full p-2 border rounded-lg"
-                    value={newActivityApparatus}
-                    onChange={(e) => setNewActivityApparatus(e.target.value)}
-                  >
-                    <option value="">Select Apparatus</option>
-                    {apparatusList.map((apparatus) => (
-                      <option key={apparatus} value={apparatus}>{apparatus}</option>
-                    ))}
-                  </select>
+                  {/* Custom searchable apparatus dropdown */}
+                  <div className="relative">
+                    <input
+                      type="text"
+                      className="w-full p-2 border rounded-lg"
+                      placeholder="Type to search apparatus..."
+                      value={apparatusSearchTerm || newActivityApparatus}
+                      onChange={handleApparatusInputChange}
+                      onFocus={() => setApparatusDropdownOpen(true)}
+                      onBlur={() => setTimeout(() => setApparatusDropdownOpen(false), 150)}
+                    />
+                    
+                    {/* Dropdown list */}
+                    {apparatusDropdownOpen && (
+                      <div className="absolute top-full left-0 right-0 bg-white border border-gray-300 rounded-lg shadow-lg z-50 max-h-40 overflow-y-auto">
+                        {filteredApparatus.length > 0 ? (
+                          filteredApparatus.map((apparatus) => (
+                            <div
+                              key={apparatus}
+                              className="p-2 hover:bg-gray-100 cursor-pointer border-b border-gray-100 last:border-b-0"
+                              onMouseDown={() => handleApparatusSelect(apparatus)}
+                            >
+                              {apparatus}
+                            </div>
+                          ))
+                        ) : (
+                          <div className="p-2 text-gray-500 text-sm">
+                            No apparatus found
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
                 </div>
               </div>
             </div>
@@ -611,16 +720,39 @@ const NewActivityModal = ({ show, onClose, onAddActivity, darkMode, currentStati
                   <label className="block text-sm font-medium mb-1">
                     Apparatus
                   </label>
-                  <select 
-                    className="w-full p-2 border rounded-lg"
-                    value={newActivityApparatus}
-                    onChange={(e) => setNewActivityApparatus(e.target.value)}
-                  >
-                    <option value="">Select Apparatus</option>
-                    {apparatusList.map((apparatus) => (
-                      <option key={apparatus} value={apparatus}>{apparatus}</option>
-                    ))}
-                  </select>
+                  {/* Custom searchable apparatus dropdown */}
+                  <div className="relative">
+                    <input
+                      type="text"
+                      className="w-full p-2 border rounded-lg"
+                      placeholder="Type to search apparatus..."
+                      value={apparatusSearchTerm || newActivityApparatus}
+                      onChange={handleApparatusInputChange}
+                      onFocus={() => setApparatusDropdownOpen(true)}
+                      onBlur={() => setTimeout(() => setApparatusDropdownOpen(false), 150)}
+                    />
+                    
+                    {/* Dropdown list */}
+                    {apparatusDropdownOpen && (
+                      <div className="absolute top-full left-0 right-0 bg-white border border-gray-300 rounded-lg shadow-lg z-50 max-h-40 overflow-y-auto">
+                        {filteredApparatus.length > 0 ? (
+                          filteredApparatus.map((apparatus) => (
+                            <div
+                              key={apparatus}
+                              className="p-2 hover:bg-gray-100 cursor-pointer border-b border-gray-100 last:border-b-0"
+                              onMouseDown={() => handleApparatusSelect(apparatus)}
+                            >
+                              {apparatus}
+                            </div>
+                          ))
+                        ) : (
+                          <div className="p-2 text-gray-500 text-sm">
+                            No apparatus found
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
                 </div>
               </div>
             </div>
