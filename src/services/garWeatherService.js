@@ -56,8 +56,8 @@ const getMockWeatherData = () => {
     wind: '8',
     windDirection: 'W',
     humidity: '65',
-    precipitation: '0.00',
-    precipitationRate: '0.00',
+    precipitation: 'Clear',
+    precipitationRate: '0.000',
     waveHeight: '3.9',
     wavePeriod: '8',
     waveDirection: 'NW',
@@ -137,6 +137,26 @@ const degreesToCardinal = (degrees) => {
   return directions[index];
 };
 
+// Convert precipitation rate (in/hr) to descriptive weather conditions
+// Based on NOAA dBZ to rainfall rate correlation
+const precipitationRateToCondition = (rateInchesPerHour) => {
+  const rate = parseFloat(rateInchesPerHour) || 0;
+  
+  if (rate === 0) {
+    return 'Clear';
+  } else if (rate > 0 && rate <= 0.010) {
+    return 'Very light rain';
+  } else if (rate > 0.010 && rate <= 0.100) {
+    return 'Light rain';
+  } else if (rate > 0.100 && rate <= 0.300) {
+    return 'Moderate rain';
+  } else if (rate > 0.300 && rate <= 2.000) {
+    return 'Heavy rain';
+  } else {
+    return 'Extreme rain/hail';
+  }
+};
+
 // Create formatted PST timestamp
 const createFormattedPSTTimestamp = () => {
   const now = new Date();
@@ -206,14 +226,17 @@ const formatGARWeatherData = (weatherData, marineData) => {
     const dataSource = getDataSource();
     const lastUpdatedPST = createFormattedPSTTimestamp();
     
+    // Calculate precipitation rate in inches per hour
+    const precipitationRateValue = precipitation !== null ? (precipitation * 0.0393701).toFixed(3) : '0.000';
+    
     const formatted = {
       temperature: temperature !== null ? celsiusToFahrenheit(temperature).toString() : '',
       temperatureUnit: '°F',
       wind: windSpeedMph !== null ? windSpeedMph.toString() : '',
       windDirection: windDirectionStr || 'NW',
       humidity: humidity !== null ? Math.round(humidity).toString() : '',
-      precipitation: precipitation !== null ? (precipitation * 0.0393701).toFixed(2) : '0.00', // mm/h to in/h
-      precipitationRate: precipitation !== null ? (precipitation * 0.0393701).toFixed(2) : '0.00',
+      precipitation: precipitationRateToCondition(precipitationRateValue), // Descriptive condition
+      precipitationRate: precipitationRateValue, // Numeric rate
       waveHeight: waveHeight !== null ? metersToFeet(waveHeight).toString() : '',
       wavePeriod: wavePeriod !== null ? Math.round(wavePeriod).toString() : '',
       waveDirection: waveDirection !== null ? degreesToCardinal(waveDirection) : 'N',

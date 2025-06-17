@@ -1675,7 +1675,7 @@ const GARAssessment = () => {
             </div>
             
             <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Wind</label>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Wind Speed (mph)</label>
               <div className="flex">
                 <input
                   ref={(el) => formRefs.current.wind = el}
@@ -1739,7 +1739,7 @@ const GARAssessment = () => {
             </div>
             
             <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Precipitation</label>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Precipitation Condition</label>
               <input
                 ref={(el) => formRefs.current.precipitation = el}
                 type="text"
@@ -1756,7 +1756,7 @@ const GARAssessment = () => {
             </div>
             
             <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Rate (in/hr)</label>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Precipitation Rate (in/hr)</label>
               <input
                 ref={(el) => formRefs.current.precipitationRate = el}
                 type="text"
