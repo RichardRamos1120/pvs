@@ -95,18 +95,22 @@ const Layout = ({ children, darkMode, setDarkMode, selectedStation, setSelectedS
     fetchData();
   }, [auth.currentUser, firestoreOperations]);  // Removed selectedStation dependency to prevent re-fetching loop
   
-  // Toggle dark mode
-  const toggleDarkMode = () => {
-    setDarkMode(!darkMode);
-    if (!darkMode) {
+  // Sync document classes with dark mode state
+  useEffect(() => {
+    if (darkMode) {
       document.body.classList.add('dark-mode');
-      document.documentElement.classList.add('dark'); // For Tailwind dark mode
+      document.documentElement.classList.add('dark');
     } else {
       document.body.classList.remove('dark-mode');
-      document.documentElement.classList.remove('dark'); // For Tailwind dark mode
+      document.documentElement.classList.remove('dark');
     }
-    // Save to localStorage
-    localStorage.setItem('darkMode', (!darkMode).toString());
+  }, [darkMode]);
+
+  // Toggle dark mode
+  const toggleDarkMode = () => {
+    const newDarkMode = !darkMode;
+    setDarkMode(newDarkMode);
+    localStorage.setItem('darkMode', newDarkMode.toString());
   };
   
   // Handle logout
@@ -384,8 +388,8 @@ const Layout = ({ children, darkMode, setDarkMode, selectedStation, setSelectedS
                 </a>
                 
                 {isAdmin && (
-                  <Link
-                    to="/admin"
+                  <a
+                    href="/admin"
                     onClick={() => setMenuOpen(false)}
                     className={`flex items-center px-4 py-3 rounded-lg text-base font-medium transition-all duration-200 ${
                       isActivePath('/admin')
@@ -395,7 +399,7 @@ const Layout = ({ children, darkMode, setDarkMode, selectedStation, setSelectedS
                   >
                     <Shield className="h-6 w-6 mr-4" />
                     <span>Admin Portal</span>
-                  </Link>
+                  </a>
                 )}
               </div>
               
@@ -477,8 +481,8 @@ const Layout = ({ children, darkMode, setDarkMode, selectedStation, setSelectedS
             </a>
             
             {isAdmin && (
-              <Link
-                to="/admin"
+              <a
+                href="/admin"
                 className={`px-3 py-2 rounded-md text-sm font-medium ${
                   isActivePath('/admin')
                     ? `${darkMode ? 'bg-blue-900 text-blue-200' : 'bg-blue-100 text-blue-800'}`
@@ -487,14 +491,14 @@ const Layout = ({ children, darkMode, setDarkMode, selectedStation, setSelectedS
               >
                 <Shield className="h-4 w-4 inline mr-1" />
                 Admin Portal
-              </Link>
+              </a>
             )}
           </div>
         </div>
       </nav>
       
       {/* Main content */}
-      <main className="flex-1">
+      <main className={`flex-1 ${darkMode ? 'bg-gray-900' : 'bg-gray-100'}`}>
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
           {children}
         </div>
