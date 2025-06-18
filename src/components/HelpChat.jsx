@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useLayoutEffect, useRef, useContext, useCallback } from 'react';
 import { getAuth } from 'firebase/auth';
+import { useLocation } from 'react-router-dom';
 import { FirestoreContext } from '../App';
 import { useModal } from '../contexts/ModalContext';
 import { formatDatePST } from '../utils/timezone';
@@ -20,6 +21,7 @@ import {
 
 const HelpChat = ({ darkMode }) => {
   const { hasOpenModals, registerModal, unregisterModal } = useModal();
+  const location = useLocation();
   const [isOpen, setIsOpen] = useState(false);
   const [isMinimized, setIsMinimized] = useState(false);
   const [currentView, setCurrentView] = useState('conversations'); // 'conversations', 'chat', 'new'
@@ -484,20 +486,20 @@ const HelpChat = ({ darkMode }) => {
   // Get conversation type color
   const getTypeColor = (type) => {
     switch (type) {
-      case 'bug': return 'text-red-600 bg-red-100';
-      case 'feature': return 'text-blue-600 bg-blue-100';
-      case 'help': return 'text-purple-600 bg-purple-100';
-      default: return 'text-gray-600 bg-gray-100';
+      case 'bug': return 'text-red-600 bg-red-100 dark:text-red-200 dark:bg-red-900';
+      case 'feature': return 'text-blue-600 bg-blue-100 dark:text-blue-200 dark:bg-blue-900';
+      case 'help': return 'text-purple-600 bg-purple-100 dark:text-purple-200 dark:bg-purple-900';
+      default: return 'text-gray-600 bg-gray-100 dark:text-gray-200 dark:bg-gray-700';
     }
   };
 
   // Get priority color
   const getPriorityColor = (priority) => {
     switch (priority) {
-      case 'urgent': return 'text-red-600';
-      case 'high': return 'text-orange-600';
-      case 'medium': return 'text-yellow-600';
-      default: return 'text-green-600';
+      case 'urgent': return 'text-red-600 dark:text-red-400';
+      case 'high': return 'text-orange-600 dark:text-orange-400';
+      case 'medium': return 'text-yellow-600 dark:text-yellow-400';
+      default: return 'text-green-600 dark:text-green-400';
     }
   };
 
@@ -512,8 +514,8 @@ const HelpChat = ({ darkMode }) => {
 
   return (
     <>
-      {/* Floating Action Button - Hide when any modal is open */}
-      {!isOpen && !hasOpenModals && (
+      {/* Floating Action Button - Hide when any modal is open or on GAR assessment page */}
+      {!isOpen && !hasOpenModals && location.pathname !== '/gar-assessment' && (
         <div className="fixed bottom-6 right-6 z-50">
           <button
             onClick={() => setIsOpen(true)}
