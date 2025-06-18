@@ -702,13 +702,13 @@ const Dashboard = () => {
                 {/* Quick Links */}
                 <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
                     <h3 className="text-lg font-semibold mb-4">Quick Links</h3>
-                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                         {/* Only show "New Log" button for users who can create logs when no active log exists and stations exist */}
                         {!hasActiveLog && canCreateLogs(userProfile) && 
                          !(selectedStation === 'No Stations Available' || selectedStation === 'Error Loading Stations') && (
                             <button
                                 onClick={createNewLog}
-                                className="flex flex-col items-center justify-center p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg hover:bg-blue-100 dark:hover:bg-blue-900/30 transition-colors"
+                                className="flex flex-col items-center justify-center p-6 min-h-[120px] bg-blue-50 dark:bg-blue-900/20 rounded-lg hover:bg-blue-100 dark:hover:bg-blue-900/30 transition-colors touch-manipulation"
                             >
                                 <PlusCircle className="h-8 w-8 text-blue-600 dark:text-blue-400 mb-2" />
                                 <span className="text-sm font-medium">New Log</span>
@@ -718,7 +718,7 @@ const Dashboard = () => {
                         {/* Show a disabled button when no stations exist */}
                         {!hasActiveLog && canCreateLogs(userProfile) && 
                          (selectedStation === 'No Stations Available' || selectedStation === 'Error Loading Stations') && (
-                            <div className="flex flex-col items-center justify-center p-4 bg-gray-100 dark:bg-gray-800 rounded-lg text-gray-400 dark:text-gray-500 cursor-not-allowed">
+                            <div className="flex flex-col items-center justify-center p-6 min-h-[120px] bg-gray-100 dark:bg-gray-800 rounded-lg text-gray-400 dark:text-gray-500 cursor-not-allowed">
                                 <PlusCircle className="h-8 w-8 mb-2" />
                                 <span className="text-sm font-medium">New Log</span>
                                 <span className="text-xs mt-1">No Stations</span>
@@ -729,7 +729,7 @@ const Dashboard = () => {
                         {hasActiveLog && (
                             <button
                                 onClick={() => navigate('/today')}
-                                className="flex flex-col items-center justify-center p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg hover:bg-blue-100 dark:hover:bg-blue-900/30 transition-colors"
+                                className="flex flex-col items-center justify-center p-6 min-h-[120px] bg-blue-50 dark:bg-blue-900/20 rounded-lg hover:bg-blue-100 dark:hover:bg-blue-900/30 transition-colors touch-manipulation"
                             >
                                 <FileText className="h-8 w-8 text-blue-600 dark:text-blue-400 mb-2" />
                                 <span className="text-sm font-medium">Today's Log</span>
@@ -738,7 +738,7 @@ const Dashboard = () => {
 
                         <button
                             onClick={() => navigate('/reports')}
-                            className="flex flex-col items-center justify-center p-4 bg-green-50 dark:bg-green-900/20 rounded-lg hover:bg-green-100 dark:hover:bg-green-900/30 transition-colors"
+                            className="flex flex-col items-center justify-center p-6 min-h-[120px] bg-green-50 dark:bg-green-900/20 rounded-lg hover:bg-green-100 dark:hover:bg-green-900/30 transition-colors touch-manipulation"
                         >
                             <FileText className="h-8 w-8 text-green-600 dark:text-green-400 mb-2" />
                             <span className="text-sm font-medium">All Reports</span>
@@ -746,7 +746,7 @@ const Dashboard = () => {
 
                         <button
                             onClick={() => navigate('/gar-assessment')}
-                            className="flex flex-col items-center justify-center p-4 bg-amber-50 dark:bg-amber-900/20 rounded-lg hover:bg-amber-100 dark:hover:bg-amber-900/30 transition-colors"
+                            className="flex flex-col items-center justify-center p-6 min-h-[120px] bg-amber-50 dark:bg-amber-900/20 rounded-lg hover:bg-amber-100 dark:hover:bg-amber-900/30 transition-colors touch-manipulation"
                         >
                             <AlertTriangle className="h-8 w-8 text-amber-600 dark:text-amber-400 mb-2" />
                             <span className="text-sm font-medium">GAR Assessment</span>

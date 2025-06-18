@@ -12,6 +12,7 @@ import Login from './components/Login';
 import Signup from './components/Signup';
 import GARAssessment from './components/GARAssessment';
 import AdminPortal from './components/AdminPortal';
+import { ModalProvider } from './contexts/ModalContext';
 import './App.css';
 
 // Initialize dark mode on app load
@@ -2394,7 +2395,8 @@ const App = () => {
     <Router>
       <AuthProvider>
         <FirestoreContext.Provider value={firestoreOperations}>
-          <div className="App">
+          <ModalProvider>
+            <div className="App">
             <Routes>
               <Route path="/login" element={<Login />} />
               {/* Redirect signup to login - app is invite-only with Google authentication */}
@@ -2443,7 +2445,8 @@ const App = () => {
                 <AuthRedirect />
               } />
             </Routes>
-          </div>
+            </div>
+          </ModalProvider>
         </FirestoreContext.Provider>
       </AuthProvider>
     </Router>

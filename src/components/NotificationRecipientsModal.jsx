@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useContext } from 'react';
-import { X, Search, Users, Mail, Filter, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Search, Users, Mail, Filter, ChevronLeft, ChevronRight } from 'lucide-react';
 import { FirestoreContext } from '../App';
+import FullscreenModal from './FullscreenModal';
 
 const NotificationRecipientsModal = ({ 
   isOpen, 
@@ -166,33 +167,24 @@ const NotificationRecipientsModal = ({
     return count;
   };
 
-  if (!isOpen) return null;
-
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
-      <div className="bg-white dark:bg-gray-800 rounded-lg shadow-lg w-full max-w-4xl max-h-[90vh] flex flex-col">
-        {/* Header */}
-        <div className="flex justify-between items-center p-6 border-b border-gray-200 dark:border-gray-700">
-          <div>
-            <h2 className="text-xl font-semibold text-gray-900 dark:text-white">
-              Select Notification Recipients
-            </h2>
-            <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
-              Choose who will receive email notifications about this GAR assessment
-            </p>
-          </div>
-          <button
-            onClick={onClose}
-            className="text-gray-400 hover:text-gray-500 dark:hover:text-gray-300"
-          >
-            <X className="w-6 h-6" />
-          </button>
-        </div>
+    <FullscreenModal
+      isOpen={isOpen}
+      onClose={onClose}
+      modalId="notification-recipients"
+      title="Select Notification Recipients"
+      headerClassName="pb-2"
+    >
+      <div className="p-4 sm:p-6 border-b border-gray-200 dark:border-gray-700">
+        <p className="text-sm text-gray-500 dark:text-gray-400">
+          Choose who will receive email notifications about this GAR assessment
+        </p>
+      </div>
 
-        {/* Content */}
-        <div className="flex-1 flex overflow-hidden">
+      {/* Content */}
+      <div className="flex-1 flex flex-col lg:flex-row overflow-hidden">
           {/* Left Panel - Available Recipients */}
-          <div className="w-1/2 p-6 border-r border-gray-200 dark:border-gray-700 overflow-hidden flex flex-col">
+          <div className="w-full lg:w-1/2 p-4 sm:p-6 lg:border-r border-gray-200 dark:border-gray-700 overflow-hidden flex flex-col border-b lg:border-b-0">
             <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-4">
               Available Recipients
             </h3>
@@ -204,23 +196,23 @@ const NotificationRecipientsModal = ({
               </h4>
               
               {/* Search and Filters */}
-              <div className="space-y-2 mb-4">
+              <div className="space-y-3 mb-4">
                 <div className="relative">
-                  <Search className="absolute left-3 top-3 w-4 h-4 text-gray-400" />
+                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
                   <input
                     type="text"
-                    className="block w-full pl-10 pr-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                    className="block w-full pl-10 pr-3 py-3 sm:py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white text-base sm:text-sm"
                     placeholder="Search by name or email..."
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
                   />
                 </div>
                 
-                <div className="flex space-x-2">
+                <div className="flex flex-col sm:flex-row gap-2">
                   <select
                     value={stationFilter}
                     onChange={(e) => setStationFilter(e.target.value)}
-                    className="flex-1 p-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white text-sm"
+                    className="flex-1 p-3 sm:p-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white text-base sm:text-sm"
                   >
                     <option value="all">All Stations</option>
                     {[...new Set(availableUsers.map(u => u.station))].map(station => (
@@ -233,7 +225,7 @@ const NotificationRecipientsModal = ({
                   <select
                     value={roleFilter}
                     onChange={(e) => setRoleFilter(e.target.value)}
-                    className="flex-1 p-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white text-sm"
+                    className="flex-1 p-3 sm:p-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white text-base sm:text-sm"
                   >
                     <option value="all">All Roles</option>
                     <option value="firefighter">Firefighter</option>
@@ -264,7 +256,7 @@ const NotificationRecipientsModal = ({
                         {currentUsers.map(user => (
                           <div
                             key={user.id}
-                            className={`flex items-center p-3 border rounded-md cursor-pointer transition-all ${
+                            className={`flex items-center p-4 sm:p-3 border rounded-lg cursor-pointer transition-all touch-manipulation ${
                               selectedUsers.includes(user.id)
                                 ? 'border-green-500 bg-green-50 dark:bg-green-900/30'
                                 : 'border-gray-200 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-700'
@@ -358,7 +350,7 @@ const NotificationRecipientsModal = ({
                 {availableGroups.map(group => (
                   <div
                     key={group.id}
-                    className={`flex items-center p-3 border rounded-md cursor-pointer transition-all ${
+                    className={`flex items-center p-4 sm:p-3 border rounded-lg cursor-pointer transition-all touch-manipulation ${
                       selectedGroups.includes(group.id)
                         ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/30'
                         : 'border-gray-200 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-700'
@@ -401,7 +393,7 @@ const NotificationRecipientsModal = ({
           </div>
 
           {/* Right Panel - Selected Recipients Summary */}
-          <div className="w-1/2 p-6 bg-gray-50 dark:bg-gray-900/50">
+          <div className="w-full lg:w-1/2 p-4 sm:p-6 bg-gray-50 dark:bg-gray-900/50">
             <div className="flex justify-between items-center mb-4">
               <h3 className="text-lg font-medium text-gray-900 dark:text-white">
                 Selected Recipients
@@ -450,7 +442,7 @@ const NotificationRecipientsModal = ({
                 <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                   Selected Individual Users
                 </h4>
-                <div className="max-h-48 overflow-y-auto space-y-1 scrollbar-thin scrollbar-thumb-gray-300 dark:scrollbar-thumb-gray-600 scrollbar-track-gray-100 dark:scrollbar-track-gray-800">
+                <div className="max-h-64 overflow-y-auto space-y-1 scrollbar-thin scrollbar-thumb-gray-300 dark:scrollbar-thumb-gray-600 scrollbar-track-gray-100 dark:scrollbar-track-gray-800">
                   {selectedUsers.map(userId => {
                     const user = availableUsers.find(u => u.id === userId);
                     return user ? (
@@ -487,33 +479,32 @@ const NotificationRecipientsModal = ({
           </div>
         </div>
 
-        {/* Footer */}
-        <div className="flex justify-between items-center p-6 border-t border-gray-200 dark:border-gray-700">
+      {/* Footer */}
+      <div className="flex flex-col sm:flex-row justify-between items-center gap-4 p-4 sm:p-6 border-t border-gray-200 dark:border-gray-700">
+        <button
+          onClick={handleClear}
+          disabled={selectedGroups.length === 0 && selectedUsers.length === 0}
+          className="text-sm text-gray-500 hover:text-gray-700 disabled:opacity-50 disabled:cursor-not-allowed order-2 sm:order-1"
+        >
+          Clear All
+        </button>
+        
+        <div className="flex flex-col sm:flex-row gap-3 w-full sm:w-auto order-1 sm:order-2">
           <button
-            onClick={handleClear}
-            disabled={selectedGroups.length === 0 && selectedUsers.length === 0}
-            className="text-sm text-gray-500 hover:text-gray-700 disabled:opacity-50 disabled:cursor-not-allowed"
+            onClick={onClose}
+            className="w-full sm:w-auto px-4 py-3 sm:py-2 border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-200 rounded-lg bg-white dark:bg-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600 transition-colors"
           >
-            Clear All
+            Cancel
           </button>
-          
-          <div className="flex space-x-3">
-            <button
-              onClick={onClose}
-              className="px-4 py-2 border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-200 rounded-md bg-white dark:bg-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600"
-            >
-              Cancel
-            </button>
-            <button
-              onClick={handleSave}
-              className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
-            >
-              Save Recipients ({getSelectedCount()})
-            </button>
-          </div>
+          <button
+            onClick={handleSave}
+            className="w-full sm:w-auto px-4 py-3 sm:py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium"
+          >
+            Save Recipients ({getSelectedCount()})
+          </button>
         </div>
       </div>
-    </div>
+    </FullscreenModal>
   );
 };
 

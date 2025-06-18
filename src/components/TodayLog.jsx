@@ -863,7 +863,7 @@ const TodayLog = () => {
             <div className="mb-4 md:mb-0 flex items-center">
               <button
                 onClick={() => navigate('/dashboard')}
-                className="mr-3 p-1 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700"
+                className="mr-3 p-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700 touch-manipulation"
               >
                 <ArrowLeft className="h-5 w-5" />
               </button>
@@ -885,7 +885,7 @@ const TodayLog = () => {
                 <>
                   <button
                     onClick={() => setShowNewActivityForm(true)}
-                    className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700"
+                    className="w-full sm:w-auto inline-flex items-center justify-center px-4 py-3 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 touch-manipulation min-h-[44px]"
                   >
                     <Plus className="h-4 w-4 mr-1" />
                     Add Activity
@@ -895,18 +895,19 @@ const TodayLog = () => {
                     userRole === 'admin' ? (
                       <button
                         onClick={() => setConfirmComplete(true)}
-                        className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-green-600 hover:bg-green-700"
+                        className="w-full sm:w-auto inline-flex items-center justify-center px-4 py-3 border border-transparent text-sm font-medium rounded-md text-white bg-green-600 hover:bg-green-700 touch-manipulation min-h-[44px]"
                       >
                         <Check className="h-4 w-4 mr-1" />
                         Mark Complete
                       </button>
                     ) : (
                       <div 
-                        className="inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-500 bg-gray-100 cursor-not-allowed" 
+                        className="w-full sm:w-auto inline-flex items-center justify-center px-4 py-3 border border-gray-300 text-sm font-medium rounded-md text-gray-500 bg-gray-100 cursor-not-allowed min-h-[44px]" 
                         title="Only admins can complete logs"
                       >
                         <Lock className="h-4 w-4 mr-1" />
-                        Mark Complete (Admin Only)
+                        <span className="hidden sm:inline">Mark Complete (Admin Only)</span>
+                        <span className="sm:hidden">Admin Only</span>
                       </div>
                     )
                   )}
@@ -914,7 +915,7 @@ const TodayLog = () => {
               )}
 
               {todayLog.status === 'complete' && (
-                <div className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-green-600">
+                <div className="w-full sm:w-auto inline-flex items-center justify-center px-4 py-3 border border-transparent text-sm font-medium rounded-md text-white bg-green-600 min-h-[44px]">
                   <CheckCircle className="h-4 w-4 mr-1" />
                   Completed
                 </div>
@@ -1118,8 +1119,8 @@ const TodayLog = () => {
                   <div className="relative">
                     <textarea
                       placeholder="Captain's notes..."
-                      className="w-full p-2 border border-gray-300 dark:border-gray-600 rounded-lg text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
-                      rows={3}
+                      className="w-full p-3 border border-gray-300 dark:border-gray-600 rounded-lg text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                      rows={window.innerWidth < 768 ? 4 : 3}
                       value={localNotes}
                       onChange={handleNotesChange}
                       disabled={todayLog.status === 'complete' || readOnlyMode}
@@ -1129,7 +1130,7 @@ const TodayLog = () => {
                       {unsavedChanges && !readOnlyMode && todayLog.status !== 'complete' && (
                         <button
                           onClick={saveNotes}
-                          className="px-3 py-1 bg-blue-600 hover:bg-blue-700 text-white text-sm rounded flex items-center"
+                          className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm rounded flex items-center touch-manipulation min-h-[44px]"
                         >
                           <Save className="h-4 w-4 mr-1" />
                           Save Notes

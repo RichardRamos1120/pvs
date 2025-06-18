@@ -2,6 +2,7 @@
 import React, { useState, useEffect, useContext } from 'react';
 import { FirestoreContext } from '../App';
 import { calculateEndTimePST } from '../utils/timezone';
+import FullscreenModal from './FullscreenModal';
 import {
   FileSpreadsheet,
   Truck,
@@ -408,21 +409,15 @@ const NewActivityModal = ({ show, onClose, onAddActivity, darkMode, currentStati
   if (!show) return null;
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4 overflow-y-auto">
-      <div className={`${darkMode ? 'bg-gray-800' : 'bg-white'} rounded-lg shadow-lg w-full max-w-2xl my-8 max-h-[90vh] overflow-y-auto`}>
-        <div className={`px-6 py-4 border-b ${darkMode ? 'border-gray-700' : 'border-gray-200'} flex justify-between items-center`}>
-          <h2 className={`text-xl font-bold ${darkMode ? 'text-white' : 'text-gray-900'}`}>Add New Activity</h2>
-          <button 
-            onClick={handleClose}
-            className={`${darkMode ? 'text-gray-300 hover:text-gray-100' : 'text-gray-500 hover:text-gray-700'}`}
-          >
-            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
-            </svg>
-          </button>
-        </div>
-        
-        <div className="px-6 py-4">
+    <>
+    <FullscreenModal
+      isOpen={show}
+      onClose={handleClose}
+      modalId="new-activity"
+      title="Add New Activity"
+      className="max-w-2xl"
+    >
+      <div className="px-4 sm:px-6 py-4">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
             {/* Category selection */}
             <div>
@@ -871,25 +866,17 @@ const NewActivityModal = ({ show, onClose, onAddActivity, darkMode, currentStati
             </button>
           </div>
         </div>
-      </div>
+    </FullscreenModal>
 
-      {/* Crew Selection Modal */}
-      {showCrewSelection && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 z-[60] flex items-center justify-center p-4 overflow-y-auto">
-          <div className={`${darkMode ? 'bg-gray-800' : 'bg-white'} rounded-lg shadow-lg w-full max-w-lg my-8 max-h-[90vh] overflow-y-auto`}>
-            <div className={`px-6 py-4 border-b ${darkMode ? 'border-gray-700' : 'border-gray-200'} flex justify-between items-center`}>
-              <h2 className={`text-xl font-bold ${darkMode ? 'text-white' : 'text-gray-900'}`}>Select Crew for Activity</h2>
-              <button
-                onClick={() => setShowCrewSelection(false)}
-                className={`${darkMode ? 'text-gray-300 hover:text-gray-100' : 'text-gray-500 hover:text-gray-700'}`}
-              >
-                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
-                </svg>
-              </button>
-            </div>
-
-            <div className="px-6 py-4">
+    {/* Crew Selection Modal */}
+    <FullscreenModal
+      isOpen={showCrewSelection}
+      onClose={() => setShowCrewSelection(false)}
+      modalId="crew-selection"
+      title="Select Crew for Activity"
+      className="max-w-lg"
+    >
+      <div className="px-4 sm:px-6 py-4">
               <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
                 Select the firefighters who participated in this activity.
               </p>
@@ -1024,10 +1011,8 @@ const NewActivityModal = ({ show, onClose, onAddActivity, darkMode, currentStati
                 </button>
               </div>
             </div>
-          </div>
-        </div>
-      )}
-    </div>
+    </FullscreenModal>
+    </>
   );
 };
 

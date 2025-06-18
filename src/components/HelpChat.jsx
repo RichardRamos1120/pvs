@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useLayoutEffect, useRef, useContext, useCallback } from 'react';
 import { getAuth } from 'firebase/auth';
 import { FirestoreContext } from '../App';
+import { useModal } from '../contexts/ModalContext';
 import { formatDatePST } from '../utils/timezone';
 import {
   MessageCircle,
@@ -18,6 +19,7 @@ import {
 } from 'lucide-react';
 
 const HelpChat = ({ darkMode }) => {
+  const { hasOpenModals, registerModal, unregisterModal } = useModal();
   const [isOpen, setIsOpen] = useState(false);
   const [isMinimized, setIsMinimized] = useState(false);
   const [currentView, setCurrentView] = useState('conversations'); // 'conversations', 'chat', 'new'
@@ -49,6 +51,14 @@ const HelpChat = ({ darkMode }) => {
     
     return () => window.removeEventListener('resize', checkMobile);
   }, []);
+
+  // Register/unregister help chat modal when opened/closed
+  useEffect(() => {
+    if (isOpen) {
+      registerModal('help-chat');
+      return () => unregisterModal('help-chat');
+    }
+  }, [isOpen, registerModal, unregisterModal]);
 
   // New conversation form state
   const [newConversationData, setNewConversationData] = useState({
@@ -502,8 +512,8 @@ const HelpChat = ({ darkMode }) => {
 
   return (
     <>
-      {/* Floating Action Button */}
-      {!isOpen && (
+      {/* Floating Action Button - Hide when any modal is open */}
+      {!isOpen && !hasOpenModals && (
         <div className="fixed bottom-6 right-6 z-50">
           <button
             onClick={() => setIsOpen(true)}

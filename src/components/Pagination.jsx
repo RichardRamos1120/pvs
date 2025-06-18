@@ -54,30 +54,50 @@ const Pagination = ({
     <div className={`flex items-center justify-between px-4 py-6 sm:px-6 mt-6 ${
       darkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'
     } border-t rounded-b-lg`}>
-      <div className="flex-1 flex justify-between sm:hidden">
-        {/* Mobile pagination */}
-        <button
-          onClick={() => onPageChange(currentPage - 1)}
-          disabled={currentPage === 1}
-          className={`relative inline-flex items-center px-4 py-2 border text-sm font-medium rounded-md ${
-            darkMode
-              ? 'border-gray-600 text-gray-300 bg-gray-700 hover:bg-gray-600 disabled:opacity-50'
-              : 'border-gray-300 text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50'
-          } disabled:cursor-not-allowed`}
-        >
-          Previous
-        </button>
-        <button
-          onClick={() => onPageChange(currentPage + 1)}
-          disabled={currentPage === totalPages}
-          className={`relative ml-3 inline-flex items-center px-4 py-2 border text-sm font-medium rounded-md ${
-            darkMode
-              ? 'border-gray-600 text-gray-300 bg-gray-700 hover:bg-gray-600 disabled:opacity-50'
-              : 'border-gray-300 text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50'
-          } disabled:cursor-not-allowed`}
-        >
-          Next
-        </button>
+      <div className="flex-1 flex flex-col sm:hidden gap-4">
+        {/* Mobile pagination info */}
+        {showItemCount && (
+          <div className="text-center">
+            <p className={`text-sm font-medium ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>
+              Showing {startItem}-{endItem} of {totalItems} results
+            </p>
+          </div>
+        )}
+        
+        {/* Mobile pagination controls */}
+        <div className="flex items-center justify-between">
+          <button
+            onClick={() => onPageChange(currentPage - 1)}
+            disabled={currentPage === 1}
+            className={`relative inline-flex items-center px-6 py-3 border text-base font-medium rounded-lg ${
+              darkMode
+                ? 'border-gray-600 text-gray-300 bg-gray-700 hover:bg-gray-600 disabled:opacity-50'
+                : 'border-gray-300 text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50'
+            } disabled:cursor-not-allowed transition-colors`}
+          >
+            <ChevronLeft className="w-5 h-5 mr-2" />
+            Previous
+          </button>
+          
+          <div className={`flex items-center px-4 py-2 text-sm font-medium ${
+            darkMode ? 'text-gray-300' : 'text-gray-700'
+          }`}>
+            <span className="mx-2">Page {currentPage} of {totalPages}</span>
+          </div>
+          
+          <button
+            onClick={() => onPageChange(currentPage + 1)}
+            disabled={currentPage === totalPages}
+            className={`relative inline-flex items-center px-6 py-3 border text-base font-medium rounded-lg ${
+              darkMode
+                ? 'border-gray-600 text-gray-300 bg-gray-700 hover:bg-gray-600 disabled:opacity-50'
+                : 'border-gray-300 text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50'
+            } disabled:cursor-not-allowed transition-colors`}
+          >
+            Next
+            <ChevronRight className="w-5 h-5 ml-2" />
+          </button>
+        </div>
       </div>
 
       <div className="hidden sm:flex-1 sm:flex sm:items-center sm:justify-between">
@@ -101,7 +121,7 @@ const Pagination = ({
             <button
               onClick={() => onPageChange(currentPage - 1)}
               disabled={currentPage === 1}
-              className={`relative inline-flex items-center px-3 py-2 rounded-md border text-sm font-medium ${
+              className={`relative inline-flex items-center px-3 py-2 rounded-lg border text-sm font-medium transition-colors ${
                 darkMode
                   ? 'border-gray-600 text-gray-400 bg-gray-700 hover:bg-gray-600 disabled:opacity-50'
                   : 'border-gray-300 text-gray-500 bg-white hover:bg-gray-50 disabled:opacity-50'
@@ -117,7 +137,7 @@ const Pagination = ({
                 key={index}
                 onClick={() => typeof page === 'number' && onPageChange(page)}
                 disabled={page === '...'}
-                className={`relative inline-flex items-center px-4 py-2 border text-sm font-medium rounded-md ${
+                className={`relative inline-flex items-center px-4 py-2 border text-sm font-medium rounded-lg transition-colors ${
                   page === currentPage
                     ? darkMode
                       ? 'z-10 bg-blue-600 border-blue-600 text-white'
@@ -139,7 +159,7 @@ const Pagination = ({
             <button
               onClick={() => onPageChange(currentPage + 1)}
               disabled={currentPage === totalPages}
-              className={`relative inline-flex items-center px-3 py-2 rounded-md border text-sm font-medium ${
+              className={`relative inline-flex items-center px-3 py-2 rounded-lg border text-sm font-medium transition-colors ${
                 darkMode
                   ? 'border-gray-600 text-gray-400 bg-gray-700 hover:bg-gray-600 disabled:opacity-50'
                   : 'border-gray-300 text-gray-500 bg-white hover:bg-gray-50 disabled:opacity-50'

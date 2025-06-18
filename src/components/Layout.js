@@ -160,22 +160,37 @@ const Layout = ({ children, darkMode, setDarkMode, selectedStation, setSelectedS
                   </div>
                 ) : (
                   <select
-                    className={`${darkMode ? 'bg-gray-700' : 'bg-blue-700'} text-white rounded-md px-3 py-1 text-sm border-none focus:ring-2 focus:ring-blue-400 min-w-[120px]`}
+                    className={`${darkMode ? 'bg-gray-700 text-white' : 'bg-blue-700 text-white'} rounded-md px-3 py-1 text-sm border-none focus:ring-2 focus:ring-blue-400 min-w-[120px]`}
+                    style={{
+                      color: 'white',
+                      backgroundColor: darkMode ? '#374151' : '#1d4ed8'
+                    }}
                     value={selectedStation}
                     onChange={(e) => {
-                      setSelectedStation(e.target.value);
                       localStorage.setItem('selectedStation', e.target.value);
+                      window.location.reload();
                     }}
                     disabled={loading}
                   >
                     {loading ? (
-                      <option>Loading...</option>
+                      <option style={{ color: darkMode ? 'white' : 'black', backgroundColor: darkMode ? '#374151' : 'white' }}>Loading...</option>
                     ) : stations.length > 0 ? (
                       stations.map(station => (
-                        <option key={station} value={station}>{station}</option>
+                        <option 
+                          key={station} 
+                          value={station}
+                          style={{ color: darkMode ? 'white' : 'black', backgroundColor: darkMode ? '#374151' : 'white' }}
+                        >
+                          {station}
+                        </option>
                       ))
                     ) : (
-                      <option value={selectedStation}>{selectedStation}</option>
+                      <option 
+                        value={selectedStation}
+                        style={{ color: darkMode ? 'white' : 'black', backgroundColor: darkMode ? '#374151' : 'white' }}
+                      >
+                        {selectedStation}
+                      </option>
                     )}
                   </select>
                 )
@@ -232,20 +247,25 @@ const Layout = ({ children, darkMode, setDarkMode, selectedStation, setSelectedS
         {/* Mobile dropdown menu */}
         {menuOpen && (
           <div className="md:hidden">
-            <div className={`px-2 pt-2 pb-3 space-y-1 shadow-inner ${darkMode ? 'bg-gray-800' : 'bg-blue-800'}`}>
-              <div className="flex items-center mb-2 text-sm">
-                <Calendar className="w-4 h-4 mr-1" />
-                {formatDatePST(new Date(), {
-                  weekday: 'short',
-                  month: 'short', 
-                  day: 'numeric',
-                  year: 'numeric'
-                })}
-              </div>
-              
-              <div className="flex items-center mb-3">
-                <User className="w-4 h-4 mr-1" />
-                <span>{auth.currentUser?.displayName || 'Captain'}</span>
+            <div className={`px-4 pt-4 pb-6 space-y-4 shadow-lg ${darkMode ? 'bg-gray-900' : 'bg-blue-900'}`}>
+              {/* User Info Section */}
+              <div className="border-b border-opacity-20 pb-4 space-y-3" style={{ borderColor: darkMode ? '#6B7280' : '#93C5FD' }}>
+                <div className="flex items-center text-sm text-white">
+                  <Calendar className="w-5 h-5 mr-3 opacity-80" />
+                  <span className="font-medium">
+                    {formatDatePST(new Date(), {
+                      weekday: 'short',
+                      month: 'short', 
+                      day: 'numeric',
+                      year: 'numeric'
+                    })}
+                  </span>
+                </div>
+                
+                <div className="flex items-center text-white">
+                  <User className="w-5 h-5 mr-3 opacity-80" />
+                  <span className="font-semibold text-base">{auth.currentUser?.displayName || 'Captain'}</span>
+                </div>
               </div>
               
               {/* Mobile station selector - hidden on GAR Assessment pages, disabled on Reports/Admin pages */}
@@ -256,9 +276,9 @@ const Layout = ({ children, darkMode, setDarkMode, selectedStation, setSelectedS
                 location.pathname === '/admin' ||
                 location.pathname.startsWith('/admin/') || 
                 stations.length === 0 ? (
-                  <div className={`w-full ${darkMode ? 'bg-gray-700' : 'bg-blue-700'} text-white rounded-md px-3 py-2 text-sm mb-2 ${stations.length === 0 ? 'bg-opacity-60 dark:bg-opacity-60' : 'opacity-50'} flex items-center`}>
-                    <span>Station: </span>
-                    <span className="ml-2 font-medium">
+                  <div className={`w-full ${darkMode ? 'bg-gray-800' : 'bg-blue-800'} text-white rounded-lg px-4 py-3 text-sm ${stations.length === 0 ? 'bg-opacity-60 dark:bg-opacity-60' : 'opacity-75'} flex items-center mb-4`}>
+                    <span className="text-white text-opacity-80">Station: </span>
+                    <span className="ml-2 font-semibold">
                       {location.pathname === '/admin' || location.pathname.startsWith('/admin/') ? 
                         'All Stations' : 
                         stations.length === 0 ?
@@ -269,36 +289,128 @@ const Layout = ({ children, darkMode, setDarkMode, selectedStation, setSelectedS
                   </div>
                 ) : (
                   <select
-                    className={`w-full ${darkMode ? 'bg-gray-700' : 'bg-blue-700'} text-white rounded-md px-3 py-2 text-sm border-none focus:ring-2 focus:ring-blue-400 mb-2`}
+                    className={`w-full ${darkMode ? 'bg-gray-800 text-white' : 'bg-blue-800 text-white'} rounded-lg px-4 py-3 text-base border-none focus:ring-2 focus:ring-blue-400 mb-4 font-medium`}
+                    style={{
+                      color: 'white',
+                      backgroundColor: darkMode ? '#1F2937' : '#1e40af'
+                    }}
                     value={selectedStation}
                     onChange={(e) => {
-                      setSelectedStation(e.target.value);
                       localStorage.setItem('selectedStation', e.target.value);
-                      setMenuOpen(false);
+                      window.location.reload();
                     }}
                     disabled={loading}
                   >
                     {loading ? (
-                      <option>Loading...</option>
+                      <option style={{ color: darkMode ? 'white' : 'black', backgroundColor: darkMode ? '#374151' : 'white' }}>Loading...</option>
                     ) : stations.length > 0 ? (
                       stations.map(station => (
-                        <option key={station} value={station}>{station}</option>
+                        <option 
+                          key={station} 
+                          value={station}
+                          style={{ color: darkMode ? 'white' : 'black', backgroundColor: darkMode ? '#374151' : 'white' }}
+                        >
+                          {station}
+                        </option>
                       ))
                     ) : (
-                      <option value={selectedStation}>{selectedStation}</option>
+                      <option 
+                        value={selectedStation}
+                        style={{ color: darkMode ? 'white' : 'black', backgroundColor: darkMode ? '#374151' : 'white' }}
+                      >
+                        {selectedStation}
+                      </option>
                     )}
                   </select>
                 )
               )}
               
-              <div className="flex flex-col space-y-2">
+              {/* Navigation Links Section */}
+              <div className="space-y-1">
+                <div className="text-xs font-semibold text-white text-opacity-60 uppercase tracking-wider mb-3 px-1">
+                  Navigation
+                </div>
+                
+                <Link
+                  to="/dashboard"
+                  onClick={() => setMenuOpen(false)}
+                  className={`flex items-center px-4 py-3 rounded-lg text-base font-medium transition-all duration-200 ${
+                    isActivePath('/dashboard') 
+                      ? `${darkMode ? 'bg-blue-800' : 'bg-blue-700'} text-white hover:text-white shadow-lg`
+                      : `text-white hover:text-white ${darkMode ? 'hover:bg-gray-800' : 'hover:bg-blue-700'}`
+                  }`}
+                >
+                  <Home className="h-6 w-6 mr-4" />
+                  <span>Dashboard</span>
+                </Link>
+                
+                <Link
+                  to="/today"
+                  onClick={() => setMenuOpen(false)}
+                  className={`flex items-center px-4 py-3 rounded-lg text-base font-medium transition-all duration-200 ${
+                    isActivePath('/today') 
+                      ? `${darkMode ? 'bg-blue-800' : 'bg-blue-700'} text-white hover:text-white shadow-lg`
+                      : `text-white hover:text-white ${darkMode ? 'hover:bg-gray-800' : 'hover:bg-blue-700'}`
+                  }`}
+                >
+                  <Clipboard className="h-6 w-6 mr-4" />
+                  <span>Today's Log</span>
+                </Link>
+                
+                <Link
+                  to="/reports"
+                  onClick={() => setMenuOpen(false)}
+                  className={`flex items-center px-4 py-3 rounded-lg text-base font-medium transition-all duration-200 ${
+                    isActivePath('/reports')
+                      ? `${darkMode ? 'bg-blue-800' : 'bg-blue-700'} text-white hover:text-white shadow-lg`
+                      : `text-white hover:text-white ${darkMode ? 'hover:bg-gray-800' : 'hover:bg-blue-700'}`
+                  }`}
+                >
+                  <Calendar className="h-6 w-6 mr-4" />
+                  <span>Past Logs</span>
+                </Link>
+                
+                <a
+                  href="/gar-assessment"
+                  onClick={() => setMenuOpen(false)}
+                  className={`flex items-center px-4 py-3 rounded-lg text-base font-medium transition-all duration-200 ${
+                    isActivePath('/gar-assessment')
+                      ? `${darkMode ? 'bg-blue-800' : 'bg-blue-700'} text-white hover:text-white shadow-lg`
+                      : `text-white hover:text-white ${darkMode ? 'hover:bg-gray-800' : 'hover:bg-blue-700'}`
+                  }`}
+                >
+                  <AlertTriangle className="h-6 w-6 mr-4" />
+                  <span>GAR Assessment</span>
+                </a>
+                
+                {isAdmin && (
+                  <Link
+                    to="/admin"
+                    onClick={() => setMenuOpen(false)}
+                    className={`flex items-center px-4 py-3 rounded-lg text-base font-medium transition-all duration-200 ${
+                      isActivePath('/admin')
+                        ? `${darkMode ? 'bg-blue-800' : 'bg-blue-700'} text-white hover:text-white shadow-lg`
+                        : `text-white hover:text-white ${darkMode ? 'hover:bg-gray-800' : 'hover:bg-blue-700'}`
+                    }`}
+                  >
+                    <Shield className="h-6 w-6 mr-4" />
+                    <span>Admin Portal</span>
+                  </Link>
+                )}
+              </div>
+              
+              {/* Settings Section */}
+              <div className="border-t border-opacity-20 pt-4 space-y-1" style={{ borderColor: darkMode ? '#6B7280' : '#93C5FD' }}>
+                <div className="text-xs font-semibold text-white text-opacity-60 uppercase tracking-wider mb-3 px-1">
+                  Settings
+                </div>
                 
                 <button
                   onClick={toggleDarkMode}
-                  className={`flex items-center px-3 py-2 rounded-md text-sm font-medium ${darkMode ? 'hover:bg-gray-700' : 'hover:bg-blue-700'}`}
+                  className={`w-full flex items-center px-4 py-3 rounded-lg text-base font-medium transition-all duration-200 text-white ${darkMode ? 'hover:bg-gray-800' : 'hover:bg-blue-700'}`}
                 >
-                  {darkMode ? <Sun className="h-5 w-5 mr-2" /> : <Moon className="h-5 w-5 mr-2" />}
-                  {darkMode ? 'Light Mode' : 'Dark Mode'}
+                  {darkMode ? <Sun className="h-6 w-6 mr-4" /> : <Moon className="h-6 w-6 mr-4" />}
+                  <span>{darkMode ? 'Light Mode' : 'Dark Mode'}</span>
                 </button>
                 
                 <button
@@ -306,10 +418,10 @@ const Layout = ({ children, darkMode, setDarkMode, selectedStation, setSelectedS
                     handleLogout();
                     setMenuOpen(false);
                   }}
-                  className={`flex items-center px-3 py-2 rounded-md text-sm font-medium ${darkMode ? 'hover:bg-gray-700' : 'hover:bg-blue-700'}`}
+                  className={`w-full flex items-center px-4 py-3 rounded-lg text-base font-medium transition-all duration-200 text-white ${darkMode ? 'hover:bg-gray-800' : 'hover:bg-blue-700'}`}
                 >
-                  <LogOut className="h-5 w-5 mr-2" />
-                  Logout
+                  <LogOut className="h-6 w-6 mr-4" />
+                  <span>Logout</span>
                 </button>
               </div>
             </div>
@@ -317,8 +429,8 @@ const Layout = ({ children, darkMode, setDarkMode, selectedStation, setSelectedS
         )}
       </header>
       
-      {/* Navigation */}
-      <nav className={`${darkMode ? 'bg-gray-800' : 'bg-white'} shadow`}>
+      {/* Navigation - Hidden on mobile */}
+      <nav className={`hidden md:block ${darkMode ? 'bg-gray-800' : 'bg-white'} shadow`}>
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex space-x-4 items-center h-14">
             <Link
