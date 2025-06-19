@@ -6,7 +6,7 @@ import { FirestoreContext } from '../App';
 import Layout from './Layout';
 import Pagination from './Pagination';
 import { downloadCSV, formatLogDataForExport } from '../utils/csvExport';
-import { formatDatePST, getCurrentPSTDate } from '../utils/timezone';
+import { formatDatePST, getCurrentPSTDate, formatDateTimePST } from '../utils/timezone';
 import {
   Calendar,
   Search,
@@ -54,6 +54,27 @@ const Reports = () => {
       return userProfile?.role === 'admin' || 
              ['Captain', 'Deputy Chief', 'Battalion Chief', 'Chief'].includes(userProfile?.rank);
   };
+
+  // Helper function to check if user can edit a specific log
+  const canEditLog = (log, userProfile) => {
+    // Admins and high-rank users can always edit any log
+    if (userProfile?.role === 'admin' || 
+        ['Captain', 'Deputy Chief', 'Battalion Chief', 'Chief'].includes(userProfile?.rank)) {
+      return true;
+    }
+    
+    // Draft logs can ALWAYS be edited by anyone
+    if (log.status === 'draft') {
+      return true;
+    }
+    
+    // For completed logs, check 72-hour window
+    const logDate = new Date(log.rawDate);
+    const now = new Date();
+    const hoursSinceLog = (now - logDate) / (1000 * 60 * 60);
+    
+    return hoursSinceLog <= 72;
+  };
   const [activeTab, setActiveTab] = useState('all'); // 'all', 'draft', 'complete'
   // Initialize stationFilter - default to 'all' for admin users or to selectedStation for others
   const [stationFilter, setStationFilter] = useState('all'); // Start with 'all', we'll update after checking user role
@@ -64,6 +85,8 @@ const Reports = () => {
   const [userProfile, setUserProfile] = useState(null);
   const [logToDelete, setLogToDelete] = useState(null);
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
+  const [logToEdit, setLogToEdit] = useState(null);
+  const [editConfirmOpen, setEditConfirmOpen] = useState(false);
   const [stationsList, setStationsList] = useState(['Station 1']);
   
   // Pagination state
@@ -329,6 +352,64 @@ const Reports = () => {
       setError('Failed to delete log. Please try again.');
     }
   };
+
+  // Confirm edit for completed logs
+  const confirmEditLog = (log) => {
+    if (log.status === 'complete') {
+      setLogToEdit(log);
+      setEditConfirmOpen(true);
+    } else {
+      // For draft logs, edit directly without confirmation
+      handleEditLog(log);
+    }
+  };
+
+  // Handle editing a log
+  const handleEditLog = async (log) => {
+    try {
+      // If it's a completed log, change status to draft and add edit tracking
+      if (log.status === 'complete') {
+        const updatedLog = {
+          ...log,
+          status: 'draft',
+          editedBy: {
+            userId: auth.currentUser?.uid,
+            userEmail: auth.currentUser?.email,
+            userDisplayName: userProfile?.firstName && userProfile?.lastName 
+              ? `${userProfile.firstName} ${userProfile.lastName}`
+              : userProfile?.displayName || auth.currentUser?.displayName || auth.currentUser?.email || 'Unknown User',
+            editedAt: new Date().toISOString(),
+            originalStatus: 'complete'
+          }
+        };
+
+        // Update in Firestore
+        await firestoreOperations.updateLog(log.id, updatedLog);
+
+        // Update local state
+        setPastLogs(pastLogs.map(l => l.id === log.id ? updatedLog : l));
+      }
+
+      // Set station and navigate to edit
+      if (log.station) {
+        localStorage.setItem('selectedStation', log.station);
+      }
+      
+      navigate('/today', {
+        state: {
+          logId: log.id,
+          fromStation: log.station
+        }
+      });
+
+      // Close confirmation modal if it was open
+      setEditConfirmOpen(false);
+      setLogToEdit(null);
+    } catch (error) {
+      console.error('Error preparing log for edit:', error);
+      setError('Failed to prepare log for editing. Please try again.');
+    }
+  };
   
   // Filter logs based on station, status, and search term
   const getFilteredLogs = () => {
@@ -464,6 +545,46 @@ const Reports = () => {
                   className="px-4 py-2 bg-red-600 text-white rounded-md text-sm font-medium hover:bg-red-700"
                 >
                   Delete Draft Log
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Edit Confirmation Modal */}
+        {editConfirmOpen && logToEdit && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
+            <div className="bg-white dark:bg-gray-800 rounded-lg shadow-lg p-6 max-w-md w-full">
+              <div className="flex items-center mb-4 text-amber-600 dark:text-amber-400">
+                <AlertTriangle className="h-6 w-6 mr-2" />
+                <h3 className="text-lg font-medium">Edit Completed Log</h3>
+              </div>
+
+              <p className="mb-6 text-gray-600 dark:text-gray-300">
+                Are you sure you want to edit the completed log from <span className="font-semibold">{logToEdit.date}</span>?
+                <br /><br />
+                <span className="text-amber-600 dark:text-amber-400 font-medium">
+                  This will change the log status from "Complete" to "Draft" and you'll need to complete it again after making changes.
+                </span>
+                <br /><br />
+                The edit will be tracked for audit purposes.
+              </p>
+
+              <div className="flex justify-end space-x-3">
+                <button
+                  onClick={() => {
+                    setEditConfirmOpen(false);
+                    setLogToEdit(null);
+                  }}
+                  className="px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-700 dark:text-white text-sm font-medium hover:bg-gray-50 dark:hover:bg-gray-600"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={() => handleEditLog(logToEdit)}
+                  className="px-4 py-2 bg-amber-600 text-white rounded-md text-sm font-medium hover:bg-amber-700"
+                >
+                  Edit Log
                 </button>
               </div>
             </div>
@@ -685,13 +806,13 @@ const Reports = () => {
             {Object.entries(getReportsByStation()).length > 0 ? (
               Object.entries(getReportsByStation()).map(([stationName, logs]) => (
                 <div key={stationName} className="border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden">
-                  <div className="bg-gray-50 dark:bg-gray-750 p-4 flex items-center justify-between">
+                  <div className="bg-blue-50 dark:bg-blue-900/30 border-b-2 border-blue-200 dark:border-blue-700 p-4 flex items-center justify-between">
                     <div className="flex items-center">
-                      <Building className="w-5 h-5 mr-2 text-blue-600 dark:text-blue-400" />
-                      <h3 className="font-medium">{stationName}</h3>
+                      <Building className="w-6 h-6 mr-3 text-blue-600 dark:text-blue-400" />
+                      <h3 className="text-lg font-semibold text-blue-800 dark:text-blue-200">{stationName}</h3>
                     </div>
-                    <div className="flex items-center">
-                      <span className="text-sm text-gray-500 dark:text-gray-400 mr-2">
+                    <div className="flex items-center bg-blue-100 dark:bg-blue-800 px-3 py-1 rounded-full">
+                      <span className="text-sm font-medium text-blue-700 dark:text-blue-300">
                         {logs.length} {logs.length === 1 ? 'Report' : 'Reports'}
                       </span>
                     </div>
@@ -724,6 +845,26 @@ const Reports = () => {
                           <tr key={log.id} className="hover:bg-gray-50 dark:hover:bg-gray-700">
                             <td className="px-6 py-4 whitespace-nowrap">
                               <div className="text-sm font-medium text-gray-900 dark:text-white">{log.date}</div>
+                              {log.editedBy && (
+                                <div className="text-xs text-amber-600 dark:text-amber-400 mt-1">
+                                  Edited by {log.editedBy.userDisplayName} on {formatDateTimePST(log.editedBy.editedAt, { 
+                                    month: 'short', 
+                                    day: 'numeric', 
+                                    hour: '2-digit', 
+                                    minute: '2-digit' 
+                                  })}
+                                </div>
+                              )}
+                              {log.status === 'complete' && log.completedBy && (
+                                <div className="text-xs text-green-600 dark:text-green-400 mt-1">
+                                  Completed by {log.completedBy} on {formatDateTimePST(log.completedAt, { 
+                                    month: 'short', 
+                                    day: 'numeric', 
+                                    hour: '2-digit', 
+                                    minute: '2-digit' 
+                                  })}
+                                </div>
+                              )}
                             </td>
                             <td className="px-6 py-4 whitespace-nowrap">
                               <div className="text-sm text-gray-600 dark:text-gray-400">
@@ -754,47 +895,30 @@ const Reports = () => {
                                   </span>
                                 )}
                                 <div className="flex items-center space-x-3 ml-4">
-                                  {log.status === 'draft' ? (
-                                    <>
-                                      {canManageLogs(userProfile) && (
-                                        <button
-                                          onClick={() => {
-                                            // First update localStorage directly to ensure station is set before navigation
-                                            if (log.station) {
-                                              localStorage.setItem('selectedStation', log.station);
-                                            }
-                                            // Navigate to today's log with the log ID and station info
-                                            navigate('/today', {
-                                              state: {
-                                                logId: log.id,
-                                                fromStation: log.station
-                                              }
-                                            });
-                                          }}
-                                          className="text-green-600 hover:text-green-900 dark:text-green-400 dark:hover:text-green-200 inline-flex items-center"
-                                        >
-                                          <Edit3 className="w-4 h-4 mr-1" />
-                                          Edit
-                                        </button>
-                                      )}
-                                      {canManageLogs(userProfile) && (
-                                        <button
-                                          onClick={() => confirmDeleteLog(log)}
-                                          className="text-red-600 hover:text-red-900 dark:text-red-400 dark:hover:text-red-200 inline-flex items-center"
-                                        >
-                                          <Trash2 className="w-4 h-4 mr-1" />
-                                          Delete
-                                        </button>
-                                      )}
-                                      <button
-                                        className="text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300 inline-flex items-center"
-                                        onClick={() => navigate(`/report/${log.id}`)}
-                                      >
-                                        <Eye className="w-4 h-4 mr-1" />
-                                        View
-                                      </button>
-                                    </>
-                                  ) : (
+                                  {/* Edit button - show if user can edit this log */}
+                                  {canEditLog(log, userProfile) && (
+                                    <button
+                                      onClick={() => confirmEditLog(log)}
+                                      className="text-green-600 hover:text-green-900 dark:text-green-400 dark:hover:text-green-200 inline-flex items-center"
+                                    >
+                                      <Edit3 className="w-4 h-4 mr-1" />
+                                      Edit
+                                    </button>
+                                  )}
+                                  
+                                  {/* Delete button - only for admins/captains */}
+                                  {canManageLogs(userProfile) && (
+                                    <button
+                                      onClick={() => confirmDeleteLog(log)}
+                                      className="text-red-600 hover:text-red-900 dark:text-red-400 dark:hover:text-red-200 inline-flex items-center"
+                                    >
+                                      <Trash2 className="w-4 h-4 mr-1" />
+                                      Delete
+                                    </button>
+                                  )}
+                                  
+                                  {/* View button - only show for completed logs */}
+                                  {log.status === 'complete' && (
                                     <button
                                       className="text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300 inline-flex items-center"
                                       onClick={() => navigate(`/report/${log.id}`)}
@@ -825,6 +949,26 @@ const Reports = () => {
                             <div className="text-sm text-gray-500 dark:text-gray-400">
                               {log.createdByName || log.captain || 'Unknown'} • {log.shift === "B" ? "Day Shift" : log.shift}
                             </div>
+                            {log.editedBy && (
+                              <div className="text-xs text-amber-600 dark:text-amber-400 mt-1">
+                                Edited by {log.editedBy.userDisplayName} on {formatDateTimePST(log.editedBy.editedAt, { 
+                                  month: 'short', 
+                                  day: 'numeric', 
+                                  hour: '2-digit', 
+                                  minute: '2-digit' 
+                                })}
+                              </div>
+                            )}
+                            {log.status === 'complete' && log.completedBy && (
+                              <div className="text-xs text-green-600 dark:text-green-400 mt-1">
+                                Completed by {log.completedBy} on {formatDateTimePST(log.completedAt, { 
+                                  month: 'short', 
+                                  day: 'numeric', 
+                                  hour: '2-digit', 
+                                  minute: '2-digit' 
+                                })}
+                              </div>
+                            )}
                           </div>
                         </div>
                         
@@ -851,47 +995,30 @@ const Reports = () => {
                         </div>
                         
                         <div className="mt-2 flex justify-end space-x-3">
-                          {log.status === 'draft' ? (
-                            <>
-                              {canManageLogs(userProfile) && (
-                                <button
-                                  onClick={() => {
-                                    // First update localStorage directly to ensure station is set before navigation
-                                    if (log.station) {
-                                      localStorage.setItem('selectedStation', log.station);
-                                    }
-                                    // Navigate to today's log with the log ID and station info
-                                    navigate('/today', {
-                                      state: {
-                                        logId: log.id,
-                                        fromStation: log.station
-                                      }
-                                    });
-                                  }}
-                                  className="text-green-600 hover:text-green-900 dark:text-green-400 dark:hover:text-green-200 text-sm flex items-center"
-                                >
-                                  <Edit3 className="w-4 h-4 mr-1" />
-                                  Edit
-                                </button>
-                              )}
-                              {canManageLogs(userProfile) && (
-                                <button
-                                  onClick={() => confirmDeleteLog(log)}
-                                  className="text-red-600 hover:text-red-900 dark:text-red-400 dark:hover:text-red-200 text-sm flex items-center"
-                                >
-                                  <Trash2 className="w-4 h-4 mr-1" />
-                                  Delete
-                                </button>
-                              )}
-                              <button
-                                className="text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300 text-sm flex items-center"
-                                onClick={() => navigate(`/report/${log.id}`)}
-                              >
-                                <Eye className="w-4 h-4 mr-1" />
-                                View
-                              </button>
-                            </>
-                          ) : (
+                          {/* Edit button - show if user can edit this log */}
+                          {canEditLog(log, userProfile) && (
+                            <button
+                              onClick={() => confirmEditLog(log)}
+                              className="text-green-600 hover:text-green-900 dark:text-green-400 dark:hover:text-green-200 text-sm flex items-center"
+                            >
+                              <Edit3 className="w-4 h-4 mr-1" />
+                              Edit
+                            </button>
+                          )}
+                          
+                          {/* Delete button - only for admins/captains */}
+                          {canManageLogs(userProfile) && (
+                            <button
+                              onClick={() => confirmDeleteLog(log)}
+                              className="text-red-600 hover:text-red-900 dark:text-red-400 dark:hover:text-red-200 text-sm flex items-center"
+                            >
+                              <Trash2 className="w-4 h-4 mr-1" />
+                              Delete
+                            </button>
+                          )}
+                          
+                          {/* View button - only show for completed logs */}
+                          {log.status === 'complete' && (
                             <button
                               className="text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300 text-sm flex items-center"
                               onClick={() => navigate(`/report/${log.id}`)}

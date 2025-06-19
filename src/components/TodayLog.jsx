@@ -37,6 +37,26 @@ const TodayLog = () => {
   const auth = getAuth();
   const db = getFirestore();
 
+  // Helper function to check if user can edit a specific log
+  const canEditLog = (log, userRole) => {
+    // Admins and high-rank users can always edit any log
+    if (userRole === 'admin') {
+      return true;
+    }
+    
+    // Draft logs can ALWAYS be edited by anyone with basic permissions
+    if (log.status === 'draft') {
+      return true;
+    }
+    
+    // For completed logs, check 72-hour window
+    const logDate = new Date(log.rawDate);
+    const now = new Date();
+    const hoursSinceLog = (now - logDate) / (1000 * 60 * 60);
+    
+    return hoursSinceLog <= 72;
+  };
+
   // Initialize darkMode from localStorage with default to true (dark mode)
   const [darkMode, setDarkMode] = useState(() => {
     const savedMode = localStorage.getItem('darkMode');
@@ -216,9 +236,9 @@ const TodayLog = () => {
           if (userData.role) {
             setUserRole(userData.role);
 
-            // Determine permissions based on role
+            // Initial permissions - will be updated when log is loaded
             if (userData.role === 'admin' || userData.role === 'firefighter') {
-              setReadOnlyMode(false);
+              setReadOnlyMode(false); // Will be rechecked with 72-hour rule when log loads
             } else {
               setReadOnlyMode(true);
             }
@@ -260,6 +280,15 @@ const TodayLog = () => {
       setSelectedCrew(todayLog.crewIds || []);
     }
   }, [todayLog]);
+
+  // Update readOnlyMode based on log and user permissions
+  useEffect(() => {
+    if (todayLog && userRole) {
+      // Check if this user can edit this specific log
+      const canEdit = canEditLog(todayLog, userRole);
+      setReadOnlyMode(!canEdit);
+    }
+  }, [todayLog, userRole]);
 
   // Load firefighters when crew modal is opened
   useEffect(() => {
@@ -929,7 +958,7 @@ const TodayLog = () => {
           <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
             <div className="bg-white dark:bg-gray-800 rounded-lg shadow-lg p-6 w-full max-w-md">
               <h3 className="text-lg font-semibold mb-4">Confirm Complete</h3>
-              <p className="mb-4">Are you sure you want to mark this log as complete? Once completed, it cannot be edited further.</p>
+              <p className="mb-4">Are you sure you want to mark this log as complete? Make sure all activities and information are accurate before completing.</p>
               <div className="flex justify-end space-x-3">
                 <button
                   onClick={() => setConfirmComplete(false)}

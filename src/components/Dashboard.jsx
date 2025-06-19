@@ -22,7 +22,7 @@ import {
     AlertCircle
 } from 'lucide-react';
 import Layout from './Layout';
-import { getTodayFormattedPST, getCurrentDateWithWeekdayPST, getCurrentPSTDate } from '../utils/timezone';
+import { getTodayFormattedPST, getCurrentDateWithWeekdayPST, getCurrentPSTDate, formatDateTimePST } from '../utils/timezone';
 
 const Dashboard = () => {
     // Initialize darkMode from localStorage with default to true (dark mode)
@@ -59,11 +59,34 @@ const Dashboard = () => {
         return userProfile?.role === 'admin' || userProfile?.role === 'firefighter' ||
                ['Captain', 'Deputy Chief', 'Battalion Chief', 'Chief'].includes(userProfile?.rank);
     };
+
+    // Helper function to check if user can edit a specific log
+    const canEditLog = (log, userProfile) => {
+        // Admins and high-rank users can always edit any log
+        if (userProfile?.role === 'admin' || 
+            ['Captain', 'Deputy Chief', 'Battalion Chief', 'Chief'].includes(userProfile?.rank)) {
+            return true;
+        }
+        
+        // Draft logs can ALWAYS be edited by anyone
+        if (log.status === 'draft') {
+            return true;
+        }
+        
+        // For completed logs, check 72-hour window
+        const logDate = new Date(log.rawDate);
+        const now = new Date();
+        const hoursSinceLog = (now - logDate) / (1000 * 60 * 60);
+        
+        return hoursSinceLog <= 72;
+    };
     const [userProfile, setUserProfile] = useState(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
     const [logToDelete, setLogToDelete] = useState(null);
     const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
+    const [logToEdit, setLogToEdit] = useState(null);
+    const [editConfirmOpen, setEditConfirmOpen] = useState(false);
 
     const navigate = useNavigate();
     const auth = getAuth();
@@ -267,6 +290,64 @@ const Dashboard = () => {
         }
     };
 
+    // Confirm edit for completed logs
+    const confirmEditLog = (log) => {
+        if (log.status === 'complete') {
+            setLogToEdit(log);
+            setEditConfirmOpen(true);
+        } else {
+            // For draft logs, edit directly without confirmation
+            handleEditLog(log);
+        }
+    };
+
+    // Handle editing a log
+    const handleEditLog = async (log) => {
+        try {
+            // If it's a completed log, change status to draft and add edit tracking
+            if (log.status === 'complete') {
+                const updatedLog = {
+                    ...log,
+                    status: 'draft',
+                    editedBy: {
+                        userId: auth.currentUser?.uid,
+                        userEmail: auth.currentUser?.email,
+                        userDisplayName: userProfile?.firstName && userProfile?.lastName 
+                            ? `${userProfile.firstName} ${userProfile.lastName}`
+                            : userProfile?.displayName || auth.currentUser?.displayName || auth.currentUser?.email || 'Unknown User',
+                        editedAt: new Date().toISOString(),
+                        originalStatus: 'complete'
+                    }
+                };
+
+                // Update in Firestore
+                await firestoreOperations.updateLog(log.id, updatedLog);
+
+                // Update local state
+                setPastLogs(pastLogs.map(l => l.id === log.id ? updatedLog : l));
+            }
+
+            // Set station and navigate to edit
+            if (log.station) {
+                localStorage.setItem('selectedStation', log.station);
+            }
+            
+            navigate('/today', {
+                state: {
+                    logId: log.id,
+                    fromStation: log.station
+                }
+            });
+
+            // Close confirmation modal if it was open
+            setEditConfirmOpen(false);
+            setLogToEdit(null);
+        } catch (error) {
+            console.error('Error preparing log for edit:', error);
+            setError('Failed to prepare log for editing. Please try again.');
+        }
+    };
+
     // Get statistics for dashboard
     const getStatistics = () => {
         // Total reports submitted this week
@@ -368,6 +449,47 @@ const Dashboard = () => {
                         </div>
                     </div>
                 )}
+
+                {/* Edit Confirmation Modal */}
+                {editConfirmOpen && logToEdit && (
+                    <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
+                        <div className="bg-white dark:bg-gray-800 rounded-lg shadow-lg p-6 max-w-md w-full">
+                            <div className="flex items-center mb-4 text-amber-600 dark:text-amber-400">
+                                <AlertTriangle className="h-6 w-6 mr-2" />
+                                <h3 className="text-lg font-medium">Edit Completed Log</h3>
+                            </div>
+
+                            <p className="mb-6 text-gray-600 dark:text-gray-300">
+                                Are you sure you want to edit the completed log from <span className="font-semibold">{logToEdit.date}</span>?
+                                <br /><br />
+                                <span className="text-amber-600 dark:text-amber-400 font-medium">
+                                    This will change the log status from "Complete" to "Draft" and you'll need to complete it again after making changes.
+                                </span>
+                                <br /><br />
+                                The edit will be tracked for audit purposes.
+                            </p>
+
+                            <div className="flex justify-end space-x-3">
+                                <button
+                                    onClick={() => {
+                                        setEditConfirmOpen(false);
+                                        setLogToEdit(null);
+                                    }}
+                                    className="px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-700 dark:text-white text-sm font-medium hover:bg-gray-50 dark:hover:bg-gray-600"
+                                >
+                                    Cancel
+                                </button>
+                                <button
+                                    onClick={() => handleEditLog(logToEdit)}
+                                    className="px-4 py-2 bg-amber-600 text-white rounded-md text-sm font-medium hover:bg-amber-700"
+                                >
+                                    Edit Log
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                )}
+
                 {/* Welcome Section */}
                 <div className="bg-white dark:bg-gray-800 shadow rounded-lg p-6 mb-6">
                     <div className="flex flex-col md:flex-row justify-between items-start md:items-center">
@@ -503,6 +625,26 @@ const Dashboard = () => {
                                                     <p className="text-sm text-gray-500 dark:text-gray-400">
                                                         {log.totalHours} hours • {log.activities ? log.activities.length : 0} activities
                                                     </p>
+                                                    {log.editedBy && (
+                                                        <p className="text-xs text-amber-600 dark:text-amber-400 mt-1">
+                                                            Edited by {log.editedBy.userDisplayName} on {formatDateTimePST(log.editedBy.editedAt, { 
+                                                                month: 'short', 
+                                                                day: 'numeric', 
+                                                                hour: '2-digit', 
+                                                                minute: '2-digit' 
+                                                            })}
+                                                        </p>
+                                                    )}
+                                                    {log.status === 'complete' && log.completedBy && (
+                                                        <p className="text-xs text-green-600 dark:text-green-400 mt-1">
+                                                            Completed by {log.completedBy} on {formatDateTimePST(log.completedAt, { 
+                                                                month: 'short', 
+                                                                day: 'numeric', 
+                                                                hour: '2-digit', 
+                                                                minute: '2-digit' 
+                                                            })}
+                                                        </p>
+                                                    )}
                                                 </div>
                                             </div>
                                             <div className="flex items-center">
@@ -511,17 +653,31 @@ const Dashboard = () => {
                                                     }`}>
                                                     {log.status === 'complete' ? 'Complete' : 'Draft'}
                                                 </span>
-                                                {log.status === 'draft' ? (
-                                                    <div className="flex space-x-3">
-                                                        {canManageLogs(userProfile) && (
-                                                            <button
-                                                                onClick={() => confirmDeleteLog(log)}
-                                                                className="text-red-600 dark:text-red-400 hover:text-red-800 dark:hover:text-red-300 text-sm flex items-center px-2 py-1"
-                                                            >
-                                                                <Trash2 className="h-4 w-4 mr-1" />
-                                                                Delete
-                                                            </button>
-                                                        )}
+                                                <div className="flex space-x-3">
+                                                    {/* Edit button - show if user can edit this log */}
+                                                    {canEditLog(log, userProfile) && (
+                                                        <button
+                                                            onClick={() => confirmEditLog(log)}
+                                                            className="text-green-600 dark:text-green-400 hover:text-green-800 dark:hover:text-green-300 text-sm flex items-center px-2 py-1"
+                                                        >
+                                                            <Edit3 className="h-4 w-4 mr-1" />
+                                                            Edit
+                                                        </button>
+                                                    )}
+                                                    
+                                                    {/* Delete button - only for admins/captains */}
+                                                    {canManageLogs(userProfile) && (
+                                                        <button
+                                                            onClick={() => confirmDeleteLog(log)}
+                                                            className="text-red-600 dark:text-red-400 hover:text-red-800 dark:hover:text-red-300 text-sm flex items-center px-2 py-1"
+                                                        >
+                                                            <Trash2 className="h-4 w-4 mr-1" />
+                                                            Delete
+                                                        </button>
+                                                    )}
+                                                    
+                                                    {/* View button - only show for completed logs */}
+                                                    {log.status === 'complete' && (
                                                         <button
                                                             onClick={() => navigate(`/report/${log.id}`)}
                                                             className="text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 text-sm flex items-center px-2 py-1"
@@ -529,16 +685,8 @@ const Dashboard = () => {
                                                             <Eye className="h-4 w-4 mr-1" />
                                                             View
                                                         </button>
-                                                    </div>
-                                                ) : (
-                                                    <button
-                                                        onClick={() => navigate(`/report/${log.id}`)}
-                                                        className="text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 text-sm flex items-center px-2 py-1"
-                                                    >
-                                                        <Eye className="h-4 w-4 mr-1" />
-                                                        View
-                                                    </button>
-                                                )}
+                                                    )}
+                                                </div>
                                             </div>
                                         </div>
                                     ))}
@@ -563,6 +711,26 @@ const Dashboard = () => {
                                                     <div className="text-sm text-gray-500 dark:text-gray-400">
                                                         {log.totalHours} hours • {log.activities ? log.activities.length : 0} activities
                                                     </div>
+                                                    {log.editedBy && (
+                                                        <div className="text-xs text-amber-600 dark:text-amber-400 mt-1">
+                                                            Edited by {log.editedBy.userDisplayName} on {formatDateTimePST(log.editedBy.editedAt, { 
+                                                                month: 'short', 
+                                                                day: 'numeric', 
+                                                                hour: '2-digit', 
+                                                                minute: '2-digit' 
+                                                            })}
+                                                        </div>
+                                                    )}
+                                                    {log.status === 'complete' && log.completedBy && (
+                                                        <div className="text-xs text-green-600 dark:text-green-400 mt-1">
+                                                            Completed by {log.completedBy} on {formatDateTimePST(log.completedAt, { 
+                                                                month: 'short', 
+                                                                day: 'numeric', 
+                                                                hour: '2-digit', 
+                                                                minute: '2-digit' 
+                                                            })}
+                                                        </div>
+                                                    )}
                                                 </div>
                                             </div>
 
@@ -577,26 +745,30 @@ const Dashboard = () => {
                                             </div>
 
                                             <div className="mt-2 flex justify-end space-x-3">
-                                                {log.status === 'draft' ? (
-                                                    <>
-                                                        {canManageLogs(userProfile) && (
-                                                            <button
-                                                                onClick={() => confirmDeleteLog(log)}
-                                                                className="text-red-600 hover:text-red-900 dark:text-red-400 dark:hover:text-red-200 text-sm flex items-center"
-                                                            >
-                                                                <Trash2 className="w-4 h-4 mr-1" />
-                                                                Delete
-                                                            </button>
-                                                        )}
-                                                        <button
-                                                            className="text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300 text-sm flex items-center"
-                                                            onClick={() => navigate(`/report/${log.id}`)}
-                                                        >
-                                                            <Eye className="w-4 h-4 mr-1" />
-                                                            View
-                                                        </button>
-                                                    </>
-                                                ) : (
+                                                {/* Edit button - show if user can edit this log */}
+                                                {canEditLog(log, userProfile) && (
+                                                    <button
+                                                        onClick={() => confirmEditLog(log)}
+                                                        className="text-green-600 hover:text-green-900 dark:text-green-400 dark:hover:text-green-200 text-sm flex items-center"
+                                                    >
+                                                        <Edit3 className="w-4 h-4 mr-1" />
+                                                        Edit
+                                                    </button>
+                                                )}
+                                                
+                                                {/* Delete button - only for admins/captains */}
+                                                {canManageLogs(userProfile) && (
+                                                    <button
+                                                        onClick={() => confirmDeleteLog(log)}
+                                                        className="text-red-600 hover:text-red-900 dark:text-red-400 dark:hover:text-red-200 text-sm flex items-center"
+                                                    >
+                                                        <Trash2 className="w-4 h-4 mr-1" />
+                                                        Delete
+                                                    </button>
+                                                )}
+                                                
+                                                {/* View button - only show for completed logs */}
+                                                {log.status === 'complete' && (
                                                     <button
                                                         className="text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300 text-sm flex items-center"
                                                         onClick={() => navigate(`/report/${log.id}`)}
