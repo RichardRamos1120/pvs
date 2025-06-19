@@ -931,7 +931,7 @@ const TodayLog = () => {
                       </button>
                     ) : (
                       <div 
-                        className="w-full sm:w-auto inline-flex items-center justify-center px-4 py-3 border border-gray-300 text-sm font-medium rounded-md text-gray-500 bg-gray-100 cursor-not-allowed min-h-[44px]" 
+                        className="w-full sm:w-auto inline-flex items-center justify-center px-4 py-3 border border-gray-300 dark:border-gray-600 text-sm font-medium rounded-md text-gray-500 dark:text-gray-400 bg-gray-100 dark:bg-gray-700 cursor-not-allowed min-h-[44px]" 
                         title="Only admins can complete logs"
                       >
                         <Lock className="h-4 w-4 mr-1" />
