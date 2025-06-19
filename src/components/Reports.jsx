@@ -76,8 +76,10 @@ const Reports = () => {
     return hoursSinceLog <= 72;
   };
   const [activeTab, setActiveTab] = useState('all'); // 'all', 'draft', 'complete'
-  // Initialize stationFilter - default to 'all' for admin users or to selectedStation for others
-  const [stationFilter, setStationFilter] = useState('all'); // Start with 'all', we'll update after checking user role
+  // Initialize stationFilter - load from localStorage or default to 'all'
+  const [stationFilter, setStationFilter] = useState(() => {
+    return localStorage.getItem('reportsStationFilter') || 'all';
+  });
   const [searchTerm, setSearchTerm] = useState('');
   const [dateRange, setDateRange] = useState('all');
   const [loading, setLoading] = useState(true);
@@ -183,13 +185,18 @@ const Reports = () => {
             setStationFilter('all');
           }
         } else {
-          // Non-admin users are limited to their saved station
-          const stationToUse = savedStation || profile.station || selectedStation;
-          setStationFilter(stationToUse);
+          // Non-admin users can now also use 'all' stations filter
+          // Only set to saved station if stationFilter is still default 'all' on first load
+          if (stationFilter === 'all' && !localStorage.getItem('reportsStationFilter')) {
+            const stationToUse = savedStation || profile.station || selectedStation;
+            setStationFilter(stationToUse);
+          }
+          // Save the current filter choice for non-admins
+          localStorage.setItem('reportsStationFilter', stationFilter);
         }
 
         // Fetch paginated logs
-        const stationToFilter = profile && profile.role === 'admin' && stationFilter === 'all' ? null : stationFilter;
+        const stationToFilter = stationFilter === 'all' ? null : stationFilter;
         const statusToFilter = activeTab === 'all' ? null : activeTab;
         
         
@@ -217,6 +224,9 @@ const Reports = () => {
   const handleStationFilterChange = (stationName) => {
     setStationFilter(stationName);
     setCurrentPage(1); // Reset to first page when filter changes
+    
+    // Save the filter choice for all users
+    localStorage.setItem('reportsStationFilter', stationName);
 
     // Also update the global selectedStation if not "all"
     if (stationName !== 'all') {
