@@ -675,10 +675,8 @@ const Reports = () => {
                 value={stationFilter}
                 onChange={(e) => handleStationFilterChange(e.target.value)}
               >
-                {/* Show "All Stations" option only for admin users */}
-                {userProfile?.role === 'admin' && (
-                  <option value="all">All Stations</option>
-                )}
+                {/* Show "All Stations" option for all users */}
+                <option value="all">All Stations</option>
 
                 {/* Show individual stations */}
                 {stationsList
