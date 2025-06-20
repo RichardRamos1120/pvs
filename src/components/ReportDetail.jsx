@@ -93,7 +93,8 @@ const ReportDetail = () => {
     switch(category) {
       case "ADMIN":
         return "bg-blue-500";
-      case "MAINTENANCE":
+      case "VEHICLE MAINTENANCE":
+      case "STATION MAINTENANCE":
         return "bg-green-500";
       case "MEDICAL":
         return "bg-red-500";
@@ -119,7 +120,8 @@ const ReportDetail = () => {
     switch(category) {
       case "ADMIN":
         return <FileText className="w-5 h-5" />;
-      case "MAINTENANCE":
+      case "VEHICLE MAINTENANCE":
+      case "STATION MAINTENANCE":
         return <Calendar className="w-5 h-5" />;
       case "MEDICAL":
         return <User className="w-5 h-5" />;
@@ -417,7 +419,7 @@ const ReportDetail = () => {
           // Type-specific details
           let hasDetails = false;
           
-          if (activity.type === 'MAINTENANCE') {
+          if (activity.type === 'VEHICLE MAINTENANCE' || activity.type === 'STATION MAINTENANCE') {
             if (activity.details?.apparatus || activity.details?.maintenanceType || activity.details?.passFailStatus) {
               hasDetails = true;
               pdf.setFont('helvetica', 'normal');
@@ -793,7 +795,7 @@ const ReportDetail = () => {
                       
                       {/* Activity details based on type */}
                       <div className="ml-10 mt-2">
-                        {activity.type === 'MAINTENANCE' && (
+                        {(activity.type === 'VEHICLE MAINTENANCE' || activity.type === 'STATION MAINTENANCE') && (
                           <div className="grid grid-cols-1 md:grid-cols-3 gap-2 text-sm">
                             {activity.details?.apparatus && (
                               <div>

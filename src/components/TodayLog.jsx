@@ -514,8 +514,10 @@ const TodayLog = () => {
     switch (category) {
       case "ADMIN":
         return "bg-blue-500";
-      case "MAINTENANCE":
+      case "VEHICLE MAINTENANCE":
         return "bg-green-500";
+      case "STATION MAINTENANCE":
+        return "bg-green-600";
       case "MEDICAL":
         return "bg-red-500";
       case "OPERATIONS":
@@ -540,8 +542,10 @@ const TodayLog = () => {
     switch (category) {
       case "ADMIN":
         return <FileSpreadsheet className="w-5 h-5" />;
-      case "MAINTENANCE":
+      case "VEHICLE MAINTENANCE":
         return <Truck className="w-5 h-5" />;
+      case "STATION MAINTENANCE":
+        return <Building className="w-5 h-5" />;
       case "MEDICAL":
         return <Clipboard className="w-5 h-5" />;
       case "OPERATIONS":
@@ -1032,7 +1036,7 @@ const TodayLog = () => {
 
                         {/* Activity details based on type */}
                         <div className="ml-10 mt-2">
-                          {activity.type === 'MAINTENANCE' && (
+                          {(activity.type === 'VEHICLE MAINTENANCE' || activity.type === 'STATION MAINTENANCE') && (
                             <div className="grid grid-cols-1 md:grid-cols-3 gap-2 text-sm">
                               {activity.details?.apparatus && (
                                 <div>

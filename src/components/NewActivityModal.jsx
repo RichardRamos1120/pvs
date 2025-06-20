@@ -10,7 +10,8 @@ import {
   Users,
   FileText,
   MoreHorizontal,
-  Mic
+  Mic,
+  Clock
 } from 'lucide-react';
 
 const NewActivityModal = ({ show, onClose, onAddActivity, darkMode, currentStation }) => {
@@ -39,6 +40,9 @@ const NewActivityModal = ({ show, onClose, onAddActivity, darkMode, currentStati
   // Custom apparatus dropdown states
   const [apparatusDropdownOpen, setApparatusDropdownOpen] = useState(false);
   const [apparatusSearchTerm, setApparatusSearchTerm] = useState("");
+
+  // Time picker dropdown state
+  const [timePickerOpen, setTimePickerOpen] = useState(false);
 
   const firestoreOperations = useContext(FirestoreContext);
 
@@ -105,21 +109,31 @@ const NewActivityModal = ({ show, onClose, onAddActivity, darkMode, currentStati
       "MEETING",
       "PROJECT - DISTRICT PROJECT WORK"
     ],
-    "MAINTENANCE": [
-      "APP BI-MONTHLY INSPECTION",
-      "APP PRE CHECK - ROUTINE DAILY",
-      "APP PUMP TESTING",
-      "APPARATUS - IN HOUSE MAINTENANCE",
-      "COMPLETED",
-      "DIVE EQUIPMENT - ROUTINE CHECK",
+    "VEHICLE MAINTENANCE": {
+      "Daily Tasks": [
+        "APP PRE CHECK - ROUTINE DAILY",
+        "FIRE BOAT - ROUTINE DAILY"
+      ],
+      "Weekly Tasks": [
+        "LADDER - WEEKLY AERIAL INSPECTIONS"
+      ],
+      "Bi-Monthly Tasks": [
+        "APP BI-MONTHLY INSPECTION"
+      ],
+      "As-Needed Tasks": [
+        "APP PUMP TESTING",
+        "APPARATUS - IN HOUSE MAINTENANCE", 
+        "DIVE EQUIPMENT - ROUTINE CHECK",
+        "FLUIDS - LEVEL CHECKS",
+        "FUEL",
+        "NARCS - ROUTINE CHECKS",
+        "COMPLETED"
+      ]
+    },
+    "STATION MAINTENANCE": [
+      "STATION - ROUTINE MAINTENANCE",
       "FACILITY - MAJOR",
-      "FIRE BOAT - ROUTINE DAILY",
-      "FLUIDS - LEVEL CHECKS",
-      "FUEL",
-      "LADDER - WEEKLY AERIAL INSPECTIONS",
-      "NARCS - ROUTINE CHECKS",
-      "OUTSIDE - MILL VALLEY CORP YARD",
-      "STATION - ROUTINE MAINTENANCE"
+      "OUTSIDE - MILL VALLEY CORP YARD"
     ],
     "MEDICAL": [
       "PHYSICAL - DEPARTMENT PHYSICAL"
@@ -242,11 +256,36 @@ const NewActivityModal = ({ show, onClose, onAddActivity, darkMode, currentStati
     apparatus.toLowerCase().includes(apparatusSearchTerm.toLowerCase())
   );
 
+  // Generate time options (every 15 minutes from 00:00 to 23:45)
+  const generateTimeOptions = () => {
+    const times = [];
+    for (let hour = 0; hour < 24; hour++) {
+      for (let minute = 0; minute < 60; minute += 15) {
+        const timeString = `${hour.toString().padStart(2, '0')}:${minute.toString().padStart(2, '0')}`;
+        const displayTime = new Date(`2000-01-01T${timeString}`).toLocaleTimeString('en-US', {
+          hour: 'numeric',
+          minute: '2-digit',
+          hour12: true
+        });
+        times.push({ value: timeString, display: displayTime });
+      }
+    }
+    return times;
+  };
+
+  const timeOptions = generateTimeOptions();
+
   // Handle apparatus selection
   const handleApparatusSelect = (apparatus) => {
     setNewActivityApparatus(apparatus);
     setApparatusSearchTerm("");
     setApparatusDropdownOpen(false);
+  };
+
+  // Handle time selection
+  const handleTimeSelect = (timeValue) => {
+    setNewActivityStartTime(timeValue);
+    setTimePickerOpen(false);
   };
 
   // Handle apparatus input change
@@ -297,6 +336,20 @@ const NewActivityModal = ({ show, onClose, onAddActivity, darkMode, currentStati
     });
   };
 
+  // Close time picker when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (timePickerOpen && !event.target.closest('.time-picker-container')) {
+        setTimePickerOpen(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [timePickerOpen]);
+
   // Reset form fields
   const resetForm = () => {
     setNewActivityCategory("");
@@ -315,6 +368,7 @@ const NewActivityModal = ({ show, onClose, onAddActivity, darkMode, currentStati
     setShowCrewSelection(false);
     setCrewSearchTerm("");
     setTempSelectedCrew([]);
+    setTimePickerOpen(false);
     // Note: Don't reset stations array as it should persist
   };
   
@@ -357,7 +411,7 @@ const NewActivityModal = ({ show, onClose, onAddActivity, darkMode, currentStati
     };
 
     // Add category-specific details
-    if (newActivityCategory === 'MAINTENANCE') {
+    if (newActivityCategory === 'VEHICLE MAINTENANCE' || newActivityCategory === 'STATION MAINTENANCE') {
       details.apparatus = newActivityApparatus;
       details.maintenanceType = newActivityMaintenanceType;
       details.passFailStatus = newActivityPassFail;
@@ -453,9 +507,21 @@ const NewActivityModal = ({ show, onClose, onAddActivity, darkMode, currentStati
                   required
                 >
                   <option value="">Select Activity Type</option>
-                  {activityCodes[newActivityCategory].map((activity) => (
-                    <option key={activity} value={activity}>{activity}</option>
-                  ))}
+                  {Array.isArray(activityCodes[newActivityCategory]) ? (
+                    // Handle regular arrays (like ADMIN, MEDICAL, etc.)
+                    activityCodes[newActivityCategory].map((activity) => (
+                      <option key={activity} value={activity}>{activity}</option>
+                    ))
+                  ) : (
+                    // Handle grouped objects (like VEHICLE MAINTENANCE)
+                    Object.entries(activityCodes[newActivityCategory]).map(([groupName, activities]) => (
+                      <optgroup key={groupName} label={groupName}>
+                        {activities.map((activity) => (
+                          <option key={activity} value={activity}>{activity}</option>
+                        ))}
+                      </optgroup>
+                    ))
+                  )}
                 </select>
               </div>
             )}
@@ -468,13 +534,48 @@ const NewActivityModal = ({ show, onClose, onAddActivity, darkMode, currentStati
               <label className="block text-sm font-medium mb-1">
                 Start Time*
               </label>
-              <input
-                type="time"
-                className={`w-full p-2 border rounded-lg ${darkMode ? 'bg-gray-700 border-gray-600 text-white' : 'bg-white border-gray-300 text-gray-900'}`}
-                value={newActivityStartTime}
-                onChange={(e) => setNewActivityStartTime(e.target.value)}
-                required
-              />
+              <div className="relative time-picker-container">
+                <input
+                  type="time"
+                  className={`w-full p-2 pr-10 border rounded-lg ${darkMode ? 'bg-gray-700 border-gray-600 text-white' : 'bg-white border-gray-300 text-gray-900'}`}
+                  value={newActivityStartTime}
+                  onChange={(e) => setNewActivityStartTime(e.target.value)}
+                  required
+                />
+                <button
+                  type="button"
+                  className="absolute inset-y-0 right-0 flex items-center pr-3 hover:bg-gray-100 dark:hover:bg-gray-600 rounded-r-lg transition-colors"
+                  onClick={() => setTimePickerOpen(!timePickerOpen)}
+                >
+                  <Clock className={`h-4 w-4 ${darkMode ? 'text-gray-400' : 'text-gray-500'}`} />
+                </button>
+                
+                {/* Time picker dropdown */}
+                {timePickerOpen && (
+                  <div className={`absolute top-full left-0 right-0 mt-1 rounded-lg shadow-lg z-50 max-h-60 overflow-y-auto ${
+                    darkMode 
+                      ? 'bg-gray-700 border border-gray-600' 
+                      : 'bg-white border border-gray-300'
+                  }`}>
+                    {timeOptions.map((time) => (
+                      <button
+                        key={time.value}
+                        type="button"
+                        className={`w-full px-3 py-2 text-left hover:bg-gray-100 dark:hover:bg-gray-600 first:rounded-t-lg last:rounded-b-lg ${
+                          newActivityStartTime === time.value 
+                            ? 'bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200' 
+                            : darkMode 
+                              ? 'text-white' 
+                              : 'text-gray-900'
+                        }`}
+                        onClick={() => handleTimeSelect(time.value)}
+                      >
+                        {time.display}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
             </div>
             
             {/* Duration input */}
@@ -527,7 +628,7 @@ const NewActivityModal = ({ show, onClose, onAddActivity, darkMode, currentStati
           </div>
           
           {/* Category-specific details */}
-          {newActivityCategory === 'MAINTENANCE' && (
+          {(newActivityCategory === 'VEHICLE MAINTENANCE' || newActivityCategory === 'STATION MAINTENANCE') && (
             <div className="mb-4">
               <h3 className="text-sm font-medium mb-2 pb-1 border-b">
                 Maintenance Details
@@ -541,7 +642,7 @@ const NewActivityModal = ({ show, onClose, onAddActivity, darkMode, currentStati
                   <div className="relative">
                     <input
                       type="text"
-                      className="w-full p-2 border rounded-lg"
+                      className={`w-full p-2 border rounded-lg ${darkMode ? 'bg-gray-700 border-gray-600 text-white' : 'bg-white border-gray-300 text-gray-900'}`}
                       placeholder="Type to search apparatus..."
                       value={apparatusSearchTerm || newActivityApparatus}
                       onChange={handleApparatusInputChange}
@@ -551,19 +652,27 @@ const NewActivityModal = ({ show, onClose, onAddActivity, darkMode, currentStati
                     
                     {/* Dropdown list */}
                     {apparatusDropdownOpen && (
-                      <div className="absolute top-full left-0 right-0 bg-white border border-gray-300 rounded-lg shadow-lg z-50 max-h-40 overflow-y-auto">
+                      <div className={`absolute top-full left-0 right-0 rounded-lg shadow-lg z-50 max-h-40 overflow-y-auto ${
+                        darkMode 
+                          ? 'bg-gray-700 border border-gray-600' 
+                          : 'bg-white border border-gray-300'
+                      }`}>
                         {filteredApparatus.length > 0 ? (
                           filteredApparatus.map((apparatus) => (
                             <div
                               key={apparatus}
-                              className="p-2 hover:bg-gray-100 cursor-pointer border-b border-gray-100 last:border-b-0"
+                              className={`p-2 cursor-pointer last:border-b-0 ${
+                                darkMode 
+                                  ? 'hover:bg-gray-600 border-b border-gray-600 text-white' 
+                                  : 'hover:bg-gray-100 border-b border-gray-100'
+                              }`}
                               onMouseDown={() => handleApparatusSelect(apparatus)}
                             >
                               {apparatus}
                             </div>
                           ))
                         ) : (
-                          <div className="p-2 text-gray-500 text-sm">
+                          <div className={`p-2 text-sm ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>
                             No apparatus found
                           </div>
                         )}
@@ -660,7 +769,7 @@ const NewActivityModal = ({ show, onClose, onAddActivity, darkMode, currentStati
                   <div className="relative">
                     <input
                       type="text"
-                      className="w-full p-2 border rounded-lg"
+                      className={`w-full p-2 border rounded-lg ${darkMode ? 'bg-gray-700 border-gray-600 text-white' : 'bg-white border-gray-300 text-gray-900'}`}
                       placeholder="Type to search apparatus..."
                       value={apparatusSearchTerm || newActivityApparatus}
                       onChange={handleApparatusInputChange}
@@ -670,19 +779,27 @@ const NewActivityModal = ({ show, onClose, onAddActivity, darkMode, currentStati
                     
                     {/* Dropdown list */}
                     {apparatusDropdownOpen && (
-                      <div className="absolute top-full left-0 right-0 bg-white border border-gray-300 rounded-lg shadow-lg z-50 max-h-40 overflow-y-auto">
+                      <div className={`absolute top-full left-0 right-0 rounded-lg shadow-lg z-50 max-h-40 overflow-y-auto ${
+                        darkMode 
+                          ? 'bg-gray-700 border border-gray-600' 
+                          : 'bg-white border border-gray-300'
+                      }`}>
                         {filteredApparatus.length > 0 ? (
                           filteredApparatus.map((apparatus) => (
                             <div
                               key={apparatus}
-                              className="p-2 hover:bg-gray-100 cursor-pointer border-b border-gray-100 last:border-b-0"
+                              className={`p-2 cursor-pointer last:border-b-0 ${
+                                darkMode 
+                                  ? 'hover:bg-gray-600 border-b border-gray-600 text-white' 
+                                  : 'hover:bg-gray-100 border-b border-gray-100'
+                              }`}
                               onMouseDown={() => handleApparatusSelect(apparatus)}
                             >
                               {apparatus}
                             </div>
                           ))
                         ) : (
-                          <div className="p-2 text-gray-500 text-sm">
+                          <div className={`p-2 text-sm ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>
                             No apparatus found
                           </div>
                         )}
@@ -719,7 +836,7 @@ const NewActivityModal = ({ show, onClose, onAddActivity, darkMode, currentStati
                   <div className="relative">
                     <input
                       type="text"
-                      className="w-full p-2 border rounded-lg"
+                      className={`w-full p-2 border rounded-lg ${darkMode ? 'bg-gray-700 border-gray-600 text-white' : 'bg-white border-gray-300 text-gray-900'}`}
                       placeholder="Type to search apparatus..."
                       value={apparatusSearchTerm || newActivityApparatus}
                       onChange={handleApparatusInputChange}
@@ -729,19 +846,27 @@ const NewActivityModal = ({ show, onClose, onAddActivity, darkMode, currentStati
                     
                     {/* Dropdown list */}
                     {apparatusDropdownOpen && (
-                      <div className="absolute top-full left-0 right-0 bg-white border border-gray-300 rounded-lg shadow-lg z-50 max-h-40 overflow-y-auto">
+                      <div className={`absolute top-full left-0 right-0 rounded-lg shadow-lg z-50 max-h-40 overflow-y-auto ${
+                        darkMode 
+                          ? 'bg-gray-700 border border-gray-600' 
+                          : 'bg-white border border-gray-300'
+                      }`}>
                         {filteredApparatus.length > 0 ? (
                           filteredApparatus.map((apparatus) => (
                             <div
                               key={apparatus}
-                              className="p-2 hover:bg-gray-100 cursor-pointer border-b border-gray-100 last:border-b-0"
+                              className={`p-2 cursor-pointer last:border-b-0 ${
+                                darkMode 
+                                  ? 'hover:bg-gray-600 border-b border-gray-600 text-white' 
+                                  : 'hover:bg-gray-100 border-b border-gray-100'
+                              }`}
                               onMouseDown={() => handleApparatusSelect(apparatus)}
                             >
                               {apparatus}
                             </div>
                           ))
                         ) : (
-                          <div className="p-2 text-gray-500 text-sm">
+                          <div className={`p-2 text-sm ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>
                             No apparatus found
                           </div>
                         )}

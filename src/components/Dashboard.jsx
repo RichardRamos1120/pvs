@@ -836,7 +836,7 @@ const Dashboard = () => {
                                                 <div className="flex justify-between mb-1">
                                                     <div className="flex items-center">
                                                         <div className={`w-4 h-4 rounded-sm bg-${item.category === 'ADMIN' ? 'blue' :
-                                                            item.category === 'MAINTENANCE' ? 'green' :
+                                                            (item.category === 'VEHICLE MAINTENANCE' || item.category === 'STATION MAINTENANCE') ? 'green' :
                                                                 item.category === 'MEDICAL' ? 'red' :
                                                                     item.category === 'OPERATIONS' ? 'purple' :
                                                                         item.category === 'PR' ? 'yellow' :
@@ -851,7 +851,7 @@ const Dashboard = () => {
                                                 <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
                                                     <div
                                                         className={`bg-${item.category === 'ADMIN' ? 'blue' :
-                                                            item.category === 'MAINTENANCE' ? 'green' :
+                                                            (item.category === 'VEHICLE MAINTENANCE' || item.category === 'STATION MAINTENANCE') ? 'green' :
                                                                 item.category === 'MEDICAL' ? 'red' :
                                                                     item.category === 'OPERATIONS' ? 'purple' :
                                                                         item.category === 'PR' ? 'yellow' :
