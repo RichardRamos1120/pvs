@@ -43,6 +43,9 @@ const NewActivityModal = ({ show, onClose, onAddActivity, darkMode, currentStati
 
   // Time picker dropdown state
   const [timePickerOpen, setTimePickerOpen] = useState(false);
+  const [selectedHour, setSelectedHour] = useState("12");
+  const [selectedMinute, setSelectedMinute] = useState("00");
+  const [selectedPeriod, setSelectedPeriod] = useState("AM");
 
   const firestoreOperations = useContext(FirestoreContext);
 
@@ -256,24 +259,10 @@ const NewActivityModal = ({ show, onClose, onAddActivity, darkMode, currentStati
     apparatus.toLowerCase().includes(apparatusSearchTerm.toLowerCase())
   );
 
-  // Generate time options (every 15 minutes from 00:00 to 23:45)
-  const generateTimeOptions = () => {
-    const times = [];
-    for (let hour = 0; hour < 24; hour++) {
-      for (let minute = 0; minute < 60; minute += 15) {
-        const timeString = `${hour.toString().padStart(2, '0')}:${minute.toString().padStart(2, '0')}`;
-        const displayTime = new Date(`2000-01-01T${timeString}`).toLocaleTimeString('en-US', {
-          hour: 'numeric',
-          minute: '2-digit',
-          hour12: true
-        });
-        times.push({ value: timeString, display: displayTime });
-      }
-    }
-    return times;
-  };
-
-  const timeOptions = generateTimeOptions();
+  // Time picker options
+  const hourOptions = Array.from({ length: 12 }, (_, i) => (i + 1).toString());
+  const minuteOptions = Array.from({length: 60}, (_, i) => i.toString().padStart(2, '0'));
+  const periodOptions = ["AM", "PM"];
 
   // Handle apparatus selection
   const handleApparatusSelect = (apparatus) => {
@@ -282,10 +271,73 @@ const NewActivityModal = ({ show, onClose, onAddActivity, darkMode, currentStati
     setApparatusDropdownOpen(false);
   };
 
-  // Handle time selection
-  const handleTimeSelect = (timeValue) => {
-    setNewActivityStartTime(timeValue);
-    setTimePickerOpen(false);
+  // Convert 12-hour time to 24-hour format
+  const convertTo24Hour = (hour, minute, period) => {
+    let hour24 = parseInt(hour);
+    if (period === "AM" && hour24 === 12) {
+      hour24 = 0;
+    } else if (period === "PM" && hour24 !== 12) {
+      hour24 += 12;
+    }
+    return `${hour24.toString().padStart(2, '0')}:${minute}`;
+  };
+
+  // Parse 24-hour time to 12-hour components
+  const parseTime = (time24) => {
+    if (!time24) return { hour: "12", minute: "00", period: "AM" };
+    
+    const [hour, minute] = time24.split(":");
+    const hour24 = parseInt(hour);
+    
+    let hour12 = hour24;
+    let period = "AM";
+    
+    if (hour24 === 0) {
+      hour12 = 12;
+    } else if (hour24 > 12) {
+      hour12 = hour24 - 12;
+      period = "PM";
+    } else if (hour24 === 12) {
+      period = "PM";
+    }
+    
+    return {
+      hour: hour12.toString(),
+      minute: minute,
+      period: period
+    };
+  };
+
+  // Handle time component changes
+  const handleTimeComponentChange = (type, value) => {
+    let newHour = selectedHour;
+    let newMinute = selectedMinute;
+    let newPeriod = selectedPeriod;
+    
+    if (type === "hour") newHour = value;
+    if (type === "minute") newMinute = value;
+    if (type === "period") newPeriod = value;
+    
+    setSelectedHour(newHour);
+    setSelectedMinute(newMinute);
+    setSelectedPeriod(newPeriod);
+    
+    // Update the actual time input
+    const time24 = convertTo24Hour(newHour, newMinute, newPeriod);
+    setNewActivityStartTime(time24);
+  };
+
+  // Toggle time picker and parse current time
+  const toggleTimePicker = () => {
+    if (timePickerOpen) {
+      setTimePickerOpen(false);
+    } else {
+      const parsed = parseTime(newActivityStartTime);
+      setSelectedHour(parsed.hour);
+      setSelectedMinute(parsed.minute);
+      setSelectedPeriod(parsed.period);
+      setTimePickerOpen(true);
+    }
   };
 
   // Handle apparatus input change
@@ -545,34 +597,108 @@ const NewActivityModal = ({ show, onClose, onAddActivity, darkMode, currentStati
                 <button
                   type="button"
                   className="absolute inset-y-0 right-0 flex items-center pr-3 hover:bg-gray-100 dark:hover:bg-gray-600 rounded-r-lg transition-colors"
-                  onClick={() => setTimePickerOpen(!timePickerOpen)}
+                  onClick={toggleTimePicker}
                 >
                   <Clock className={`h-4 w-4 ${darkMode ? 'text-gray-400' : 'text-gray-500'}`} />
                 </button>
                 
-                {/* Time picker dropdown */}
+                {/* Advanced Time picker dropdown */}
                 {timePickerOpen && (
-                  <div className={`absolute top-full left-0 right-0 mt-1 rounded-lg shadow-lg z-50 max-h-60 overflow-y-auto ${
+                  <div className={`absolute top-full left-0 right-0 mt-1 rounded-lg shadow-lg z-50 p-4 ${
                     darkMode 
                       ? 'bg-gray-700 border border-gray-600' 
                       : 'bg-white border border-gray-300'
                   }`}>
-                    {timeOptions.map((time) => (
+                    <div className="grid grid-cols-3 gap-3 mb-4">
+                      {/* Hour selector */}
+                      <div>
+                        <label className={`block text-xs font-medium mb-2 ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>
+                          Hour
+                        </label>
+                        <div className="max-h-32 overflow-y-auto border rounded">
+                          {hourOptions.map((hour) => (
+                            <button
+                              key={hour}
+                              type="button"
+                              className={`w-full px-2 py-1 text-center hover:bg-gray-100 dark:hover:bg-gray-600 ${
+                                selectedHour === hour 
+                                  ? 'bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200' 
+                                  : darkMode 
+                                    ? 'text-white' 
+                                    : 'text-gray-900'
+                              }`}
+                              onClick={() => handleTimeComponentChange("hour", hour)}
+                            >
+                              {hour}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                      
+                      {/* Minute selector */}
+                      <div>
+                        <label className={`block text-xs font-medium mb-2 ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>
+                          Minute
+                        </label>
+                        <div className="max-h-32 overflow-y-auto border rounded">
+                          {minuteOptions.map((minute) => (
+                            <button
+                              key={minute}
+                              type="button"
+                              className={`w-full px-2 py-1 text-center hover:bg-gray-100 dark:hover:bg-gray-600 ${
+                                selectedMinute === minute 
+                                  ? 'bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200' 
+                                  : darkMode 
+                                    ? 'text-white' 
+                                    : 'text-gray-900'
+                              }`}
+                              onClick={() => handleTimeComponentChange("minute", minute)}
+                            >
+                              {minute}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                      
+                      {/* AM/PM selector */}
+                      <div>
+                        <label className={`block text-xs font-medium mb-2 ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>
+                          Period
+                        </label>
+                        <div className="max-h-32 overflow-y-auto border rounded">
+                          {periodOptions.map((period) => (
+                            <button
+                              key={period}
+                              type="button"
+                              className={`w-full px-2 py-1 text-center hover:bg-gray-100 dark:hover:bg-gray-600 ${
+                                selectedPeriod === period 
+                                  ? 'bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200' 
+                                  : darkMode 
+                                    ? 'text-white' 
+                                    : 'text-gray-900'
+                              }`}
+                              onClick={() => handleTimeComponentChange("period", period)}
+                            >
+                              {period}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+                    
+                    {/* Selected time display and close button */}
+                    <div className="flex justify-between items-center pt-2 border-t">
+                      <div className={`text-sm ${darkMode ? 'text-gray-300' : 'text-gray-600'}`}>
+                        Selected: {selectedHour}:{selectedMinute} {selectedPeriod}
+                      </div>
                       <button
-                        key={time.value}
                         type="button"
-                        className={`w-full px-3 py-2 text-left hover:bg-gray-100 dark:hover:bg-gray-600 first:rounded-t-lg last:rounded-b-lg ${
-                          newActivityStartTime === time.value 
-                            ? 'bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200' 
-                            : darkMode 
-                              ? 'text-white' 
-                              : 'text-gray-900'
-                        }`}
-                        onClick={() => handleTimeSelect(time.value)}
+                        onClick={() => setTimePickerOpen(false)}
+                        className="px-3 py-1 bg-blue-600 text-white text-sm rounded hover:bg-blue-700"
                       >
-                        {time.display}
+                        Done
                       </button>
-                    ))}
+                    </div>
                   </div>
                 )}
               </div>
