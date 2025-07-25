@@ -12,6 +12,7 @@ import Login from './components/Login';
 import Signup from './components/Signup';
 import GARAssessment from './components/GARAssessment';
 import AdminPortal from './components/AdminPortal';
+import EquipmentInspection from './components/EquipmentInspection';
 import { ModalProvider } from './contexts/ModalContext';
 import './App.css';
 
@@ -1348,6 +1349,148 @@ const App = () => {
       }
     },
 
+    // Equipment Inspection Operations
+    // Create a new equipment inspection
+    createEquipmentInspection: async (inspectionData) => {
+      try {
+        const newInspection = {
+          ...inspectionData,
+          createdAt: serverTimestamp(),
+          createdBy: auth.currentUser?.displayName || 'Unknown',
+          createdByEmail: auth.currentUser?.email || 'Unknown',
+          createdByUid: auth.currentUser?.uid || 'Unknown',
+          updatedAt: serverTimestamp()
+        };
+        const docRef = await addDoc(collection(db, "equipment_inspections"), newInspection);
+        
+        // Track activity
+        const userId = auth.currentUser?.uid;
+        if (userId) {
+          await firestoreOperations.trackUserActivity(userId, 'equipment_inspection_created', {
+            inspectionId: docRef.id,
+            inspectionType: inspectionData.inspectionType || 'Unknown',
+            unitNumber: inspectionData.metadata?.unit_number || 'Unknown',
+            station: inspectionData.station || 'Unknown'
+          });
+        }
+        
+        return {
+          id: docRef.id,
+          ...newInspection
+        };
+      } catch (error) {
+        console.error("Error creating equipment inspection:", error);
+        return null;
+      }
+    },
+    
+    // Get equipment inspections
+    getEquipmentInspections: async (station = null, inspectionType = null, limitCount = 50) => {
+      try {
+        const inspectionsRef = collection(db, "equipment_inspections");
+        let conditions = [orderBy("createdAt", "desc")];
+        
+        if (station && station !== 'all') {
+          conditions.unshift(where("station", "==", station));
+        }
+        
+        if (inspectionType && inspectionType !== 'all') {
+          conditions.unshift(where("inspectionType", "==", inspectionType));
+        }
+        
+        conditions.push(limit(limitCount));
+        
+        const q = query(inspectionsRef, ...conditions);
+        const snapshot = await getDocs(q);
+        
+        return snapshot.docs.map(doc => ({
+          id: doc.id,
+          ...doc.data()
+        }));
+      } catch (error) {
+        console.error("Error getting equipment inspections:", error);
+        return [];
+      }
+    },
+    
+    // Get single equipment inspection
+    getEquipmentInspection: async (inspectionId) => {
+      try {
+        const docRef = doc(db, "equipment_inspections", inspectionId);
+        const docSnap = await getDoc(docRef);
+        
+        if (docSnap.exists()) {
+          return {
+            id: docSnap.id,
+            ...docSnap.data()
+          };
+        }
+        return null;
+      } catch (error) {
+        console.error("Error getting equipment inspection:", error);
+        return null;
+      }
+    },
+    
+    // Update equipment inspection
+    updateEquipmentInspection: async (inspectionId, inspectionData) => {
+      try {
+        const inspectionRef = doc(db, "equipment_inspections", inspectionId);
+        const updateData = {
+          ...inspectionData,
+          updatedAt: serverTimestamp(),
+          updatedBy: auth.currentUser?.displayName || 'Unknown',
+          updatedByEmail: auth.currentUser?.email || 'Unknown',
+          updatedByUid: auth.currentUser?.uid || 'Unknown'
+        };
+        await updateDoc(inspectionRef, updateData);
+        return true;
+      } catch (error) {
+        console.error("Error updating equipment inspection:", error);
+        return false;
+      }
+    },
+    
+    // Delete equipment inspection
+    deleteEquipmentInspection: async (inspectionId) => {
+      try {
+        // Get inspection data before deleting for audit
+        const inspectionRef = doc(db, "equipment_inspections", inspectionId);
+        const inspectionSnap = await getDoc(inspectionRef);
+        
+        if (!inspectionSnap.exists()) {
+          console.error("Equipment inspection not found for deletion:", inspectionId);
+          return false;
+        }
+        
+        const inspectionData = inspectionSnap.data();
+        
+        // Add to audit logs
+        const auditData = {
+          deletedBy: auth.currentUser?.email || 'Unknown',
+          deletedByName: auth.currentUser?.displayName || 'Unknown User',
+          deletedByUid: auth.currentUser?.uid || 'Unknown',
+          deletedAt: serverTimestamp(),
+          deletedItem: {
+            ...inspectionData,
+            id: inspectionId
+          },
+          itemType: 'equipment_inspection',
+          itemId: inspectionId,
+          station: inspectionData.station || 'Unknown'
+        };
+        
+        await addDoc(collection(db, "audit_logs"), auditData);
+        
+        // Delete the inspection
+        await deleteDoc(inspectionRef);
+        return true;
+      } catch (error) {
+        console.error("Error deleting equipment inspection:", error);
+        return false;
+      }
+    },
+
     // Get recent activity for admin dashboard
     getRecentActivity: async (maxItems = 10) => {
       try {
@@ -2429,6 +2572,11 @@ const App = () => {
               <Route path="/gar-assessment/:id" element={
                 <ProtectedRoute>
                   <GARAssessment />
+                </ProtectedRoute>
+              } />
+              <Route path="/equipment-inspection" element={
+                <ProtectedRoute>
+                  <EquipmentInspection />
                 </ProtectedRoute>
               } />
               <Route path="/admin" element={

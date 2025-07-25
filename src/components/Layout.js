@@ -129,6 +129,7 @@ const Layout = ({ children, darkMode, setDarkMode, selectedStation, setSelectedS
     if (path === '/today' && location.pathname === '/today') return true;
     if (path === '/reports' && (location.pathname === '/reports' || location.pathname.startsWith('/report/'))) return true;
     if (path === '/gar-assessment' && location.pathname === '/gar-assessment') return true;
+    if (path === '/equipment-inspection' && location.pathname === '/equipment-inspection') return true;
     if (path === '/admin' && location.pathname === '/admin') return true;
     return false;
   };
@@ -146,9 +147,11 @@ const Layout = ({ children, darkMode, setDarkMode, selectedStation, setSelectedS
             </div>
             
             <div className="hidden md:flex items-center space-x-6">
-              {/* Station selector - hidden on GAR Assessment pages, disabled on Reports/Admin pages */}
+              {/* Station selector - hidden on GAR Assessment and Equipment Inspection pages, disabled on Reports/Admin pages */}
               {(location.pathname === '/gar-assessment' || 
-                location.pathname.startsWith('/gar-assessment/')) ? null : (
+                location.pathname.startsWith('/gar-assessment/') ||
+                location.pathname === '/equipment-inspection' ||
+                location.pathname.startsWith('/equipment-inspection/')) ? null : (
                 location.pathname === '/reports' ||
                 location.pathname.startsWith('/report/') ||
                 location.pathname === '/admin' ||
@@ -272,9 +275,11 @@ const Layout = ({ children, darkMode, setDarkMode, selectedStation, setSelectedS
                 </div>
               </div>
               
-              {/* Mobile station selector - hidden on GAR Assessment pages, disabled on Reports/Admin pages */}
+              {/* Mobile station selector - hidden on GAR Assessment and Equipment Inspection pages, disabled on Reports/Admin pages */}
               {(location.pathname === '/gar-assessment' || 
-                location.pathname.startsWith('/gar-assessment/')) ? null : (
+                location.pathname.startsWith('/gar-assessment/') ||
+                location.pathname === '/equipment-inspection' ||
+                location.pathname.startsWith('/equipment-inspection/')) ? null : (
                 location.pathname === '/reports' ||
                 location.pathname.startsWith('/report/') ||
                 location.pathname === '/admin' ||
@@ -387,6 +392,19 @@ const Layout = ({ children, darkMode, setDarkMode, selectedStation, setSelectedS
                   <span>GAR Assessment</span>
                 </a>
                 
+                <a
+                  href="/equipment-inspection"
+                  onClick={() => setMenuOpen(false)}
+                  className={`flex items-center px-4 py-3 rounded-lg text-base font-medium transition-all duration-200 ${
+                    isActivePath('/equipment-inspection')
+                      ? `${darkMode ? 'bg-blue-800' : 'bg-blue-700'} text-white hover:text-white shadow-lg`
+                      : `text-white hover:text-white ${darkMode ? 'hover:bg-gray-800' : 'hover:bg-blue-700'}`
+                  }`}
+                >
+                  <Clipboard className="h-6 w-6 mr-4" />
+                  <span>Equipment Inspection</span>
+                </a>
+                
                 {isAdmin && (
                   <a
                     href="/admin"
@@ -478,6 +496,18 @@ const Layout = ({ children, darkMode, setDarkMode, selectedStation, setSelectedS
             >
               <AlertTriangle className="h-4 w-4 inline mr-1" />
               GAR Assessment
+            </a>
+            
+            <a
+              href="/equipment-inspection"
+              className={`px-3 py-2 rounded-md text-sm font-medium ${
+                isActivePath('/equipment-inspection')
+                  ? `${darkMode ? 'bg-blue-900 text-blue-200' : 'bg-blue-100 text-blue-800'}`
+                  : `${darkMode ? 'text-gray-300 hover:bg-gray-700' : 'text-gray-600 hover:bg-gray-100'}`
+              }`}
+            >
+              <Clipboard className="h-4 w-4 inline mr-1" />
+              Equipment Inspection
             </a>
             
             {isAdmin && (
