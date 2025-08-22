@@ -12,7 +12,9 @@ import Login from './components/Login';
 import Signup from './components/Signup';
 import GARAssessment from './components/GARAssessment';
 import AdminPortal from './components/AdminPortal';
-import EquipmentInspection from './components/EquipmentInspection';
+// ========== EQUIPMENT INSPECTION FEATURE - TEMPORARILY DISABLED ==========
+// TO RE-ENABLE: Uncomment the import below (Step 1 of 3)
+// import EquipmentInspection from './components/EquipmentInspection';
 import { ModalProvider } from './contexts/ModalContext';
 import './App.css';
 
@@ -2574,11 +2576,22 @@ const App = () => {
                   <GARAssessment />
                 </ProtectedRoute>
               } />
+              {/* ========== EQUIPMENT INSPECTION ROUTE - TEMPORARILY DISABLED ==========
+                 TO RE-ENABLE: 
+                 Step 2 of 3: Comment out or delete the redirect route below
+                 Step 3 of 3: Uncomment the original route that's commented below this section
+              */}
+              <Route path="/equipment-inspection" element={
+                <Navigate to="/dashboard" replace />
+              } />
+              
+              {/* ORIGINAL EQUIPMENT INSPECTION ROUTE - Uncomment this block to re-enable:
               <Route path="/equipment-inspection" element={
                 <ProtectedRoute>
                   <EquipmentInspection />
                 </ProtectedRoute>
               } />
+              */}
               <Route path="/admin" element={
                 <ProtectedRoute>
                   <AdminPortal 

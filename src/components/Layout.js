@@ -392,6 +392,8 @@ const Layout = ({ children, darkMode, setDarkMode, selectedStation, setSelectedS
                   <span>GAR Assessment</span>
                 </a>
                 
+                {/* ========== MOBILE MENU: EQUIPMENT INSPECTION LINK - DISABLED ==========
+                    TO RE-ENABLE: Uncomment the <a> tag below (Step 1 of 2 for navigation)
                 <a
                   href="/equipment-inspection"
                   onClick={() => setMenuOpen(false)}
@@ -404,6 +406,7 @@ const Layout = ({ children, darkMode, setDarkMode, selectedStation, setSelectedS
                   <Clipboard className="h-6 w-6 mr-4" />
                   <span>Equipment Inspection</span>
                 </a>
+                */}
                 
                 {isAdmin && (
                   <a
@@ -498,6 +501,8 @@ const Layout = ({ children, darkMode, setDarkMode, selectedStation, setSelectedS
               GAR Assessment
             </a>
             
+            {/* ========== DESKTOP NAV: EQUIPMENT INSPECTION LINK - DISABLED ==========
+                TO RE-ENABLE: Uncomment the <a> tag below (Step 2 of 2 for navigation)
             <a
               href="/equipment-inspection"
               className={`px-3 py-2 rounded-md text-sm font-medium ${
@@ -509,6 +514,7 @@ const Layout = ({ children, darkMode, setDarkMode, selectedStation, setSelectedS
               <Clipboard className="h-4 w-4 inline mr-1" />
               Equipment Inspection
             </a>
+            */}
             
             {isAdmin && (
               <a
