@@ -35,8 +35,8 @@ A comprehensive web application for fire departments to manage and track daily a
 
 1. Clone the repository:
    ```
-   git clone https://github.com/yourusername/firebase-firefighter-dashboard.git
-   cd firebase-firefighter-dashboard
+   git clone https://github.com/yourusername/smfd-fullboxhq.git
+   cd smfd-fullboxhq
    ```
 
 2. Install dependencies:
@@ -154,4 +154,4 @@ A comprehensive web application for fire departments to manage and track daily a
 
 ## License
 
-This project is licensed under the MIT License - see the LICENSE file for details.
+All rights reserved.
