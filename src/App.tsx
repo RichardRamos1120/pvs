@@ -1,7 +1,7 @@
 // src/App.js
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, ReactNode } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate, useNavigate, useLocation } from 'react-router-dom';
-import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, deleteUser } from 'firebase/auth';
+import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, deleteUser, User } from 'firebase/auth';
 import { initializeApp } from 'firebase/app';
 import { getFirestore, collection, getDocs, addDoc, updateDoc, doc, getDoc, query, where, orderBy, serverTimestamp, deleteDoc, setDoc, writeBatch, limit, startAfter, getCountFromServer, onSnapshot } from 'firebase/firestore';
 import Dashboard from './components/Dashboard';
@@ -49,8 +49,12 @@ const auth = getAuth(app);
 const db = getFirestore(app);
 
 // Auth Provider Component
-const AuthProvider = ({ children }) => {
-  const [currentUser, setCurrentUser] = useState(null);
+interface AuthProviderProps {
+  children: ReactNode;
+}
+
+const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
+  const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -70,9 +74,13 @@ const AuthProvider = ({ children }) => {
 };
 
 // Protected Route Component
-const ProtectedRoute = ({ children }) => {
+interface ProtectedRouteProps {
+  children: ReactNode;
+}
+
+const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children }) => {
   const location = useLocation();
-  const [currentUser, setCurrentUser] = useState(null);
+  const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -97,7 +105,7 @@ const ProtectedRoute = ({ children }) => {
 
 // Auth Redirect Component - Redirects to dashboard if logged in, login if not
 const AuthRedirect = () => {
-  const [currentUser, setCurrentUser] = useState(null);
+  const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -118,7 +126,11 @@ const AuthRedirect = () => {
 };
 
 // FirestoreContext for database operations
-export const FirestoreContext = React.createContext();
+type FirestoreOperations = {
+  [key: string]: any;
+};
+
+export const FirestoreContext = React.createContext<FirestoreOperations | null>(null);
 
 const App = () => {
   // Firebase database operations
@@ -182,7 +194,7 @@ const App = () => {
         const stationsSnapshot = await getDocs(stationsRef);
         const stationsList = stationsSnapshot.docs.map(doc => ({
           id: doc.id,
-          ...doc.data()
+          ...(doc.data() as any)
         }));
         return stationsList;
       } catch (error) {
@@ -199,7 +211,7 @@ const App = () => {
         const snapshot = await getDocs(q);
         const firefightersList = snapshot.docs.map(doc => ({
           id: doc.id,
-          ...doc.data()
+          ...(doc.data() as any)
         }));
         return firefightersList;
       } catch (error) {
@@ -230,7 +242,7 @@ const App = () => {
         const snapshot = await getDocs(q);
         const logsList = snapshot.docs.map(doc => ({
           id: doc.id,
-          ...doc.data()
+          ...(doc.data() as any)
         }));
         return logsList;
       } catch (error) {
@@ -256,7 +268,7 @@ const App = () => {
         const snapshot = await getDocs(q);
         const logsList = snapshot.docs.map(doc => ({
           id: doc.id,
-          ...doc.data()
+          ...(doc.data() as any)
         }));
         
         return logsList;
@@ -274,7 +286,7 @@ const App = () => {
         const snapshot = await getDocs(q);
         const logsList = snapshot.docs.map(doc => ({
           id: doc.id,
-          ...doc.data()
+          ...(doc.data() as any)
         }));
         return logsList;
       } catch (error) {
@@ -290,7 +302,7 @@ const App = () => {
         let baseQuery = logsRef;
 
         // Build query conditions
-        const conditions = [orderBy("rawDate", "desc")];
+        const conditions: any[] = [orderBy("rawDate", "desc")];
         
         if (stationFilter && stationFilter !== 'all') {
           conditions.unshift(where("station", "==", stationFilter));
@@ -325,7 +337,7 @@ const App = () => {
         const snapshot = await getDocs(finalQuery);
         const logsList = snapshot.docs.map(doc => ({
           id: doc.id,
-          ...doc.data()
+          ...(doc.data() as any)
         }));
 
         return {
@@ -358,7 +370,7 @@ const App = () => {
         // Try server-side filtering first, fall back to client-side if indexes are missing
         try {
           // Build query conditions
-          const conditions = [orderBy("createdAt", "desc")];
+          const conditions: any[] = [orderBy("createdAt", "desc")];
           
           if (roleFilter && roleFilter !== 'all') {
             conditions.unshift(where("role", "==", roleFilter));
@@ -399,7 +411,7 @@ const App = () => {
           const snapshot = await getDocs(finalQuery);
           const usersList = snapshot.docs.map(doc => ({
             id: doc.id,
-            ...doc.data()
+            ...(doc.data() as any)
           }));
 
 
@@ -419,7 +431,7 @@ const App = () => {
           const allUsersSnapshot = await getDocs(query(usersRef, orderBy("createdAt", "desc")));
           let allUsers = allUsersSnapshot.docs.map(doc => ({
             id: doc.id,
-            ...doc.data()
+            ...(doc.data() as any)
           }));
 
           // Apply client-side filters
@@ -471,7 +483,7 @@ const App = () => {
         const stationsRef = collection(db, "stations");
         
         // Build query conditions
-        const conditions = [orderBy("number", "asc")];
+        const conditions: any[] = [orderBy("number", "asc")];
 
         // Get total count
         const countQuery = query(stationsRef);
@@ -496,7 +508,7 @@ const App = () => {
         const snapshot = await getDocs(finalQuery);
         const stationsList = snapshot.docs.map(doc => ({
           id: doc.id,
-          ...doc.data()
+          ...(doc.data() as any)
         }));
 
         return {
@@ -539,7 +551,7 @@ const App = () => {
         // Convert to array and sort by date
         const allAssessments = snapshot.docs.map(doc => ({
           id: doc.id,
-          ...doc.data()
+          ...(doc.data() as any)
         })).sort((a, b) => {
           // Sort by rawDate if available, otherwise use date, with fallback for invalid dates
           let dateA, dateB;
@@ -574,11 +586,11 @@ const App = () => {
             dateB = new Date(0); // Very old date as fallback
           }
           
-          return dateB - dateA; // Descending order (newest first)
+          return dateB.getTime() - dateA.getTime(); // Descending order (newest first)
         });
 
         // Debug: Show unique station names in all assessments
-        const uniqueStations = [...new Set(allAssessments.map(a => a.station))];
+        const uniqueStations = Array.from(new Set(allAssessments.map(a => a.station)));
 
         const totalAssessments = allAssessments.length;
 
@@ -678,7 +690,7 @@ const App = () => {
     },
 
     // Delete a log
-    deleteLog: async (logId, userInfo = {}) => {
+    deleteLog: async (logId: string, userInfo: any = {}) => {
       try {
         // First get the log data before deleting
         const logRef = doc(db, "logs", logId);
@@ -738,7 +750,7 @@ const App = () => {
         const snapshot = await getDocs(q);
         const usersList = snapshot.docs.map(doc => ({
           id: doc.id,
-          ...doc.data()
+          ...(doc.data() as any)
         }));
         return usersList;
       } catch (error) {
@@ -758,7 +770,7 @@ const App = () => {
         
         const usersList = snapshot.docs.map(doc => ({
           id: doc.id,
-          ...doc.data()
+          ...(doc.data() as any)
         }));
         return usersList;
       } catch (error) {
@@ -778,7 +790,7 @@ const App = () => {
         
         const usersList = snapshot.docs.map(doc => ({
           id: doc.id,
-          ...doc.data()
+          ...(doc.data() as any)
         }));
         return usersList;
       } catch (error) {
@@ -794,7 +806,7 @@ const App = () => {
         const snapshot = await getDocs(usersRef);
         const usersList = snapshot.docs.map(doc => ({
           id: doc.id,
-          ...doc.data()
+          ...(doc.data() as any)
         }));
         return usersList;
       } catch (error) {
@@ -817,7 +829,7 @@ const App = () => {
           const userId = userDoc.id;
           
           let needsUpdate = false;
-          const updates = {};
+          const updates: any = {};
           
           // Ensure role field exists
           if (!userData.role) {
@@ -875,7 +887,7 @@ const App = () => {
             
           return {
             id: doc.id,
-            ...data,
+            ...(data as any),
             deletedAtFormatted: deletedAt.toLocaleString()
           };
         });
@@ -1210,7 +1222,7 @@ const App = () => {
           // Ensure we always have an ID in the assessment object
           const assessment = {
             id: assessmentSnap.id,
-            ...data
+            ...(data as any)
           };
 
           return assessment;
@@ -1230,12 +1242,12 @@ const App = () => {
         const snapshot = await getDocs(assessmentsRef);
         const assessmentsList = snapshot.docs.map(doc => ({
           id: doc.id,
-          ...doc.data()
+          ...(doc.data() as any)
         })).sort((a, b) => {
           // Sort by rawDate if available, otherwise use date
           const dateA = a.rawDate ? new Date(a.rawDate) : new Date(a.date);
           const dateB = b.rawDate ? new Date(b.rawDate) : new Date(b.date);
-          return dateB - dateA; // Descending order (newest first)
+          return dateB.getTime() - dateA.getTime(); // Descending order (newest first)
         });
         return assessmentsList;
       } catch (error) {
@@ -1267,13 +1279,13 @@ const App = () => {
           const data = doc.data();
           return {
             id: doc.id,
-            ...data
+            ...(data as any)
           };
         }).sort((a, b) => {
           // Sort by rawDate if available, otherwise use date
           const dateA = a.rawDate ? new Date(a.rawDate) : new Date(a.date);
           const dateB = b.rawDate ? new Date(b.rawDate) : new Date(b.date);
-          return dateB - dateA; // Descending order (newest first)
+          return dateB.getTime() - dateA.getTime(); // Descending order (newest first)
         });
 
         // Verify all assessments have IDs
@@ -1308,7 +1320,7 @@ const App = () => {
     },
 
     // Delete an assessment
-    deleteAssessment: async (assessmentId, userInfo = {}) => {
+    deleteAssessment: async (assessmentId: string, userInfo: any = {}) => {
       try {
         // First get the assessment data before deleting
         const assessmentRef = doc(db, "assessments", assessmentId);
@@ -1390,7 +1402,7 @@ const App = () => {
     getEquipmentInspections: async (station = null, inspectionType = null, limitCount = 50) => {
       try {
         const inspectionsRef = collection(db, "equipment_inspections");
-        let conditions = [orderBy("createdAt", "desc")];
+        let conditions: any[] = [orderBy("createdAt", "desc")];
         
         if (station && station !== 'all') {
           conditions.unshift(where("station", "==", station));
@@ -1407,7 +1419,7 @@ const App = () => {
         
         return snapshot.docs.map(doc => ({
           id: doc.id,
-          ...doc.data()
+          ...(doc.data() as any)
         }));
       } catch (error) {
         console.error("Error getting equipment inspections:", error);
@@ -1598,7 +1610,7 @@ const App = () => {
             if (data.lastLogin) {
               // Only include logins from the last 7 days to keep it relevant
               const loginDate = data.lastLogin.seconds ? new Date(data.lastLogin.seconds * 1000) : new Date(data.lastLogin);
-              const daysSinceLogin = (new Date() - loginDate) / (1000 * 60 * 60 * 24);
+              const daysSinceLogin = (new Date().getTime() - loginDate.getTime()) / (1000 * 60 * 60 * 24);
               
               
               if (daysSinceLogin <= 7) {
@@ -1623,11 +1635,11 @@ const App = () => {
             const data = doc.data();
             if (data.lastLogin) {
               const loginDate = data.lastLogin.seconds ? new Date(data.lastLogin.seconds * 1000) : new Date(data.lastLogin);
-              const daysSinceLogin = (new Date() - loginDate) / (1000 * 60 * 60 * 24);
+              const daysSinceLogin = (new Date().getTime() - loginDate.getTime()) / (1000 * 60 * 60 * 24);
               
               if (daysSinceLogin <= 7) {
                 usersWithLogin.push({
-                  ...data,
+                  ...(data as any),
                   id: doc.id,
                   loginDate: loginDate
                 });
@@ -1706,7 +1718,7 @@ const App = () => {
         const snapshot = await getDocs(usersRef);
         const users = snapshot.docs.map(doc => ({
           id: doc.id,
-          ...doc.data()
+          ...(doc.data() as any)
         }));
         return {
           success: true,
@@ -1725,7 +1737,7 @@ const App = () => {
         const snapshot = await getDocs(stationsRef);
         const stations = snapshot.docs.map(doc => ({
           id: doc.id,
-          ...doc.data()
+          ...(doc.data() as any)
         }));
         return {
           success: true,
@@ -1745,7 +1757,7 @@ const App = () => {
         const snapshot = await getDocs(q);
         const assessments = snapshot.docs.map(doc => ({
           id: doc.id,
-          ...doc.data()
+          ...(doc.data() as any)
         }));
         return {
           success: true,
@@ -1765,7 +1777,7 @@ const App = () => {
         const snapshot = await getDocs(q);
         const logs = snapshot.docs.map(doc => ({
           id: doc.id,
-          ...doc.data()
+          ...(doc.data() as any)
         }));
         return {
           success: true,
@@ -1888,7 +1900,7 @@ const App = () => {
             const snapshot = await getDocs(q);
             activities = snapshot.docs.map(doc => ({
               id: doc.id,
-              ...doc.data()
+              ...(doc.data() as any)
             }));
           } catch (indexError) {
             // Fallback: get all activities and filter client-side
@@ -1896,7 +1908,7 @@ const App = () => {
             activities = allSnapshot.docs
               .map(doc => ({
                 id: doc.id,
-                ...doc.data()
+                ...(doc.data() as any)
               }))
               .filter(activity => {
                 const activityDate = activity.timestamp?.toDate?.() || new Date(activity.timestamp);
@@ -1917,7 +1929,7 @@ const App = () => {
         const usersSnapshot = await getDocs(usersRef);
         const users = usersSnapshot.docs.map(doc => ({
           id: doc.id,
-          ...doc.data()
+          ...(doc.data() as any)
         }));
 
         // Analyze the data
@@ -1941,7 +1953,11 @@ const App = () => {
           stationActivity: {},
           
           // Daily activity trend
-          dailyActivity: {}
+          dailyActivity: {},
+
+          // Additional arrays that will be populated later
+          topUsers: [],
+          topStations: []
         };
 
         // Calculate action breakdown
@@ -1979,7 +1995,7 @@ const App = () => {
         });
 
         // Calculate station activity
-        Object.values(analytics.userActivity).forEach(userActivity => {
+        Object.values(analytics.userActivity).forEach((userActivity: any) => {
           if (userActivity.station) {
             if (!analytics.stationActivity[userActivity.station]) {
               analytics.stationActivity[userActivity.station] = {
@@ -2023,12 +2039,12 @@ const App = () => {
 
         // Convert userActivity object to sorted array
         analytics.topUsers = Object.values(analytics.userActivity)
-          .sort((a, b) => b.activityCount - a.activityCount)
+          .sort((a: any, b: any) => b.activityCount - a.activityCount)
           .slice(0, 10);
 
         // Convert stationActivity object to sorted array
         analytics.topStations = Object.values(analytics.stationActivity)
-          .sort((a, b) => b.totalActivity - a.totalActivity);
+          .sort((a: any, b: any) => b.totalActivity - a.totalActivity);
 
         return analytics;
       } catch (error) {
@@ -2095,7 +2111,7 @@ const App = () => {
     },
 
     // Get audit logs
-    getAuditLogs: async (filters = {}) => {
+    getAuditLogs: async (filters: any = {}) => {
       try {
         const auditLogsRef = collection(db, "audit_logs");
         let q = query(auditLogsRef, orderBy("deletedAt", "desc"));
@@ -2122,7 +2138,7 @@ const App = () => {
         const snapshot = await getDocs(q);
         const auditLogs = snapshot.docs.map(doc => ({
           id: doc.id,
-          ...doc.data()
+          ...(doc.data() as any)
         }));
         
         return auditLogs;
@@ -2133,12 +2149,12 @@ const App = () => {
     },
 
     // Get paginated audit logs
-    getPaginatedAuditLogs: async (page = 1, logsPerPage = 10, filters = {}) => {
+    getPaginatedAuditLogs: async (page = 1, logsPerPage = 10, filters: any = {}) => {
       try {
         const auditLogsRef = collection(db, "audit_logs");
         
         // Build query conditions
-        const conditions = [orderBy("deletedAt", "desc")];
+        const conditions: any[] = [orderBy("deletedAt", "desc")];
         
         if (filters.itemType) {
           conditions.unshift(where("itemType", "==", filters.itemType));
@@ -2175,7 +2191,7 @@ const App = () => {
         const snapshot = await getDocs(finalQuery);
         const auditLogs = snapshot.docs.map(doc => ({
           id: doc.id,
-          ...doc.data()
+          ...(doc.data() as any)
         }));
         
         return {
@@ -2228,7 +2244,7 @@ const App = () => {
         const snapshot = await getDocs(q);
         const reportsList = snapshot.docs.map(doc => ({
           id: doc.id,
-          ...doc.data()
+          ...(doc.data() as any)
         }));
         return reportsList;
       } catch (error) {
@@ -2241,7 +2257,7 @@ const App = () => {
     updateHelpReportStatus: async (reportId, status, response = '') => {
       try {
         const reportRef = doc(db, "help_reports", reportId);
-        const updateData = {
+        const updateData: any = {
           status,
           updatedAt: serverTimestamp()
         };
@@ -2290,7 +2306,7 @@ const App = () => {
         const snapshot = await getDocs(q);
         const conversationsList = snapshot.docs.map(doc => ({
           id: doc.id,
-          ...doc.data()
+          ...(doc.data() as any)
         }));
         return conversationsList;
       } catch (error) {
@@ -2307,7 +2323,7 @@ const App = () => {
         const snapshot = await getDocs(q);
         const conversationsList = snapshot.docs.map(doc => ({
           id: doc.id,
-          ...doc.data()
+          ...(doc.data() as any)
         }));
         return conversationsList;
       } catch (error) {
@@ -2348,7 +2364,7 @@ const App = () => {
         
         if (conversationSnap.exists()) {
           const currentData = conversationSnap.data();
-          const updateData = {
+          const updateData: any = {
             lastMessageAt: serverTimestamp(),
             lastMessage: messageData.message,
             updatedAt: serverTimestamp()
@@ -2391,7 +2407,7 @@ const App = () => {
         const snapshot = await getDocs(q);
         const messagesList = snapshot.docs.map(doc => ({
           id: doc.id,
-          ...doc.data()
+          ...(doc.data() as any)
         }));
         return messagesList;
       } catch (error) {
@@ -2409,7 +2425,7 @@ const App = () => {
         const unsubscribe = onSnapshot(q, (snapshot) => {
           const messagesList = snapshot.docs.map(doc => ({
             id: doc.id,
-            ...doc.data()
+            ...(doc.data() as any)
           }));
           onMessagesUpdate(messagesList);
         });
@@ -2438,7 +2454,7 @@ const App = () => {
         const unsubscribe = onSnapshot(q, (snapshot) => {
           const conversationsList = snapshot.docs.map(doc => ({
             id: doc.id,
-            ...doc.data()
+            ...(doc.data() as any)
           }));
           onConversationsUpdate(conversationsList);
         });
@@ -2468,7 +2484,7 @@ const App = () => {
         const isAdminReading = isAdmin || (conversationData.userId !== readerUserId);
         
         
-        const updateData = {};
+        const updateData: any = {};
         
         if (isUserReading) {
           // User is reading - clear user unread count and mark admin messages as read

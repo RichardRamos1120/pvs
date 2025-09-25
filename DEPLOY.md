@@ -32,9 +32,9 @@ If you're getting 404 errors when navigating to routes in the built app, it's be
 npx serve -s build --single
 ```
 
-### Solution 2: Use the included Express server (server.js)
+### Solution 2: Use the included Express server (server.ts/server.js)
 ```
-node server.js
+node server.ts (or compiled server.js)
 ```
 
 ### Solution 3: For Apache servers

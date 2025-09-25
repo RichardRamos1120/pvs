@@ -40,7 +40,7 @@ export const logAuthEvent = async (userId, event, metadata = {}) => {
       userId,
       event,
       timestamp: serverTimestamp(),
-      ip: metadata.ip || 'unknown',
+      ip: (metadata as any).ip || 'unknown',
       userAgent: navigator.userAgent,
       ...metadata
     };

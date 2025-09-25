@@ -463,7 +463,7 @@ const AdminPortal = ({ darkMode, setDarkMode, selectedStation, setSelectedStatio
       
       const now = new Date();
       const activityTime = timestamp.seconds ? new Date(timestamp.seconds * 1000) : new Date(timestamp);
-      const diffInMinutes = Math.floor((now - activityTime) / (1000 * 60));
+      const diffInMinutes = Math.floor((now.getTime() - activityTime.getTime()) / (1000 * 60));
       
       if (diffInMinutes < 1) return 'Just now';
       if (diffInMinutes < 60) return `${diffInMinutes} minutes ago`;
@@ -1747,7 +1747,7 @@ const AdminPortal = ({ darkMode, setDarkMode, selectedStation, setSelectedStatio
                       <span className={`text-sm ${darkMode ? 'text-gray-300' : 'text-gray-600'}`}>
                         {action.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase())}
                       </span>
-                      <span className={`font-medium ${darkMode ? 'text-white' : 'text-gray-900'}`}>{count}</span>
+                      <span className={`font-medium ${darkMode ? 'text-white' : 'text-gray-900'}`}>{count as number}</span>
                     </div>
                   ))
                 ) : (
@@ -1799,7 +1799,7 @@ const AdminPortal = ({ darkMode, setDarkMode, selectedStation, setSelectedStatio
                   analytics.topStations.map((station, index) => {
                     const maxActivity = Math.max(...analytics.topStations.map(s => s.totalActivity));
                     const activityPercentage = maxActivity > 0 ? (station.totalActivity / maxActivity) * 100 : 0;
-                    const engagementRate = station.userCount > 0 ? (station.totalActivity / station.userCount).toFixed(1) : 0;
+                    const engagementRate = station.userCount > 0 ? +(station.totalActivity / station.userCount).toFixed(1) : 0;
                     
                     return (
                       <div key={station.stationName} className={`p-4 rounded-lg border ${darkMode ? 'border-gray-700 bg-gray-750' : 'border-gray-200 bg-gray-50'}`}>
@@ -1915,7 +1915,7 @@ const AdminPortal = ({ darkMode, setDarkMode, selectedStation, setSelectedStatio
             <div className={`${darkMode ? 'bg-gray-800' : 'bg-white'} rounded-lg shadow p-4 md:p-6`}>
               <h3 className={`text-base md:text-lg font-semibold mb-3 md:mb-4 ${darkMode ? 'text-white' : 'text-gray-900'}`}>Daily Activity (Last 7 Days)</h3>
               <div className="space-y-2">
-                {Object.values(analytics.dailyActivity).map((day) => (
+                {Object.values(analytics.dailyActivity).map((day: any) => (
                   <div key={day.date} className="flex justify-between items-center">
                     <span className={`text-xs ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>
                       {formatDatePST(day.date, { 
@@ -1994,7 +1994,7 @@ const AdminPortal = ({ darkMode, setDarkMode, selectedStation, setSelectedStatio
         try {
           setLoading(true);
           
-          const filters = {};
+          const filters: any = {};
           if (filterType !== 'all') filters.itemType = filterType;
           if (filterStation !== 'all') filters.station = filterStation;
           
@@ -2224,7 +2224,7 @@ const AdminPortal = ({ darkMode, setDarkMode, selectedStation, setSelectedStatio
                                 <p>Type: {log.deletedItem.type}</p>
                                 {log.deletedItem.riskFactors && (
                                   <p>Risk Score: {
-                                    Object.values(log.deletedItem.riskFactors).reduce((a, b) => a + b, 0)
+                                    Object.values(log.deletedItem.riskFactors).reduce((a: any, b: any) => a + b, 0) as number
                                   }</p>
                                 )}
                               </div>
@@ -2315,7 +2315,7 @@ const AdminPortal = ({ darkMode, setDarkMode, selectedStation, setSelectedStatio
                           <p><span className="font-medium">Status:</span> {log.deletedItem.status}</p>
                           {log.deletedItem.riskFactors && (
                             <p><span className="font-medium">Risk Score:</span> {
-                              Object.values(log.deletedItem.riskFactors).reduce((a, b) => a + b, 0)
+                              Object.values(log.deletedItem.riskFactors).reduce((a: any, b: any) => a + b, 0) as number
                             }</p>
                           )}
                         </div>
@@ -2641,7 +2641,7 @@ const AdminPortal = ({ darkMode, setDarkMode, selectedStation, setSelectedStatio
                           <div className="col-span-2">
                             <span className="text-gray-500 dark:text-gray-400">Total Risk Score:</span>
                             <p className="font-bold text-lg">{
-                              Object.values(selectedDeletedItem.deletedItem.riskFactors).reduce((a, b) => a + b, 0)
+                              Object.values(selectedDeletedItem.deletedItem.riskFactors).reduce((a: any, b: any) => a + b, 0) as number
                             }</p>
                           </div>
                         </div>
@@ -2680,11 +2680,11 @@ const AdminPortal = ({ darkMode, setDarkMode, selectedStation, setSelectedStatio
                     )}
                     
                     {/* Mitigation Strategies */}
-                    {selectedDeletedItem.deletedItem.mitigations && Object.values(selectedDeletedItem.deletedItem.mitigations).some(m => m && m.trim()) && (
+                    {selectedDeletedItem.deletedItem.mitigations && Object.values(selectedDeletedItem.deletedItem.mitigations).some((m: any) => m && m.trim()) && (
                       <div>
                         <h4 className="font-semibold mb-3">Mitigation Strategies</h4>
                         <div className="space-y-2">
-                          {Object.entries(selectedDeletedItem.deletedItem.mitigations).map(([factor, mitigation]) => {
+                          {Object.entries(selectedDeletedItem.deletedItem.mitigations).map(([factor, mitigation]: [string, any]) => {
                             if (!mitigation || !mitigation.trim()) return null;
                             return (
                               <div key={factor} className={`p-3 rounded-lg ${darkMode ? 'bg-gray-750' : 'bg-gray-100'}`}>
@@ -2719,7 +2719,7 @@ const AdminPortal = ({ darkMode, setDarkMode, selectedStation, setSelectedStatio
   };
   
   // Help Chats Component - Memoized to prevent recreation
-  const HelpChats = React.memo(({ darkMode, firestoreOperations, auth, showStatusMessage, formatDateTimePST, formatDatePST }) => {
+  const HelpChats = React.memo(({ darkMode, firestoreOperations, auth, showStatusMessage, formatDateTimePST, formatDatePST }: any) => {
     // Debug: Log when component re-renders (reduced frequency)
     const [conversations, setConversations] = useState([]);
     const [selectedConversationId, setSelectedConversationId] = useState(() => 
@@ -3006,7 +3006,7 @@ const AdminPortal = ({ darkMode, setDarkMode, selectedStation, setSelectedStatio
     }, [selectedConversationId, selectedConversation?.id, selectedConversation?.adminUnreadCount]);
 
     // Memoized message component with custom comparison to prevent unnecessary re-renders
-    const MessageItem = React.memo(({ message, darkMode }) => (
+    const MessageItem = React.memo(({ message, darkMode }: any) => (
       <div
         className={`flex ${message.sender === 'admin' ? 'justify-end' : 'justify-start'}`}
       >
@@ -3074,7 +3074,7 @@ const AdminPortal = ({ darkMode, setDarkMode, selectedStation, setSelectedStatio
     });
 
     // Memoized messages list component to prevent unnecessary re-renders
-    const MessagesList = React.memo(({ messages, darkMode }) => {
+    const MessagesList = React.memo(({ messages, darkMode }: any) => {
       // Debug: Log when MessagesList re-renders (reduced frequency)
       return (
         <div className="space-y-4">

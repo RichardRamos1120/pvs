@@ -357,7 +357,7 @@ const ReportDetail = () => {
         Object.entries(hoursByCategory).forEach(([category, hours]) => {
           pdf.setFont('helvetica', 'normal');
           pdf.text(category, 15, y);
-          pdf.text(hours.toFixed(1), 120, y);
+          pdf.text((hours as number).toFixed(1), 120, y);
           y += 7; // Proper row spacing
         });
 
@@ -922,7 +922,7 @@ const ReportDetail = () => {
             <h3 className="text-lg font-semibold border-b pb-2 mb-4">Activity Summary</h3>
             
             <div className="space-y-3">
-              {Object.entries(hoursByCategory).map(([category, hours]) => (
+              {Object.entries(hoursByCategory).map(([category, hours]: [string, number]) => (
                 <div key={category} className="flex justify-between items-center p-2 bg-gray-50 dark:bg-gray-750 rounded-lg">
                   <div className="flex items-center">
                     <div className={`w-8 h-8 rounded-lg ${getActivityColor(category)} text-white flex items-center justify-center mr-2`}>
@@ -930,7 +930,7 @@ const ReportDetail = () => {
                     </div>
                     <span className="font-medium">{category}</span>
                   </div>
-                  <span className="font-medium">{hours.toFixed(1)} hrs</span>
+                  <span className="font-medium">{(hours as number).toFixed(1)} hrs</span>
                 </div>
               ))}
               

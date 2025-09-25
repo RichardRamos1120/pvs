@@ -386,7 +386,7 @@ const NotificationRecipientsSection = ({
       if (cleanedUsers.length > 0) {
         console.log("Example user data:", JSON.stringify(cleanedUsers[0]));
         const roles = cleanedUsers.map(u => u.role);
-        console.log("Roles found:", [...new Set(roles)]);
+        console.log("Roles found:", Array.from(new Set(roles)));
         
         // Log emails to help debug
         console.log("User emails:", cleanedUsers.map(u => u.email).join(", "));

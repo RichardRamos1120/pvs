@@ -178,7 +178,7 @@ export default {
 
 // Add to window for easy console access
 if (typeof window !== 'undefined') {
-  window.testEmailJS = { 
+  (window as any).testEmailJS = { 
     sendTestEmail, 
     testFromConsole,
     checkConfiguration,

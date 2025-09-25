@@ -65,7 +65,7 @@ const ReadOnlyAssessmentView = ({
         
         // Add colored score box - Fixed GAR risk level colors
         const scoreColor = score <= 3 ? [0, 128, 0] : score <= 6 ? [255, 165, 0] : [255, 0, 0];
-        pdf.setFillColor(...scoreColor);
+        (pdf as any).setFillColor(...scoreColor);
         pdf.rect(170, y - 4, 20, 6, 'F');
         pdf.setTextColor(255, 255, 255);
         pdf.setFont('helvetica', 'bold');
@@ -169,7 +169,7 @@ const ReadOnlyAssessmentView = ({
                        riskLevelInfo.level === 'MODERATE RISK' ? [255, 165, 0] : 
                        riskLevelInfo.level === 'HIGH RISK' ? [255, 0, 0] : [255, 0, 0];
       
-      pdf.setFillColor(...boxColor);
+      (pdf as any).setFillColor(...boxColor);
       pdf.rect(15, y - 8, 180, 20, 'F');
       pdf.setTextColor(255, 255, 255);
       pdf.setFont('helvetica', 'bold');
@@ -222,7 +222,7 @@ const ReadOnlyAssessmentView = ({
       Object.entries(assessment.riskFactors).forEach(([key, score]) => {
         if (key !== 'weatherConditions') {
           y = addRiskFactor(factorLabels[key], 
-            score <= 1 ? 'Good' : score <= 3 ? 'Moderate' : 'Poor', 
+            (score as number) <= 1 ? 'Good' : (score as number) <= 3 ? 'Moderate' : 'Poor', 
             score, y);
         }
       });
@@ -232,7 +232,7 @@ const ReadOnlyAssessmentView = ({
       // Mitigation Strategies
       if (assessment.mitigations) {
         const mitigations = assessment.mitigations;
-        const hasMitigations = Object.values(mitigations).some(strategy => strategy && strategy.trim());
+        const hasMitigations = Object.values(mitigations).some((strategy: any) => strategy && strategy.trim());
         
         if (hasMitigations) {
           // Check if we need a new page for mitigation strategies
@@ -240,7 +240,7 @@ const ReadOnlyAssessmentView = ({
           y = addSectionTitle('Mitigation Strategies', y);
           
           // Add each mitigation strategy if it exists
-          Object.entries(mitigations).forEach(([factor, strategy]) => {
+          Object.entries(mitigations).forEach(([factor, strategy]: [string, any]) => {
             if (strategy && strategy.trim()) {
               const factorName = factorLabels[factor] || factor;
               
@@ -393,7 +393,7 @@ const ReadOnlyAssessmentView = ({
             return (
               <div key={factor} className="flex items-center p-3 border border-gray-200 dark:border-gray-700 rounded-md">
                 <div className={`${riskColor} text-white font-bold w-12 h-12 flex items-center justify-center rounded-full mr-4`}>
-                  {value}
+                  {value as number}
                 </div>
                 <div className="flex-1">
                   <h3 className="font-medium text-gray-900 dark:text-white">
@@ -402,7 +402,7 @@ const ReadOnlyAssessmentView = ({
                   <div className="mt-1 w-full h-2 bg-gray-200 dark:bg-gray-700 rounded-full">
                     <div 
                       className={`${riskColor} h-2 rounded-full`} 
-                      style={{ width: `${(value / 10) * 100}%` }}
+                      style={{ width: `${((value as number) / 10) * 100}%` }}
                     ></div>
                   </div>
                 </div>
@@ -416,9 +416,9 @@ const ReadOnlyAssessmentView = ({
       <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6 mb-6">
         <h2 className="text-xl font-bold mb-4 text-gray-900 dark:text-white">Mitigation Strategies</h2>
         
-        {Object.entries(assessment.mitigations).some(([_, value]) => value && value.trim()) ? (
+        {Object.entries(assessment.mitigations).some(([_, value]: [string, any]) => value && value.trim()) ? (
           <div className="space-y-4">
-            {Object.entries(assessment.mitigations).map(([factor, value]) => {
+            {Object.entries(assessment.mitigations).map(([factor, value]: [string, any]) => {
               // Only show factors that have mitigation strategies
               if (!value || !value.trim()) return null;
               
@@ -432,7 +432,7 @@ const ReadOnlyAssessmentView = ({
                     {factorLabels[factor]} ({factorScore})
                   </h3>
                   <p className="text-gray-600 dark:text-gray-400 whitespace-pre-line">
-                    {value}
+                    {value as number}
                   </p>
                 </div>
               );

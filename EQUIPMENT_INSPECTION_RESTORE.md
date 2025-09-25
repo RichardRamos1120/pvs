@@ -9,7 +9,7 @@
 Follow these 3 simple steps to restore the Equipment Inspection feature:
 
 ### Step 1: Re-enable the Component Import
-**File:** `src/App.js` (Line ~15)
+**File:** `src/App.tsx` (Line ~15)
 
 Find this comment block:
 ```javascript
@@ -24,7 +24,7 @@ import EquipmentInspection from './components/EquipmentInspection';
 ```
 
 ### Step 2: Restore the Route
-**File:** `src/App.js` (Lines ~2577-2592)
+**File:** `src/App.tsx` (Lines ~2577-2592)
 
 Find this section and follow the instructions in the comments:
 1. Delete or comment out the redirect route
@@ -47,7 +47,7 @@ To:
 ```
 
 ### Step 3: Restore Navigation Links
-**File:** `src/components/Layout.js`
+**File:** `src/components/Layout.tsx`
 
 #### Mobile Menu (Line ~395)
 Find and uncomment the mobile menu link:
@@ -65,17 +65,17 @@ Find and uncomment the desktop navigation link:
 
 ## Quick Verification Checklist
 After re-enabling, verify:
-- [ ] Component import is uncommented in App.js
-- [ ] Route is using ProtectedRoute (not redirect) in App.js
-- [ ] Mobile menu link is visible in Layout.js
-- [ ] Desktop navigation link is visible in Layout.js
+- [ ] Component import is uncommented in App.tsx
+- [ ] Route is using ProtectedRoute (not redirect) in App.tsx
+- [ ] Mobile menu link is visible in Layout.tsx
+- [ ] Desktop navigation link is visible in Layout.tsx
 - [ ] `/equipment-inspection` URL loads the correct page
 - [ ] Navigation links appear in both mobile and desktop views
 
 ## Files Modified
-1. `src/App.js` - Import and Route
-2. `src/components/Layout.js` - Navigation Links
-3. `src/components/EquipmentInspection.jsx` - No changes (component intact)
+1. `src/App.tsx` - Import and Route
+2. `src/components/Layout.tsx` - Navigation Links
+3. `src/components/EquipmentInspection.tsx` - No changes (component intact)
 
 ## Notes
 - The EquipmentInspection component itself was NOT modified or deleted

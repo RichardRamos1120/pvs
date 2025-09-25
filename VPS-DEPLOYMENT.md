@@ -13,7 +13,7 @@ npm run build
 
 The build process will:
 1. Process your CSS with Tailwind
-2. Compile and minify your JavaScript
+2. Compile and minify your TypeScript/JavaScript
 3. Create a production-ready bundle in the `build` folder
 
 ## Deployment Steps
@@ -135,6 +135,6 @@ For a simpler setup, you can use the included Express server:
 
 1. Transfer the entire project (not just the build folder) to your VPS
 2. Install dependencies: `npm install`
-3. Start the server: `node server.js`
+3. Start the server: `node server.ts` (or compiled `node server.js`)
 
 This approach handles routing automatically.

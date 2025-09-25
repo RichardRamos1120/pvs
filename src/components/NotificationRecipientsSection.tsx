@@ -26,6 +26,7 @@ const NotificationRecipientsSection = ({
     if (allUsers && allUsers.length > 0) {
       // Log detail about each user for debugging
       allUsers.forEach((user, index) => {
+        console.log(`User ${index}:`, {
           id: user.id || user.uid || user.userId,
           displayName: user.displayName,
           name: user.name,

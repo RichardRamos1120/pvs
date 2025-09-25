@@ -17,7 +17,7 @@ export const enable2FA = async (phoneNumber) => {
     if (!user) throw new Error('No authenticated user');
 
     // Set up recaptcha
-    const recaptchaVerifier = new RecaptchaVerifier('recaptcha-container', {
+    const recaptchaVerifier = new (RecaptchaVerifier as any)('recaptcha-container', {
       size: 'invisible',
       callback: (response) => {
         console.log('reCAPTCHA solved');
@@ -110,7 +110,7 @@ export const has2FAEnabled = () => {
  */
 export const send2FAVerificationCode = async (resolver, factorIndex = 0) => {
   try {
-    const recaptchaVerifier = new RecaptchaVerifier('recaptcha-container', {
+    const recaptchaVerifier = new (RecaptchaVerifier as any)('recaptcha-container', {
       size: 'invisible'
     }, auth);
 

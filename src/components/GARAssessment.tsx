@@ -691,7 +691,7 @@ const GARAssessment = () => {
     if (formRefs.current.station) formRefs.current.station.value = assessmentData.station || '';
     
     // Sync weather fields
-    const weather = assessmentData.weather || {};
+    const weather: any = assessmentData.weather || {};
     if (formRefs.current.temperature) formRefs.current.temperature.value = weather.temperature || '';
     if (formRefs.current.temperatureUnit) formRefs.current.temperatureUnit.value = weather.temperatureUnit || '°F';
     if (formRefs.current.wind) formRefs.current.wind.value = weather.wind || '';
@@ -782,7 +782,7 @@ const GARAssessment = () => {
           await firestoreOperations.updateAssessment(currentAssessmentId, updatedAssessment);
         } else {
           // First time saving this assessment
-          let assessmentToSave = { ...assessmentData };
+          let assessmentToSave: any = { ...assessmentData };
 
           // Add local data based on current step
           if (currentStep === 1) {
@@ -864,7 +864,7 @@ const GARAssessment = () => {
           await firestoreOperations.updateAssessment(currentAssessmentId, updatedAssessment);
         } else {
           // First time saving this assessment
-          let assessmentToSave = { ...assessmentData };
+          let assessmentToSave: any = { ...assessmentData };
 
           // Add local data based on current step
           if (currentStep === 1) {
@@ -1384,7 +1384,7 @@ const GARAssessment = () => {
     if (riskFilter !== 'all') {
       filtered = filtered.filter(assessment => {
         const riskFactorValues = Object.values(assessment.riskFactors || {});
-        const totalScore = riskFactorValues.reduce((acc, val) => acc + val, 0);
+        const totalScore = riskFactorValues.reduce((acc: number, val: any) => acc + val, 0);
         const riskLevel = getRiskLevel(totalScore);
         
         if (riskFilter === 'green') return riskLevel.level === 'LOW RISK';
@@ -1500,7 +1500,7 @@ const GARAssessment = () => {
           <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Date</label>
           <div className="relative">
             <input
-              ref={(el) => formRefs.current.date = el}
+              ref={(el) => { formRefs.current.date = el; }}
               type="date"
               className="w-full p-2 border border-gray-300 dark:border-gray-600 rounded-md pl-10 bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
               defaultValue={initialFormData.current.date}
@@ -1513,7 +1513,7 @@ const GARAssessment = () => {
           <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Time</label>
           <div className="relative">
             <input
-              ref={(el) => formRefs.current.time = el}
+              ref={(el) => { formRefs.current.time = el; }}
               type="time"
               className="w-full p-2 border border-gray-300 dark:border-gray-600 rounded-md pl-10 bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
               defaultValue={initialFormData.current.time}
@@ -1528,7 +1528,7 @@ const GARAssessment = () => {
         <div>
           <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Assessment Type</label>
           <select
-            ref={(el) => formRefs.current.type = el}
+            ref={(el) => { formRefs.current.type = el; }}
             className="w-full p-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
             defaultValue={initialFormData.current.type}
             onChange={(e) => handleInputChange('type', e.target.value)}
@@ -1548,7 +1548,7 @@ const GARAssessment = () => {
           ) : (
             // Stations found in database - show dropdown with database stations
             <select
-              ref={(el) => formRefs.current.station = el}
+              ref={(el) => { formRefs.current.station = el; }}
               className="w-full p-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
               defaultValue={initialFormData.current.station}
               onChange={(e) => handleInputChange('station', e.target.value)}
@@ -1598,7 +1598,7 @@ const GARAssessment = () => {
           )}
           
           {/* Professional Weather Data Attribution */}
-          {assessmentData.weather?.weatherDataSource && (
+          {(assessmentData.weather as any)?.weatherDataSource && (
             <div className="mb-4 p-3 bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-900/20 dark:to-indigo-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
               <div className="flex items-start gap-3">
                 <div className="flex-shrink-0">
@@ -1613,15 +1613,15 @@ const GARAssessment = () => {
                   <div className="text-xs text-blue-800 dark:text-blue-200 space-y-1">
                     <div className="flex flex-wrap items-center gap-4">
                       <span>
-                        <strong>Primary Source:</strong> {assessmentData.weather.weatherDataSource === 'NOAA' ? 'National Oceanic and Atmospheric Administration (NOAA)' : assessmentData.weather.weatherDataSource}
+                        <strong>Primary Source:</strong> {(assessmentData.weather as any).weatherDataSource === 'NOAA' ? 'National Oceanic and Atmospheric Administration (NOAA)' : (assessmentData.weather as any).weatherDataSource}
                       </span>
                       <span>
-                        <strong>Data Provider:</strong> {assessmentData.weather.apiSource}
+                        <strong>Data Provider:</strong> {(assessmentData.weather as any).apiSource}
                       </span>
                     </div>
                     <div className="flex flex-wrap items-center gap-4">
                       <span>
-                        <strong>Last Updated:</strong> {assessmentData.weather.lastUpdatedPST}
+                        <strong>Last Updated:</strong> {(assessmentData.weather as any).lastUpdatedPST}
                       </span>
                       <span className="inline-flex items-center px-2 py-1 rounded-full text-xs bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-200">
                         <svg className="w-3 h-3 mr-1" fill="currentColor" viewBox="0 0 20 20">
@@ -1643,7 +1643,7 @@ const GARAssessment = () => {
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Temperature</label>
               <div className="flex">
                 <input
-                  ref={(el) => formRefs.current.temperature = el}
+                  ref={(el) => { formRefs.current.temperature = el; }}
                   type="text"
                   disabled={weatherLoading}
                   className={`w-full p-2 border border-gray-300 dark:border-gray-600 rounded-l-md text-gray-900 dark:text-white ${
@@ -1658,7 +1658,7 @@ const GARAssessment = () => {
                   onBlur={() => console.log('❌ Temperature input LOST FOCUS')}
                 />
                 <select
-                  ref={(el) => formRefs.current.temperatureUnit = el}
+                  ref={(el) => { formRefs.current.temperatureUnit = el; }}
                   disabled={weatherLoading}
                   className={`p-2 border border-gray-300 dark:border-gray-600 border-l-0 rounded-r-md text-gray-900 dark:text-white ${
                     weatherLoading 
@@ -1678,7 +1678,7 @@ const GARAssessment = () => {
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Wind Speed (mph)</label>
               <div className="flex">
                 <input
-                  ref={(el) => formRefs.current.wind = el}
+                  ref={(el) => { formRefs.current.wind = el; }}
                   type="text"
                   disabled={weatherLoading}
                   className={`w-full p-2 border border-gray-300 dark:border-gray-600 rounded-l-md text-gray-900 dark:text-white ${
@@ -1691,7 +1691,7 @@ const GARAssessment = () => {
                   onChange={(e) => handleInputChange('wind', e.target.value)}
                 />
                 <select
-                  ref={(el) => formRefs.current.windDirection = el}
+                  ref={(el) => { formRefs.current.windDirection = el; }}
                   disabled={weatherLoading}
                   className={`p-2 border border-gray-300 dark:border-gray-600 border-l-0 rounded-r-md text-gray-900 dark:text-white w-20 ${
                     weatherLoading 
@@ -1724,7 +1724,7 @@ const GARAssessment = () => {
             <div>
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Humidity (%)</label>
               <input
-                ref={(el) => formRefs.current.humidity = el}
+                ref={(el) => { formRefs.current.humidity = el; }}
                 type="text"
                 disabled={weatherLoading}
                 className={`w-full p-2 border border-gray-300 dark:border-gray-600 rounded-md text-gray-900 dark:text-white ${
@@ -1741,7 +1741,7 @@ const GARAssessment = () => {
             <div>
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Precipitation Condition</label>
               <input
-                ref={(el) => formRefs.current.precipitation = el}
+                ref={(el) => { formRefs.current.precipitation = el; }}
                 type="text"
                 disabled={weatherLoading}
                 className={`w-full p-2 border border-gray-300 dark:border-gray-600 rounded-md text-gray-900 dark:text-white ${
@@ -1758,7 +1758,7 @@ const GARAssessment = () => {
             <div>
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Precipitation Rate (in/hr)</label>
               <input
-                ref={(el) => formRefs.current.precipitationRate = el}
+                ref={(el) => { formRefs.current.precipitationRate = el; }}
                 type="text"
                 disabled={weatherLoading}
                 className={`w-full p-2 border border-gray-300 dark:border-gray-600 rounded-md text-gray-900 dark:text-white ${
@@ -1775,7 +1775,7 @@ const GARAssessment = () => {
             <div>
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Wave Height (ft)</label>
               <input
-                ref={(el) => formRefs.current.waveHeight = el}
+                ref={(el) => { formRefs.current.waveHeight = el; }}
                 type="text"
                 disabled={weatherLoading}
                 className={`w-full p-2 border border-gray-300 dark:border-gray-600 rounded-md text-gray-900 dark:text-white ${
@@ -1792,7 +1792,7 @@ const GARAssessment = () => {
             <div>
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Wave Period (sec)</label>
               <input
-                ref={(el) => formRefs.current.wavePeriod = el}
+                ref={(el) => { formRefs.current.wavePeriod = el; }}
                 type="text"
                 disabled={weatherLoading}
                 className={`w-full p-2 border border-gray-300 dark:border-gray-600 rounded-md text-gray-900 dark:text-white ${
@@ -1809,7 +1809,7 @@ const GARAssessment = () => {
             <div>
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Wave Direction</label>
               <select
-                ref={(el) => formRefs.current.waveDirection = el}
+                ref={(el) => { formRefs.current.waveDirection = el; }}
                 disabled={weatherLoading}
                 className={`w-full p-2 border border-gray-300 dark:border-gray-600 rounded-md text-gray-900 dark:text-white ${
                   weatherLoading 
@@ -1842,7 +1842,7 @@ const GARAssessment = () => {
           <div className="mt-4">
             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Weather Alerts</label>
             <input
-              ref={(el) => formRefs.current.alerts = el}
+              ref={(el) => { formRefs.current.alerts = el; }}
               type="text"
               className="w-full p-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
               placeholder=""
@@ -2033,9 +2033,9 @@ const GARAssessment = () => {
                     </div>
 
                     <textarea
-                      ref={(el) => mitigationRefs.current[factor] = el}
+                      ref={(el) => { mitigationRefs.current[factor] = el; }}
                       className="w-full p-3 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
-                      rows="3"
+                      rows={3}
                       placeholder={`Describe mitigation strategies for ${factorLabels[factor]}...`}
                       defaultValue=""
                       onChange={(e) => handleMitigationChange(factor, e.target.value)}
@@ -2127,25 +2127,25 @@ const GARAssessment = () => {
             <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-md p-4">
               <div className="grid grid-cols-2 gap-2">
                 <div className="text-gray-600 dark:text-gray-400">Temperature:</div>
-                <div className="text-gray-900 dark:text-white">{assessmentData.weather.temperature}{assessmentData.weather.temperatureUnit}</div>
+                <div className="text-gray-900 dark:text-white">{(assessmentData.weather as any).temperature}{(assessmentData.weather as any).temperatureUnit}</div>
                 
                 <div className="text-gray-600 dark:text-gray-400">Wind:</div>
-                <div className="text-gray-900 dark:text-white">{assessmentData.weather.wind} mph {assessmentData.weather.windDirection}</div>
+                <div className="text-gray-900 dark:text-white">{(assessmentData.weather as any).wind} mph {(assessmentData.weather as any).windDirection}</div>
                 
                 <div className="text-gray-600 dark:text-gray-400">Humidity:</div>
-                <div className="text-gray-900 dark:text-white">{assessmentData.weather.humidity}%</div>
+                <div className="text-gray-900 dark:text-white">{(assessmentData.weather as any).humidity}%</div>
                 
                 <div className="text-gray-600 dark:text-gray-400">Precipitation:</div>
-                <div className="text-gray-900 dark:text-white">{assessmentData.weather.precipitation} ({assessmentData.weather.precipitationRate}"/hr)</div>
+                <div className="text-gray-900 dark:text-white">{(assessmentData.weather as any).precipitation} ({(assessmentData.weather as any).precipitationRate}"/hr)</div>
                 
                 <div className="text-gray-600 dark:text-gray-400">Wave Height:</div>
-                <div className="text-gray-900 dark:text-white">{assessmentData.weather.waveHeight} ft</div>
+                <div className="text-gray-900 dark:text-white">{(assessmentData.weather as any).waveHeight} ft</div>
                 
                 <div className="text-gray-600 dark:text-gray-400">Wave Period:</div>
-                <div className="text-gray-900 dark:text-white">{assessmentData.weather.wavePeriod} sec {assessmentData.weather.waveDirection}</div>
+                <div className="text-gray-900 dark:text-white">{(assessmentData.weather as any).wavePeriod} sec {(assessmentData.weather as any).waveDirection}</div>
                 
                 <div className="text-gray-600 dark:text-gray-400">Alerts:</div>
-                <div className="text-amber-600 dark:text-amber-400">{assessmentData.weather.alerts}</div>
+                <div className="text-amber-600 dark:text-amber-400">{(assessmentData.weather as any).alerts}</div>
               </div>
             </div>
           </div>
@@ -2448,8 +2448,8 @@ const GARAssessment = () => {
                 title="High Risk Assessments"
                 value={pastAssessments.filter(a => {
                   const riskFactorValues = Object.values(a.riskFactors || {});
-                  const sum = riskFactorValues.reduce((acc, val) => acc + val, 0);
-                  return sum >= 45;
+                  const sum = riskFactorValues.reduce((acc: number, val: number) => acc + val, 0);
+                  return (sum as number) >= 45;
                 }).length.toString()}
               />
             </div>
@@ -2524,7 +2524,7 @@ const GARAssessment = () => {
                   {getPaginatedAssessments.map(assessment => {
                   // Debug the assessment structure
                   
-                  const assessmentScore = Object.values(assessment.riskFactors || {}).reduce((acc, val) => acc + val, 0);
+                  const assessmentScore = Object.values(assessment.riskFactors || {}).reduce((acc: number, val: number) => acc + val, 0);
                   const assessmentRisk = getRiskLevel(assessmentScore);
                   
                   return (
@@ -2547,7 +2547,7 @@ const GARAssessment = () => {
                           </div>
                           <p className="text-sm text-gray-500 dark:text-gray-400 mt-1 leading-relaxed">
                             <span className="block sm:inline">{assessment.date || "No date"}</span>
-                            <span className="block sm:inline sm:ml-2">Score: {assessmentScore} ({assessmentRisk.level})</span>
+                            <span className="block sm:inline sm:ml-2">Score: {assessmentScore as number} ({assessmentRisk.level})</span>
                           </p>
                         </div>
                       </div>

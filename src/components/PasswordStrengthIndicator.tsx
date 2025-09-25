@@ -5,7 +5,7 @@ const PasswordStrengthIndicator = ({ password, showRequirements = true }) => {
   const validation = validatePassword(password);
   
   const getStrengthColor = () => {
-    switch (validation.strength) {
+    switch ((validation as any).strength) {
       case 'weak':
         return 'bg-red-500';
       case 'medium':
@@ -29,12 +29,12 @@ const PasswordStrengthIndicator = ({ password, showRequirements = true }) => {
           <div className="flex justify-between items-center mb-1">
             <span className="text-xs text-gray-600">Password strength</span>
             <span className={`text-xs font-medium ${
-              validation.strength === 'weak' ? 'text-red-600' :
-              validation.strength === 'medium' ? 'text-yellow-600' :
-              validation.strength === 'strong' ? 'text-green-600' :
+              (validation as any).strength === 'weak' ? 'text-red-600' :
+              (validation as any).strength === 'medium' ? 'text-yellow-600' :
+              (validation as any).strength === 'strong' ? 'text-green-600' :
               'text-gray-600'
             }`}>
-              {validation.strength ? validation.strength.charAt(0).toUpperCase() + validation.strength.slice(1) : ''}
+              {(validation as any).strength ? (validation as any).strength.charAt(0).toUpperCase() + (validation as any).strength.slice(1) : ''}
             </span>
           </div>
           

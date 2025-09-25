@@ -40,8 +40,8 @@ To fix the "Account not found" error, follow these steps to properly configure y
 
 Open the following files and update the EmailJS configuration with your new credentials:
 
-1. `/mnt/c/Users/RamRi/Documents/webdev/pvs-v1/src/utils/emailService.js`
-2. `/mnt/c/Users/RamRi/Documents/webdev/pvs-v1/src/utils/testEmailSender.js`
+1. `/mnt/c/Users/RamRi/Documents/webdev/pvs-v1/src/utils/emailService.ts`
+2. `/mnt/c/Users/RamRi/Documents/webdev/pvs-v1/src/utils/testEmailSender.ts`
 
 Update these lines in both files:
 

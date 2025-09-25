@@ -40,12 +40,12 @@ npx serve -s build
 
 If you want to switch back to BrowserRouter:
 
-1. In App.js, change:
-   ```javascript
+1. In App.tsx, change:
+   ```typescript
    import { HashRouter as Router, ... } from 'react-router-dom';
    ```
    Back to:
-   ```javascript
+   ```typescript
    import { BrowserRouter as Router, ... } from 'react-router-dom';
    ```
 

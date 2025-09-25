@@ -52,7 +52,7 @@ The application now supports email notifications for GAR assessments. When you c
 
 ### Email Template
 
-The email template is defined in the `index.js` file in the functions directory. You can customize the HTML template to match your department's branding or to include additional information.
+The email template is defined in the `index.ts` (or `index.js`) file in the functions directory. You can customize the HTML template to match your department's branding or to include additional information.
 
 ### Risk Level Colors
 

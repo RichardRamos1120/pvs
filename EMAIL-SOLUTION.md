@@ -15,7 +15,7 @@ It appears that while we've set up the code correctly, there might be an issue w
 
 ## Temporary Solution
 
-I've modified the `emailService.js` file to:
+I've modified the `emailService.ts` file to:
 
 1. Acknowledge the EmailJS account issue
 2. Simulate email sending (for now)
@@ -35,7 +35,7 @@ To properly set up EmailJS:
 5. Get your correct public key from the account settings
 
 Then update the code with the correct values:
-```javascript
+```typescript
 const SERVICE_ID = 'your_correct_service_id';
 const TEMPLATE_ID = 'your_template_id';
 const USER_ID = 'your_public_key';
@@ -46,7 +46,7 @@ const USER_ID = 'your_public_key';
 For a more robust solution, implement emails on the server side:
 
 1. Create a Firebase Cloud Function (requires Blaze plan)
-```javascript
+```typescript
 exports.sendEmail = functions.https.onCall(async (data, context) => {
   // Send email using nodemailer with your MailerSend credentials
 });

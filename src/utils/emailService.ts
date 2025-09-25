@@ -285,8 +285,8 @@ export const sendAssessmentNotifications = async (assessmentData, recipients, as
           weather_alerts: assessmentData.weather?.alerts || 'None',
           
           // Mitigation info
-          has_mitigations: Object.values(assessmentData.mitigations || {}).some(m => m && m.trim()),
-          mitigation_count: Object.values(assessmentData.mitigations || {}).filter(m => m && m.trim()).length
+          has_mitigations: Object.values(assessmentData.mitigations || {}).some((m: any) => m && m.trim()),
+          mitigation_count: Object.values(assessmentData.mitigations || {}).filter((m: any) => m && m.trim()).length
         };
         
         console.log(`[DEBUG] Sending email to ${recipient.email}`);

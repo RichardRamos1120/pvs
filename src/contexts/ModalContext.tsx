@@ -1,6 +1,14 @@
-import React, { createContext, useContext, useState } from 'react';
+import React, { createContext, useContext, useState, ReactNode } from 'react';
 
-const ModalContext = createContext();
+type ModalContextType = {
+  openModals: Set<string>;
+  registerModal: (modalId: string) => void;
+  unregisterModal: (modalId: string) => void;
+  hasOpenModals: boolean;
+  openModalsCount: number;
+};
+
+const ModalContext = createContext<ModalContextType | undefined>(undefined);
 
 export const useModal = () => {
   const context = useContext(ModalContext);
@@ -10,14 +18,14 @@ export const useModal = () => {
   return context;
 };
 
-export const ModalProvider = ({ children }) => {
-  const [openModals, setOpenModals] = useState(new Set());
+export const ModalProvider = ({ children }: { children: ReactNode }) => {
+  const [openModals, setOpenModals] = useState(new Set<string>());
 
-  const registerModal = (modalId) => {
+  const registerModal = (modalId: string) => {
     setOpenModals(prev => new Set([...prev, modalId]));
   };
 
-  const unregisterModal = (modalId) => {
+  const unregisterModal = (modalId: string) => {
     setOpenModals(prev => {
       const newSet = new Set(prev);
       newSet.delete(modalId);
@@ -29,6 +37,7 @@ export const ModalProvider = ({ children }) => {
 
   return (
     <ModalContext.Provider value={{
+      openModals,
       registerModal,
       unregisterModal,
       hasOpenModals,

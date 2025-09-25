@@ -8,14 +8,14 @@ export const downloadCSV = (data, filename) => {
   }
 
   // Get all unique keys from all objects
-  const headers = [...new Set(data.flatMap(obj => Object.keys(obj)))];
+  const headers = Array.from(new Set(data.flatMap(obj => Object.keys(obj))));
 
   // Convert data to CSV format
   const csvContent = [
     headers.join(','), // Header row
     ...data.map(row => 
       headers.map(header => {
-        const value = row[header];
+        const value = (row as any)[header as string];
         // Handle nested objects, arrays, and special characters
         if (value === null || value === undefined) {
           return '';

@@ -107,11 +107,11 @@ export const validatePassword = (password) => {
   
   // Set strength level
   if (result.score <= 2) {
-    result.strength = 'weak';
+    (result as any).strength = 'weak';
   } else if (result.score <= 3) {
-    result.strength = 'medium';
+    (result as any).strength = 'medium';
   } else {
-    result.strength = 'strong';
+    (result as any).strength = 'strong';
   }
   
   // Password is valid if it meets minimum requirements

@@ -226,8 +226,8 @@ const HelpChat = ({ darkMode }) => {
         .filter(optimisticMsg => {
           // Remove optimistic message if real message with same content exists
           return !realMessages.some(realMsg => 
-            realMsg.message === optimisticMsg.message && 
-            realMsg.senderId === optimisticMsg.senderId
+            (realMsg as any).message === (optimisticMsg as any).message && 
+            (realMsg as any).senderId === (optimisticMsg as any).senderId
           );
         });
 
@@ -246,7 +246,7 @@ const HelpChat = ({ darkMode }) => {
   }, []);
 
   // Memoized message component to prevent unnecessary re-renders
-  const MessageItem = React.memo(({ message, darkMode }) => (
+  const MessageItem = React.memo(({ message, darkMode }: any) => (
     <div
       className={`flex ${message.sender === 'user' ? 'justify-end' : 'justify-start'}`}
     >

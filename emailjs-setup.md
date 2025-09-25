@@ -59,7 +59,7 @@ To test the new email template:
 1. Make sure your EmailJS template is set up with the variables listed above
 2. Open your application in the browser
 3. From the browser console, run:
-   ```javascript
+   ```typescript
    testEmailJS.testFromConsole()
    ```
 4. Enter your email address and name when prompted

@@ -26,7 +26,7 @@ import {
   Eye,
   Save
 } from 'lucide-react';
-import NewActivityModal from './NewActivityModal.jsx';
+import NewActivityModal from './NewActivityModal';
 
 const TodayLog = () => {
   // Initialize darkMode from localStorage with default to true (dark mode)

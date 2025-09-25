@@ -137,7 +137,7 @@ export const formatTimePST = (date, options = {}) => {
     ...options
   };
   
-  return pstDate.toLocaleTimeString('en-US', defaultOptions);
+  return pstDate.toLocaleTimeString('en-US', defaultOptions as any);
 };
 
 /**

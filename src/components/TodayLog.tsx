@@ -28,7 +28,7 @@ import {
   Save,
   AlertTriangle
 } from 'lucide-react';
-import NewActivityModal from './NewActivityModal.jsx';
+import NewActivityModal from './NewActivityModal';
 
 const TodayLog = () => {
   // First get the React Router hooks to have access to location
@@ -52,7 +52,7 @@ const TodayLog = () => {
     // For completed logs, check 72-hour window
     const logDate = new Date(log.rawDate);
     const now = new Date();
-    const hoursSinceLog = (now - logDate) / (1000 * 60 * 60);
+    const hoursSinceLog = (now.getTime() - logDate.getTime()) / (1000 * 60 * 60);
     
     return hoursSinceLog <= 72;
   };

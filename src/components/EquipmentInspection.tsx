@@ -1018,7 +1018,7 @@ const EquipmentInspection = () => {
       }
 
       // Footer
-      const pageCount = pdf.internal.getNumberOfPages();
+      const pageCount = (pdf as any).internal.getNumberOfPages();
       for (let i = 1; i <= pageCount; i++) {
         pdf.setPage(i);
         pdf.setFont('helvetica', 'normal');
